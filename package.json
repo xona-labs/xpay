@@ -1,0 +1,70 @@
+{
+  "name": "@xona-labs/xpay",
+  "version": "0.1.0",
+  "description": "Discovery and usage layer for agentic commerce — multi-network wallet, x402 payments, 20k+ services via PayAI and other catalogs",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "xpay": "dist/cli/index.js",
+    "xpay-mcp": "dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "dev": "tsx src/cli/index.ts",
+    "demo": "tsx examples/discover-and-pay.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xona-labs/xpay"
+  },
+  "homepage": "https://xpay.xona.xyz",
+  "keywords": [
+    "x402",
+    "agentic-commerce",
+    "payai",
+    "solana",
+    "base",
+    "ai-agent",
+    "mcp",
+    "xona",
+    "discovery",
+    "wallet",
+    "usdc"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.95.0",
+    "bip39": "^3.1.0",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "ed25519-hd-key": "^2.0.0",
+    "ethers": "^6.16.0",
+    "inquirer": "^13.4.3",
+    "tweetnacl": "^1.0.3",
+    "zod": "^3.23.0"
+  },
+  "peerDependencies": {
+    "@privy-io/react-auth": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@privy-io/react-auth": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.9",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

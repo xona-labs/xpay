@@ -1,0 +1,242 @@
+/**
+ * Use — call a paid resource, handling x402 payment end-to-end.
+ *
+ * Two modes:
+ *  - **Catalog mode** (`resource` has `accepts[]`): we pick a requirement up
+ *    front, run guardrail, pay, then call with the X-Payment header.
+ *  - **Live challenge mode** (`resource.accepts` empty *or* `useByUrl()`): we
+ *    call the URL first, expect a `402` with a body listing accepted payment
+ *    options, then settle and retry. This is the canonical x402 v2 flow and
+ *    lets agents pay resources they discovered *outside* of any catalog.
+ *
+ * Both paths converge on the same {@link UseResult}.
+ */
+
+import {
+  ResourceSchema,
+  type PaymentRequirement,
+  type Resource,
+  type UseResult,
+} from "../types.js";
+import type { Wallet } from "../wallet/index.js";
+import type { Guardrail } from "../guardrail/index.js";
+
+export interface UseArgs {
+  resource: Resource;
+  wallet: Wallet;
+  guardrail: Guardrail;
+  body?: unknown;
+  headers?: Record<string, string>;
+}
+
+export async function use(args: UseArgs): Promise<UseResult> {
+  // If we have accepts up front, take the fast path.
+  if (args.resource.accepts.length > 0) {
+    return useWithRequirements(args, args.resource.accepts);
+  }
+  // Otherwise probe the resource for a 402 challenge.
+  return useWithLiveChallenge(args);
+}
+
+/**
+ * Convenience: call any URL with x402 support. Agents can use this when they
+ * have a URL but no catalog entry — e.g. crawled from the web.
+ */
+export interface UseByUrlArgs {
+  url: string;
+  method?: string;
+  wallet: Wallet;
+  guardrail: Guardrail;
+  body?: unknown;
+  headers?: Record<string, string>;
+}
+
+export async function useByUrl(args: UseByUrlArgs): Promise<UseResult> {
+  const resource: Resource = {
+    resource: args.url,
+    type: "http",
+    method: args.method ?? "GET",
+    accepts: [],
+  };
+  return useWithLiveChallenge({
+    resource,
+    wallet: args.wallet,
+    guardrail: args.guardrail,
+    body: args.body,
+    headers: args.headers,
+  });
+}
+
+async function useWithRequirements(
+  args: UseArgs,
+  reqs: PaymentRequirement[],
+): Promise<UseResult> {
+  const req = args.wallet.pickRequirement(reqs);
+  if (!req) {
+    throw new Error(
+      `xpay.use: no compatible payment option. Resource accepts: ${reqs.map((a) => a.network).join(", ")}`,
+    );
+  }
+
+  // Guardrail runs *before* signing — this is the security boundary.
+  await args.guardrail.check({ resource: args.resource, requirement: req });
+
+  const network = normalizeNetwork(req.network);
+  const signer = args.wallet.signer(network);
+  const txSig = await signer.pay(req);
+
+  const res = await callResource(args, paymentHeader(req, txSig, args.resource.x402Version ?? 1));
+  return finalize(res, network, req.amount ?? "0", txSig);
+}
+
+async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
+  // Step 1: probe without payment.
+  const probe = await callResource(args, undefined);
+  if (probe.res.status !== 402) {
+    // No payment required — return the probe response as-is. (Useful when a
+    // resource later becomes free or for sanity checks.)
+    return finalize(probe, "unknown", "0");
+  }
+
+  // Step 2: parse the 402 body. x402 v2 returns a body shaped like a Resource
+  // (`{ accepts: [...] }`); we accept either that or a bare PaymentRequirement[].
+  const reqs = parseChallenge(probe.data);
+  if (reqs.length === 0) {
+    throw new Error(
+      `xpay.use: ${args.resource.resource} returned 402 but no parseable accepts[] payload`,
+    );
+  }
+
+  const req = args.wallet.pickRequirement(reqs);
+  if (!req) {
+    throw new Error(
+      `xpay.use: ${args.resource.resource} accepts ${reqs.map((r) => r.network).join(", ")} but wallet has no matching signer`,
+    );
+  }
+
+  await args.guardrail.check({ resource: args.resource, requirement: req });
+  const network = normalizeNetwork(req.network);
+  const signer = args.wallet.signer(network);
+  const txSig = await signer.pay(req);
+
+  // Step 3: retry with X-Payment.
+  const res = await callResource(args, paymentHeader(req, txSig, 2));
+  return finalize(res, network, req.amount ?? "0", txSig);
+}
+
+interface RawResponse {
+  res: Response;
+  data: unknown;
+}
+
+async function callResource(
+  args: UseArgs,
+  paymentHeader: string | undefined,
+): Promise<RawResponse> {
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    ...args.headers,
+  };
+  if (paymentHeader) headers["x-payment"] = paymentHeader;
+
+  let body: BodyInit | undefined;
+  if (args.body !== undefined && args.resource.method !== "GET") {
+    headers["content-type"] = "application/json";
+    body = JSON.stringify(args.body);
+  }
+
+  const res = await fetch(args.resource.resource, {
+    method: args.resource.method,
+    headers,
+    body,
+  });
+  const text = await res.text();
+  let data: unknown = text;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    /* keep as string */
+  }
+  return { res, data };
+}
+
+function finalize(
+  raw: RawResponse,
+  network: string,
+  amountPaid: string,
+  txSig?: string,
+): UseResult {
+  if (!raw.res.ok) {
+    throw new Error(
+      `xpay.use: ${raw.res.status} ${raw.res.statusText} — ${
+        typeof raw.data === "string" ? raw.data : JSON.stringify(raw.data)
+      }`,
+    );
+  }
+  return {
+    data: raw.data,
+    status: raw.res.status,
+    network,
+    amountPaid,
+    txSig,
+  };
+}
+
+/**
+ * x402 `X-Payment` header.
+ *
+ * Format is a base64-encoded JSON blob with the settlement details. Each
+ * facilitator validates differently, but the common subset (txSig, payTo,
+ * asset, amount, network) is what's encoded here.
+ */
+function paymentHeader(
+  req: PaymentRequirement,
+  txSig: string,
+  x402Version: number,
+): string {
+  const payload = {
+    scheme: req.scheme,
+    network: req.network,
+    payTo: req.payTo,
+    asset: req.asset,
+    amount: req.amount ?? "0",
+    txSig,
+    x402Version,
+  };
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+}
+
+/**
+ * Parse a 402 response body into PaymentRequirement[].
+ * Accepts either the v2 envelope (`{ accepts: [...] }` matching Resource) or a
+ * bare array (some facilitators ship this).
+ */
+function parseChallenge(data: unknown): PaymentRequirement[] {
+  if (Array.isArray(data)) {
+    const parsed = ResourceSchema.safeParse({
+      resource: "",
+      type: "http",
+      method: "GET",
+      accepts: data,
+    });
+    return parsed.success ? parsed.data.accepts : [];
+  }
+  if (data && typeof data === "object") {
+    const parsed = ResourceSchema.safeParse({
+      resource: "",
+      type: "http",
+      method: "GET",
+      ...data,
+    });
+    if (parsed.success) return parsed.data.accepts;
+  }
+  return [];
+}
+
+function normalizeNetwork(raw: string): string {
+  if (raw === "eip155:8453") return "base";
+  if (raw === "eip155:1") return "ethereum";
+  if (raw === "eip155:42161") return "arbitrum";
+  if (raw === "eip155:10") return "optimism";
+  return raw;
+}
