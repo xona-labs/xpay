@@ -1,64 +1,31 @@
 /**
- * Discovery — find paid services across catalogs.
+ * Discovery — find paid services via OrbitX402.
  *
- * v0 wires PayAI as the only source. Pay (the MCP catalog) and xona-labs' own
- * registry slot in here as additional source modules later, all returning the
- * same {@link Resource} shape.
+ * OrbitX402 aggregates multiple x402 catalogs (its own probed resources,
+ * PayAI, pay.sh) and returns them in a unified shape. xpay delegates all
+ * discovery here rather than managing catalog sources itself.
  */
 
-import type { CatalogSource, DiscoverOptions, Resource } from "../types.js";
-import { fetchPayAIResources } from "./payai.js";
+import type { DiscoverOptions, Resource } from "../types.js";
+import { fetchOrbitX402Resources } from "./orbitx402.js";
 import { cached } from "./cache.js";
 
 export { setCacheTtl, invalidate as invalidateCache } from "./cache.js";
 
 interface InternalDiscoverOptions extends DiscoverOptions {
-  catalogs?: Partial<Record<string, string>>;
+  endpoint?: string;
 }
 
-/**
- * Each source's fetcher runs through the module cache. Cold fetch for the
- * full PayAI catalog is ~50s; cached fetches return in microseconds.
- */
-const sourceFetchers: Record<CatalogSource, (endpoint?: string) => Promise<Resource[]>> = {
-  payai: (endpoint) =>
-    cached(`payai:${endpoint ?? "default"}`, () => fetchPayAIResources({ endpoint })),
-  // TODO: pay (Solana Foundation catalog), xona (our own listings).
-  pay: async () => [],
-  xona: async () => [],
-};
-
-/**
- * Fetch resources from each source in parallel, then rank by simple relevance.
- *
- * Ranking v0 is intentionally dumb — token overlap on the URL + metadata. The
- * real moat is in v0.2 ranking (price, reliability, reputation) but we ship
- * with something that works.
- */
 export async function discover(opts: InternalDiscoverOptions = {}): Promise<Resource[]> {
-  const sources: CatalogSource[] = opts.sources ?? ["payai"];
-  const lists = await Promise.all(
-    sources.map(async (src) => {
-      const fetcher = sourceFetchers[src];
-      if (!fetcher) return [];
-      try {
-        return await fetcher(opts.catalogs?.[src]);
-      } catch (err) {
-        // One bad source shouldn't kill discovery.
-        console.warn(`[xpay] discovery source "${src}" failed:`, err);
-        return [];
-      }
-    }),
+  let results = await cached(
+    `orbitx402:${opts.endpoint ?? "default"}`,
+    () => fetchOrbitX402Resources({ endpoint: opts.endpoint }),
   );
-
-  let results = lists.flat();
 
   // Network filter.
   if (opts.networks?.length) {
     const allowed = new Set(opts.networks);
-    results = results.filter((r) =>
-      r.accepts.some((a) => allowed.has(normalizeNetwork(a.network))),
-    );
+    results = results.filter((r) => r.accepts.some((a) => allowed.has(a.network)));
   }
 
   // Query filter + ranking.
@@ -88,12 +55,4 @@ function scoreResource(r: Resource, terms: string[]): number {
     if (haystack.includes(t)) score += 1;
   }
   return score;
-}
-
-function normalizeNetwork(raw: string): string {
-  if (raw === "eip155:8453") return "base";
-  if (raw === "eip155:1") return "ethereum";
-  if (raw === "eip155:42161") return "arbitrum";
-  if (raw === "eip155:10") return "optimism";
-  return raw;
 }

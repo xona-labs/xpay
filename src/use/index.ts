@@ -13,13 +13,13 @@
  */
 
 import {
-  ResourceSchema,
   type PaymentRequirement,
   type Resource,
   type UseResult,
 } from "../types.js";
 import type { Wallet } from "../wallet/index.js";
 import type { Guardrail } from "../guardrail/index.js";
+import { extractRequirements } from "../x402/extract.js";
 
 export interface UseArgs {
   resource: Resource;
@@ -98,12 +98,11 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
     return finalize(probe, "unknown", "0");
   }
 
-  // Step 2: parse the 402 body. x402 v2 returns a body shaped like a Resource
-  // (`{ accepts: [...] }`); we accept either that or a bare PaymentRequirement[].
-  const reqs = parseChallenge(probe.data);
+  // Step 2: parse the 402 challenge — may live in the body OR a response header.
+  const { accepts: reqs } = extractRequirements(probe.res.headers, probe.data);
   if (reqs.length === 0) {
     throw new Error(
-      `xpay.use: ${args.resource.resource} returned 402 but no parseable accepts[] payload`,
+      `xpay.use: ${args.resource.resource} returned 402 but no parseable accepts[] in body or headers`,
     );
   }
 
@@ -204,33 +203,6 @@ function paymentHeader(
     x402Version,
   };
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
-}
-
-/**
- * Parse a 402 response body into PaymentRequirement[].
- * Accepts either the v2 envelope (`{ accepts: [...] }` matching Resource) or a
- * bare array (some facilitators ship this).
- */
-function parseChallenge(data: unknown): PaymentRequirement[] {
-  if (Array.isArray(data)) {
-    const parsed = ResourceSchema.safeParse({
-      resource: "",
-      type: "http",
-      method: "GET",
-      accepts: data,
-    });
-    return parsed.success ? parsed.data.accepts : [];
-  }
-  if (data && typeof data === "object") {
-    const parsed = ResourceSchema.safeParse({
-      resource: "",
-      type: "http",
-      method: "GET",
-      ...data,
-    });
-    if (parsed.success) return parsed.data.accepts;
-  }
-  return [];
 }
 
 function normalizeNetwork(raw: string): string {

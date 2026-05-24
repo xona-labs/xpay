@@ -44,6 +44,7 @@ export { Guardrail } from "./guardrail/index.js";
  */
 export { discover } from "./discover/index.js";
 export { fetchPayAIResources } from "./discover/payai.js";
+export { fetchOrbitX402Resources } from "./discover/orbitx402.js";
 
 /** Options for {@link createXPay}. */
 export interface XPayOptions {
@@ -59,8 +60,8 @@ export interface XPayOptions {
   signers?: Partial<Record<Network, Signer>>;
   /** Optional spending guardrail enforced before every {@link XPay.use} call. */
   guardrail?: GuardrailConfig;
-  /** Override built-in catalog endpoints (for self-hosted facilitators / tests). */
-  catalogs?: Partial<Record<string, string>>;
+  /** Override the OrbitX402 discovery endpoint (for self-hosted instances / tests). */
+  discoveryEndpoint?: string;
 }
 
 /** The xPay client returned by {@link createXPay}. */
@@ -116,7 +117,7 @@ export function createXPay(options: XPayOptions): XPay {
   return {
     wallet,
     guardrail,
-    discover: (opts) => discover({ ...opts, catalogs: options.catalogs }),
+    discover: (opts) => discover({ ...opts, endpoint: options.discoveryEndpoint }),
     use: (resource, opts) => use({ resource, wallet, guardrail, ...opts }),
     useByUrl: (url, opts) => useByUrl({ url, wallet, guardrail, ...opts }),
     do: (query, opts) => doIt({ query, wallet, guardrail, ...opts }),

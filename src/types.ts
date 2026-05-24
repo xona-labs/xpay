@@ -84,12 +84,7 @@ export interface DiscoverOptions {
   networks?: Network[];
   /** Max results to return. */
   limit?: number;
-  /** Catalog sources to query. Defaults to all configured. */
-  sources?: CatalogSource[];
 }
-
-/** Built-in catalog sources. Custom sources can be plugged in by users. */
-export type CatalogSource = "payai" | "pay" | "xona" | (string & {});
 
 /** A configured signer for a single network. */
 export interface Signer {
