@@ -86,6 +86,7 @@ program
   .description("Pay an x402 endpoint (catalog URL or any URL that returns 402).")
   .option("--profile <name>", "Profile to pay from (defaults to active)")
   .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--method <m>", "HTTP method (default GET — use POST for most x402 services)")
   .option("--max-usd <n>", "Override per-tx guardrail cap for this call")
   .option("--body <json>", "Request body for POST endpoints (JSON)")
   .option("-y, --yes", "Skip the confirmation prompt")

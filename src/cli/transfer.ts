@@ -80,7 +80,10 @@ export async function runTransfer(
     console.log(`  ${chalk.dim("→ to:")} ${result.to}`);
     console.log(`  ${chalk.dim("→ tx:")} ${result.txSig}`);
   } catch (err) {
-    console.error(chalk.red(`\n✗ ${(err as Error).message}`));
+    const e = err as Error & { logs?: unknown };
+    const msg = e.message || e.toString() || "(no error message)";
+    console.error(chalk.red(`\n✗ ${msg}`));
+    if (e.logs) console.error(chalk.dim(JSON.stringify(e.logs).slice(0, 400)));
     process.exit(1);
   }
 }

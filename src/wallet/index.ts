@@ -59,6 +59,10 @@ export function createWallet(opts: WalletOptions): Wallet {
       // Normalize EIP-155 strings ("eip155:8453") to our network slugs.
       const matchNetwork = (raw: string): Network | undefined => {
         if (signers[raw]) return raw;
+        // Solana CAIP — `solana:<genesis-hash>` (mainnet/devnet/testnet) → "solana".
+        if ((raw === "solana" || raw.startsWith("solana:") || raw.startsWith("solana-")) && signers["solana"]) {
+          return "solana";
+        }
         if (raw === "eip155:8453" && signers["base"]) return "base";
         if (raw === "eip155:1" && signers["ethereum"]) return "ethereum";
         if (raw === "eip155:42161" && signers["arbitrum"]) return "arbitrum";

@@ -90,7 +90,7 @@ console.log(created.mnemonic);    // back this up; not persisted in plaintext
 setProfileGuardrail("default", {
   maxPerTx: 0.5,
   maxPerDay: 5,
-  allowedHosts: ["api.payai.network", "*.xona.xyz"],
+  allowedHosts: ["api.payai.network", "*.xona-agent.com"],
 });
 
 // Use
@@ -176,7 +176,7 @@ xpay guardrail set \
   --max-per-tx 0.5 \
   --max-per-day 5 \
   --require-approval-above 1 \
-  --allowed-hosts 'api.payai.network,*.xona.xyz'
+  --allowed-hosts 'api.payai.network,*.xona-agent.com'
 ```
 
 - **`maxPerTx` / `maxPerDay`** — apply to every paid call *and* direct transfers.

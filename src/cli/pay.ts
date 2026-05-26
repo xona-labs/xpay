@@ -13,6 +13,7 @@ import { unlockActive, formatUsd } from "./common.js";
 export interface PayCmdOptions {
   profile?: string;
   passphrase?: string;
+  method?: string;
   maxUsd?: string;
   body?: string;
   yes?: boolean;
@@ -69,7 +70,7 @@ export async function runPay(url: string, opts: PayCmdOptions): Promise<void> {
 
   const t0 = Date.now();
   try {
-    const result = await xpay.useByUrl(url, { body });
+    const result = await xpay.useByUrl(url, { method: opts.method, body });
     const elapsed = Date.now() - t0;
     const amount = Number(result.amountPaid) / 1_000_000;
 
@@ -85,8 +86,11 @@ export async function runPay(url: string, opts: PayCmdOptions): Promise<void> {
     console.log(display.slice(0, 2000));
     if (display.length > 2000) console.log(chalk.dim(`\n  ...truncated (${display.length} chars total)`));
   } catch (err) {
+    const e = err as Error & { logs?: unknown };
+    const msg = e.message || e.toString() || "(no error message)";
     console.error("");
-    console.error(chalk.red(`✗ ${(err as Error).message}`));
+    console.error(chalk.red(`✗ ${msg}`));
+    if (e.logs) console.error(chalk.dim(JSON.stringify(e.logs).slice(0, 400)));
     process.exit(1);
   }
 }

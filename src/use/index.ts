@@ -210,5 +210,7 @@ function normalizeNetwork(raw: string): string {
   if (raw === "eip155:1") return "ethereum";
   if (raw === "eip155:42161") return "arbitrum";
   if (raw === "eip155:10") return "optimism";
+  // Solana CAIP — any `solana:<genesis>` form collapses to our "solana" slug.
+  if (raw === "solana" || raw.startsWith("solana:") || raw.startsWith("solana-")) return "solana";
   return raw;
 }

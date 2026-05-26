@@ -22,10 +22,14 @@ export async function discover(opts: InternalDiscoverOptions = {}): Promise<Reso
     () => fetchOrbitX402Resources({ endpoint: opts.endpoint }),
   );
 
-  // Network filter.
+  // Network filter — prefix match so "solana" matches "solana:5eykt4..."
+  // and "eip155:8453" matches exactly.
   if (opts.networks?.length) {
-    const allowed = new Set(opts.networks);
-    results = results.filter((r) => r.accepts.some((a) => allowed.has(a.network)));
+    results = results.filter((r) =>
+      r.accepts.some((a) =>
+        opts.networks!.some((n) => a.network === n || a.network.startsWith(n + ":")),
+      ),
+    );
   }
 
   // Query filter + ranking.
