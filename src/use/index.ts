@@ -20,6 +20,7 @@ import {
 import type { Wallet } from "../wallet/index.js";
 import type { Guardrail } from "../guardrail/index.js";
 import { extractRequirements } from "../x402/extract.js";
+import { buildSvmPaymentHeader, isSvmNetwork } from "../x402/svm-payment.js";
 
 export interface UseArgs {
   resource: Resource;
@@ -81,12 +82,9 @@ async function useWithRequirements(
   // Guardrail runs *before* signing — this is the security boundary.
   await args.guardrail.check({ resource: args.resource, requirement: req });
 
-  const network = normalizeNetwork(req.network);
-  const signer = args.wallet.signer(network);
-  const txSig = await signer.pay(req);
-
-  const res = await callResource(args, paymentHeader(req, txSig, args.resource.x402Version ?? 1));
-  return finalize(res, network, req.amount ?? "0", txSig);
+  const settled = await settle(args, req, args.resource.x402Version ?? 1);
+  const res = await callResource(args, settled.header);
+  return finalize(res, settled.network, req.amount ?? "0", settled.txSig);
 }
 
 async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
@@ -114,13 +112,46 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
   }
 
   await args.guardrail.check({ resource: args.resource, requirement: req });
-  const network = normalizeNetwork(req.network);
-  const signer = args.wallet.signer(network);
-  const txSig = await signer.pay(req);
+  const settled = await settle(args, req, 2);
 
   // Step 3: retry with X-Payment.
-  const res = await callResource(args, paymentHeader(req, txSig, 2));
-  return finalize(res, network, req.amount ?? "0", txSig);
+  const res = await callResource(args, settled.header);
+  return finalize(res, settled.network, req.amount ?? "0", settled.txSig);
+}
+
+/**
+ * Sign/settle a payment per the requirement and return the X-Payment header
+ * value plus accounting fields. Picks the right encoding by network:
+ *
+ *   SVM (solana / solana:*) + signer has getKitSigner →
+ *     canonical x402 v2 — sign-but-don't-broadcast, header carries the
+ *     signed tx, facilitator settles. Returns header only (no txSig until
+ *     the upstream call comes back).
+ *
+ *   Anything else (EVM facilitators, legacy v1 SVM) →
+ *     legacy path: signer.pay() broadcasts, header carries the txSig.
+ */
+async function settle(
+  args: UseArgs,
+  req: PaymentRequirement,
+  x402Version: number,
+): Promise<{ header: string; network: string; txSig?: string }> {
+  const network = normalizeNetwork(req.network);
+  const signer = args.wallet.signer(network);
+
+  if (isSvmNetwork(req.network) && typeof signer.getKitSigner === "function") {
+    const kitSigner = await signer.getKitSigner();
+    const header = await buildSvmPaymentHeader({
+      kitSigner,
+      requirement: req,
+      x402Version,
+    });
+    return { header, network };
+  }
+
+  // Legacy path — sign + broadcast on our side, send txSig in the header.
+  const txSig = await signer.pay(req);
+  return { header: paymentHeader(req, txSig, x402Version), network, txSig };
 }
 
 interface RawResponse {

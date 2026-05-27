@@ -6,6 +6,45 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.4] – 2026-05-26
+
+### Fixed
+- **`useByUrl()` against canonical x402 SVM v2 servers** — the SDK now signs
+  but does **not** broadcast the USDC transfer, and sends the canonical
+  `PaymentPayloadV2` envelope (`{ x402Version, accepted, payload: { transaction } }`)
+  base64-encoded in the `X-Payment` header. The facilitator verifies + settles.
+  Verified live against `api.xona-agent.com` (200 OK, $0.01 USDC settled, real
+  upstream response returned).
+- 0.1.3 was sending a v1-style `txSig`-only header after a client-side
+  broadcast, which spec-compliant facilitators (incl. `api.xona-agent.com`)
+  reject with `"Unsupported x402 payload"`.
+
+### Added
+- New `Signer.getKitSigner?()` (optional, additive) — returns a `@solana/kit`
+  `TransactionSigner`. `rawSolanaSigner` implements it out of the box.
+  Custom signers (KMS/MPC) implementing it gain canonical x402 v2 support
+  for SVM endpoints; existing custom signers without it keep working via
+  the legacy broadcast-then-`txSig` path for non-SVM networks.
+- New module `src/x402/svm-payment.ts` — wraps `@x402/svm`'s
+  `ExactSvmScheme.createPaymentPayload` and assembles the canonical
+  `PaymentPayloadV2` envelope. Used by `useByUrl()` for any network matching
+  `solana` / `solana:*` / `solana-*`.
+
+### Dependencies
+- `@x402/core`, `@x402/svm` — canonical x402 encoding (no spec drift).
+- `@solana/kit` — pulled in transitively by `@x402/svm`; used to construct
+  `TransactionSigner` instances from existing `@solana/web3.js` Keypairs via
+  `createKeyPairSignerFromBytes`.
+
+### Notes
+- `txSig` in the returned `UseResult` is **undefined** for SVM v2 calls (the
+  facilitator broadcasts; we never see the resulting signature client-side).
+  Downstream reconciliation can still use the upstream response + your own
+  correlationId in your DB.
+- Direct `transfer()` is unchanged — still uses `signer.pay()` (broadcasts
+  client-side, returns the real `txSig`), since there's no facilitator in
+  the direct-transfer path.
+
 ## [0.1.3] – 2026-05-26
 
 ### Fixed
@@ -74,7 +113,8 @@ Initial public release.
   Desktop, Cursor, Codex.
 - LLM tool exporters: `forClaude(xpay)`, `forOpenAI(xpay)`, `forGemini(xpay)`.
 
-[Unreleased]: https://github.com/xona-labs/xpay/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/xona-labs/xpay/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/xona-labs/xpay/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/xona-labs/xpay/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/xona-labs/xpay/compare/v0.1.0...v0.1.2
 [0.1.0]: https://github.com/xona-labs/xpay/releases/tag/v0.1.0

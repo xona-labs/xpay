@@ -105,4 +105,16 @@ export interface Signer {
    * the signer doesn't implement it.
    */
   balance?(): Promise<number>;
+  /**
+   * Optional: return a `@solana/kit` `TransactionSigner` for canonical x402
+   * SVM v2 payment payloads. When present, `useByUrl()` will sign the
+   * payment transaction without broadcasting and let the facilitator settle;
+   * when absent, it falls back to the legacy `pay()` (sign + broadcast,
+   * txSig in `X-Payment`).
+   *
+   * For built-in `rawSolanaSigner` this is implemented out of the box. Custom
+   * signers (KMS / MPC) that want v2 support implement it against their
+   * signing service.
+   */
+  getKitSigner?(): Promise<unknown>;
 }

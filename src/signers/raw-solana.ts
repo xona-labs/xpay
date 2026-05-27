@@ -49,6 +49,17 @@ export function rawSolanaSigner(opts: RawSolanaSignerOptions): Signer {
       return sig;
     },
 
+    /**
+     * Provide a `@solana/kit` TransactionSigner derived from our Keypair so
+     * `useByUrl()` can use `@x402/svm` for canonical x402 SVM v2 payloads.
+     */
+    async getKitSigner(): Promise<unknown> {
+      // Dynamic import — keeps @solana/signers off the hot path for users
+      // who never call useByUrl against an SVM endpoint.
+      const { createKeyPairSignerFromBytes } = await import("@solana/signers");
+      return createKeyPairSignerFromBytes(keypair.secretKey);
+    },
+
     async balance(): Promise<number> {
       try {
         const mint = new PublicKey(USDC_MINT_MAINNET);
