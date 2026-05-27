@@ -6,6 +6,24 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.5] – 2026-05-26
+
+### Added
+- **`UseResult.txSig` is now populated on SVM v2 calls** — extracted from
+  the facilitator's `PAYMENT-RESPONSE` (or `X-PAYMENT-RESPONSE`) header,
+  which carries the canonical `SettleResponse` envelope (base64 JSON).
+  Previously `useByUrl()` returned `txSig: undefined` for v2 because the
+  facilitator (not the client) broadcasts the transaction.
+- **`UseResult.settlement?: SettleEnvelope`** — full settle envelope from
+  the facilitator when present: `{ transaction, payer?, network, amount?,
+  success?, extensions?, extra? }`. Useful for reconciliation
+  (payer address, actual settled amount in `upto`-style schemes, etc.).
+
+### Verified
+- Live against `api.xona-agent.com/audio/x-text-to-speech` — 200 OK,
+  $0.01 USDC settled, real on-chain signature
+  (`3puHTvEY…EpEHi`) returned in both `txSig` and `settlement.transaction`.
+
 ## [0.1.4] – 2026-05-26
 
 ### Fixed
@@ -113,7 +131,8 @@ Initial public release.
   Desktop, Cursor, Codex.
 - LLM tool exporters: `forClaude(xpay)`, `forOpenAI(xpay)`, `forGemini(xpay)`.
 
-[Unreleased]: https://github.com/xona-labs/xpay/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/xona-labs/xpay/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/xona-labs/xpay/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/xona-labs/xpay/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/xona-labs/xpay/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/xona-labs/xpay/compare/v0.1.0...v0.1.2

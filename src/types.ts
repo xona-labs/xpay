@@ -62,6 +62,30 @@ export const ResourceSchema = z.object({
 });
 export type Resource = z.infer<typeof ResourceSchema>;
 
+/**
+ * Facilitator settle envelope, mirrored from the canonical x402
+ * `PAYMENT-RESPONSE` header. Present on x402 v2 calls when the facilitator
+ * echoes settlement details back to the client; absent on legacy v1 calls.
+ */
+export interface SettleEnvelope {
+  /** Settlement signature / on-chain tx hash. */
+  transaction: string;
+  /** Address that paid (typically the wallet that signed). */
+  payer?: string;
+  /** Network identifier in the form the facilitator reports (often CAIP-2). */
+  network: string;
+  /**
+   * Actual amount settled in atomic token units. Equal to the requested
+   * amount for `exact` schemes; may differ for `upto` etc.
+   */
+  amount?: string;
+  /** Indicator from the facilitator. */
+  success?: boolean;
+  /** Provider-specific extensions / extra metadata. */
+  extensions?: Record<string, unknown>;
+  extra?: Record<string, unknown>;
+}
+
 /** Result returned by {@link XPay.use}. */
 export interface UseResult {
   /** Decoded response body (JSON if possible, else string). */
@@ -72,8 +96,17 @@ export interface UseResult {
   network: Network;
   /** Atomic amount paid. */
   amountPaid: string;
-  /** Settlement signature / tx hash, if available. */
+  /**
+   * Settlement signature. For SVM v2 calls this comes from the facilitator
+   * via the `PAYMENT-RESPONSE` header (we never broadcast client-side).
+   * For legacy / EVM v1 calls this is the client-broadcast tx signature.
+   */
   txSig?: string;
+  /**
+   * Full settle envelope from the facilitator, when present in the response.
+   * Useful for reconciliation (payer address, actual settled amount, …).
+   */
+  settlement?: SettleEnvelope;
 }
 
 /** Options passed to {@link XPay.discover}. */

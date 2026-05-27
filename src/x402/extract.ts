@@ -15,7 +15,7 @@
  * Shared by `probe()` and `useByUrl()`.
  */
 
-import type { PaymentRequirement } from "../types.js";
+import type { PaymentRequirement, SettleEnvelope } from "../types.js";
 
 export interface ExtractedRequirements {
   accepts: PaymentRequirement[];
@@ -153,6 +153,51 @@ function normalizeRequirement(o: Record<string, unknown>): PaymentRequirement | 
     mimeType: typeof o.mimeType === "string" ? o.mimeType : undefined,
     extra: isObj(o.extra) ? (o.extra as Record<string, unknown>) : undefined,
   };
+}
+
+/** Header names a facilitator might use to echo the settle response back. */
+const SETTLE_HEADER_CANDIDATES = [
+  "payment-response",
+  "x-payment-response",
+];
+
+/**
+ * Decode the facilitator's settle envelope from the upstream response headers.
+ * Returns undefined when no recognized header is present or parsing fails.
+ *
+ * Header value is base64-encoded JSON of `SettleResponse`. Falls back to raw
+ * JSON if base64 decode fails (some facilitators ship it un-encoded).
+ */
+export function extractSettleEnvelope(headers: Headers): SettleEnvelope | undefined {
+  for (const name of SETTLE_HEADER_CANDIDATES) {
+    const raw = headers.get(name);
+    if (!raw) continue;
+
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
+    } catch {
+      try {
+        decoded = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+    }
+
+    if (isObj(decoded) && typeof decoded.transaction === "string" && decoded.transaction.length > 0) {
+      const d = decoded as Record<string, unknown>;
+      return {
+        transaction: d.transaction as string,
+        payer: typeof d.payer === "string" ? d.payer : undefined,
+        network: typeof d.network === "string" ? d.network : "",
+        amount: typeof d.amount === "string" ? d.amount : undefined,
+        success: typeof d.success === "boolean" ? d.success : undefined,
+        extensions: isObj(d.extensions) ? (d.extensions as Record<string, unknown>) : undefined,
+        extra: isObj(d.extra) ? (d.extra as Record<string, unknown>) : undefined,
+      };
+    }
+  }
+  return undefined;
 }
 
 export function detectVersion(data: unknown): number | undefined {

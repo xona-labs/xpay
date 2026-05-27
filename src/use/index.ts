@@ -19,7 +19,7 @@ import {
 } from "../types.js";
 import type { Wallet } from "../wallet/index.js";
 import type { Guardrail } from "../guardrail/index.js";
-import { extractRequirements } from "../x402/extract.js";
+import { extractRequirements, extractSettleEnvelope } from "../x402/extract.js";
 import { buildSvmPaymentHeader, isSvmNetwork } from "../x402/svm-payment.js";
 
 export interface UseArgs {
@@ -203,12 +203,19 @@ function finalize(
       }`,
     );
   }
+
+  // For SVM v2 calls the facilitator broadcasts and echoes settlement details
+  // in the `PAYMENT-RESPONSE` header. If present, prefer its signature over
+  // any locally-broadcast `txSig` (which only exists on the legacy v1 path).
+  const settlement = extractSettleEnvelope(raw.res.headers);
+
   return {
     data: raw.data,
     status: raw.res.status,
     network,
     amountPaid,
-    txSig,
+    txSig: settlement?.transaction ?? txSig,
+    settlement,
   };
 }
 
