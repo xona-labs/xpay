@@ -57,7 +57,7 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay init [name]` | Create a profile (Solana + EVM keys from one BIP-39 seed). `--import` to restore from a phrase, `--no-encrypt` for dev wallets, `--workspace` to store locally. |
 | `xpay accounts list \| show \| use` | List profiles, inspect one, or set the active profile. |
 | `xpay balance` | USDC balance per network for the active profile. |
-| `xpay discover [query]` | Search 21k+ x402 services from PayAI (cached on disk). `--network`, `--limit`, `--json`. |
+| `xpay discover [query]` | Search 21k+ x402 services across chains — Solana, Base, **BNB Chain**, and other EVM networks (cached on disk). `--network`, `--limit`, `--json`. |
 | `xpay pay <url>` | Pay an x402 endpoint. Works on catalog URLs and any URL that returns 402. `--max-usd`, `--body`, `-y`. |
 | `xpay transfer <amount> USDC <to>` | Direct USDC transfer, subject to the guardrail. `--network`, `-y`. |
 | `xpay history` | Recent on-chain USDC activity across all networks. `--network`, `--limit`, `--evm-window`. |
@@ -204,7 +204,7 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 ## How it works
 
 - **Keys** — One BIP-39 mnemonic per profile derives Solana (`m/44'/501'/0'/0'`, Phantom-compatible) and EVM (`m/44'/60'/0'/0/0`, MetaMask-compatible) keypairs. Encrypted at rest with scrypt + AES-256-GCM.
-- **Discovery** — PayAI's `/discovery/resources` is the primary catalog (21k+ x402 endpoints). The fetcher walks the offset-pagination, validates each entry against a Zod schema, and persists to `~/.xpay/cache/` for 10 min so CLI invocations don't pay the ~30s cold-fetch tax repeatedly.
+- **Discovery** — the catalog spans 21k+ x402 endpoints across multiple chains — **Solana, Base, BNB Chain, and other EVM networks** — so `discover()` surfaces BNB Chain x402 resources alongside everything else. The fetcher walks the offset-pagination, validates each entry against a Zod schema, and persists to `~/.xpay/cache/` so repeat lookups skip the cold-fetch tax. (Filter with `--network` / `discover({ networks })`.)
 - **Pay** — `use()` and `useByUrl()` both go: guardrail check → signer.pay(USDC) on the right network → `X-Payment` header → retry. The signer abstraction means the same code path works for Solana SPL transfers and EVM ERC-20 transfers.
 - **History** — Solana via `getSignaturesForAddress` + `getParsedTransaction` on the USDC ATA. EVM via chunked `eth_getLogs` for ERC-20 `Transfer` events. No indexer required.
 
