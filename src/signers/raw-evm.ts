@@ -49,10 +49,10 @@ const USDC_CONTRACTS: Record<string, string> = {
 };
 
 const DEFAULT_RPCS: Record<string, string> = {
-  base: "https://mainnet.base.org",
-  ethereum: "https://eth.llamarpc.com",
-  arbitrum: "https://arb1.arbitrum.io/rpc",
-  optimism: "https://mainnet.optimism.io",
+  base: "https://base-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
+  ethereum: "https://eth-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
+  arbitrum: "https://arb-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
+  optimism: "https://opt-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
 };
 
 const ERC20_ABI = [
