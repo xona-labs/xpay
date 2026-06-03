@@ -119,6 +119,17 @@ export interface DiscoverOptions {
   limit?: number;
 }
 
+/** A single token balance entry returned by {@link Signer.tokenBalances}. */
+export interface TokenBalance {
+  symbol: string;
+  name: string;
+  balance: number;
+  decimals: number;
+  /** SPL mint address (Solana) or ERC-20 contract address (EVM). Absent for native gas tokens. */
+  address?: string;
+  isNative?: boolean;
+}
+
 /** A configured signer for a single network. */
 export interface Signer {
   network: Network;
@@ -138,6 +149,11 @@ export interface Signer {
    * the signer doesn't implement it.
    */
   balance?(): Promise<number>;
+  /**
+   * Optional: read all non-zero token balances (native + known tokens).
+   * When implemented, shown by `xpay balance` instead of just USDC.
+   */
+  tokenBalances?(): Promise<TokenBalance[]>;
   /**
    * Optional: return a `@solana/kit` `TransactionSigner` for canonical x402
    * SVM v2 payment payloads. When present, `useByUrl()` will sign the

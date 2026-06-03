@@ -12,7 +12,97 @@
 
 import chalk from "chalk";
 import { setSanaApiKey, clearSanaApiKey, readProfileConfig } from "../profile/index.js";
+import { SanaClient } from "../sana/client.js";
 import { getActiveProfile } from "./accounts.js";
+
+// ─── Resolve API key ───────────────────────────────────────────────────────
+
+function resolveSanaKey(opts: { profile?: string }): string {
+  const name = opts.profile ?? getActiveProfile();
+  const config = readProfileConfig(name);
+  const key = config.sana?.apiKey ?? process.env.SANABOT_API_KEY;
+  if (!key) {
+    console.error(chalk.red("✗ No Sana API key found."));
+    console.error(chalk.dim("  Run: xpay sana link sana_live_..."));
+    process.exit(1);
+  }
+  return key;
+}
+
+// ─── Live tool runners ────────────────────────────────────────────────────
+
+export async function runSanaCard(opts: { profile?: string }): Promise<void> {
+  const client = new SanaClient(resolveSanaKey(opts));
+  const result = await client.callTool("get_card");
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export async function runSanaCardBalance(opts: { profile?: string }): Promise<void> {
+  const client = new SanaClient(resolveSanaKey(opts));
+  const result = await client.callTool("get_card_balance");
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export async function runSanaCardDeposit(amount: string, opts: { profile?: string }): Promise<void> {
+  const n = Number(amount);
+  if (!Number.isFinite(n) || n <= 0) {
+    console.error(chalk.red(`✗ Invalid amount "${amount}". Must be a positive number.`));
+    process.exit(1);
+  }
+  const client = new SanaClient(resolveSanaKey(opts));
+  const result = await client.callTool("card_deposit", { amount: n });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export async function runSanaCardTransactions(opts: { profile?: string; limit?: string }): Promise<void> {
+  const client = new SanaClient(resolveSanaKey(opts));
+  const result = await client.callTool("get_transaction_history", {
+    context: "card",
+    ...(opts.limit ? { limit: Number(opts.limit) } : {}),
+  });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export async function runSanaPortfolio(opts: { profile?: string }): Promise<void> {
+  const client = new SanaClient(resolveSanaKey(opts));
+  const [netWorth, holdings] = await Promise.all([
+    client.callTool("get_net_worth"),
+    client.callTool("get_holdings"),
+  ]);
+  console.log(JSON.stringify({ netWorth, holdings }, null, 2));
+}
+
+export async function runSanaPrice(token: string, opts: { profile?: string }): Promise<void> {
+  const client = new SanaClient(resolveSanaKey(opts));
+  const result = await client.callTool("get_price", { token: token.toUpperCase() });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export async function runSanaSwap(
+  fromToken: string,
+  toToken: string,
+  amount: string,
+  opts: { profile?: string },
+): Promise<void> {
+  const n = Number(amount);
+  if (!Number.isFinite(n) || n <= 0) {
+    console.error(chalk.red(`✗ Invalid amount "${amount}".`));
+    process.exit(1);
+  }
+  const client = new SanaClient(resolveSanaKey(opts));
+  const result = await client.callTool("wallet_swap", {
+    fromToken: fromToken.toUpperCase(),
+    toToken: toToken.toUpperCase(),
+    amount: n,
+  });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export async function runSanaNotifications(opts: { profile?: string }): Promise<void> {
+  const client = new SanaClient(resolveSanaKey(opts));
+  const result = await client.callTool("get_notifications");
+  console.log(JSON.stringify(result, null, 2));
+}
 
 export function runSanaLink(apiKey: string, opts: { profile?: string }): void {
   if (!apiKey.startsWith("sana_")) {

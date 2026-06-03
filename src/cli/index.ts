@@ -26,7 +26,11 @@ import { runPay } from "./pay.js";
 import { runHistory } from "./history.js";
 import { runTransfer } from "./transfer.js";
 import { runGuardrailShow, runGuardrailSet, runGuardrailClear } from "./guardrail.js";
-import { runSanaLink, runSanaUnlink, runSanaStatus } from "./sana.js";
+import {
+  runSanaLink, runSanaUnlink, runSanaStatus,
+  runSanaCard, runSanaCardBalance, runSanaCardDeposit, runSanaCardTransactions,
+  runSanaPortfolio, runSanaPrice, runSanaSwap, runSanaNotifications,
+} from "./sana.js";
 import { startMcpServer } from "./mcp-server.js";
 
 const program = new Command();
@@ -179,6 +183,55 @@ sana
   .description("Show whether a Sana key is configured for the active profile.")
   .option("--profile <name>", "Profile to check (defaults to active)")
   .action((opts) => runSanaStatus(opts));
+
+sana
+  .command("card")
+  .description("Card metadata — status, type, last 4, expiry.")
+  .option("--profile <name>")
+  .action((opts) => runSanaCard(opts));
+
+sana
+  .command("card-balance")
+  .description("Available spending power on the Sana card.")
+  .option("--profile <name>")
+  .action((opts) => runSanaCardBalance(opts));
+
+sana
+  .command("card-deposit <amount>")
+  .description("Top up the card with USDC (e.g. xpay sana card-deposit 10).")
+  .option("--profile <name>")
+  .action((amount: string, opts) => runSanaCardDeposit(amount, opts));
+
+sana
+  .command("card-transactions")
+  .description("Card spending history.")
+  .option("--profile <name>")
+  .option("--limit <n>", "Max entries")
+  .action((opts) => runSanaCardTransactions(opts));
+
+sana
+  .command("portfolio")
+  .description("Sana wallet net worth + token holdings.")
+  .option("--profile <name>")
+  .action((opts) => runSanaPortfolio(opts));
+
+sana
+  .command("price <token>")
+  .description("Live price for a token (e.g. xpay sana price SOL).")
+  .option("--profile <name>")
+  .action((token: string, opts) => runSanaPrice(token, opts));
+
+sana
+  .command("swap <fromToken> <toToken> <amount>")
+  .description("Swap tokens in Sana wallet (e.g. xpay sana swap SOL USDC 0.5).")
+  .option("--profile <name>")
+  .action((from: string, to: string, amount: string, opts) => runSanaSwap(from, to, amount, opts));
+
+sana
+  .command("notifications")
+  .description("Recent Sana wallet activity feed.")
+  .option("--profile <name>")
+  .action((opts) => runSanaNotifications(opts));
 
 // ---------------------------------------------------------------- mcp
 program

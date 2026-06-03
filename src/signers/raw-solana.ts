@@ -17,7 +17,21 @@ import {
   getAssociatedTokenAddress,
   getAccount,
   getOrCreateAssociatedTokenAccount,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
+import type { TokenBalance } from "../types.js";
+
+const KNOWN_MINTS: Record<string, { symbol: string; name: string }> = {
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": { symbol: "USDC",    name: "USD Coin" },
+  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": { symbol: "USDT",    name: "Tether USD" },
+  "So11111111111111111111111111111111111111112":    { symbol: "wSOL",    name: "Wrapped SOL" },
+  "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So": { symbol: "mSOL",    name: "Marinade SOL" },
+  "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn": { symbol: "JitoSOL", name: "Jito Staked SOL" },
+  "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs": { symbol: "ETH",     name: "Ether (Wormhole)" },
+  "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": { symbol: "BONK",    name: "Bonk" },
+  "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN":  { symbol: "JUP",     name: "Jupiter" },
+  "HZ1JovNiVvGrG91rGdVZr4N5bq4SB5tFTjS5jTmWDRy":  { symbol: "PYTH",    name: "Pyth Network" },
+};
 import nacl from "tweetnacl";
 import type { PaymentRequirement, Signer } from "../types.js";
 
@@ -65,12 +79,54 @@ export function rawSolanaSigner(opts: RawSolanaSignerOptions): Signer {
         const mint = new PublicKey(USDC_MINT_MAINNET);
         const ata = await getAssociatedTokenAddress(mint, keypair.publicKey);
         const acc = await getAccount(connection, ata);
-        // USDC has 6 decimals.
         return Number(acc.amount) / 1_000_000;
       } catch {
-        // Account doesn't exist yet → 0 balance.
         return 0;
       }
+    },
+
+    async tokenBalances(): Promise<TokenBalance[]> {
+      const results: TokenBalance[] = [];
+
+      // Native SOL
+      try {
+        const lamports = await connection.getBalance(keypair.publicKey);
+        if (lamports > 0) {
+          results.push({
+            symbol: "SOL",
+            name: "Solana",
+            balance: lamports / 1e9,
+            decimals: 9,
+            isNative: true,
+          });
+        }
+      } catch { /* skip */ }
+
+      // All SPL token accounts
+      try {
+        const { value: accounts } = await connection.getParsedTokenAccountsByOwner(
+          keypair.publicKey,
+          { programId: TOKEN_PROGRAM_ID },
+        );
+        for (const { account } of accounts) {
+          const parsed = account.data.parsed?.info;
+          if (!parsed) continue;
+          const mint: string = parsed.mint;
+          const uiAmount: number = parsed.tokenAmount?.uiAmount ?? 0;
+          const decimals: number = parsed.tokenAmount?.decimals ?? 0;
+          if (uiAmount === 0) continue;
+          const known = KNOWN_MINTS[mint];
+          results.push({
+            symbol: known?.symbol ?? mint.slice(0, 4) + "…",
+            name: known?.name ?? "Unknown Token",
+            balance: uiAmount,
+            decimals,
+            address: mint,
+          });
+        }
+      } catch { /* skip */ }
+
+      return results;
     },
 
     /**

@@ -51,26 +51,37 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
   console.log(chalk.bold(`Profile "${name}"`));
   console.log("");
 
-  let total = 0;
-  const rows: Array<{ network: string; address: string; balance: number }> = [];
+  let usdcTotal = 0;
+
   for (const net of networks) {
     const signer = signers[net];
     if (!signer) {
-      rows.push({ network: net, address: chalk.dim("(no signer)"), balance: 0 });
+      console.log(`  ${chalk.bold(net.padEnd(10))}  ${chalk.dim("(no signer)")}`);
       continue;
     }
-    const bal = signer.balance ? await signer.balance().catch(() => 0) : 0;
-    total += bal;
-    rows.push({ network: net, address: signer.address, balance: bal });
+
+    console.log(`  ${chalk.bold(net)}  ${chalk.dim(signer.address)}`);
+
+    if (typeof (signer as any).tokenBalances === "function") {
+      const tokens = await (signer as any).tokenBalances().catch(() => []);
+      if (tokens.length === 0) {
+        console.log(`    ${chalk.dim("(no balances)")}`);
+      }
+      for (const t of tokens) {
+        const val = t.balance.toFixed(t.decimals <= 6 ? 4 : 6);
+        const label = t.isNative ? chalk.yellow(t.symbol) : chalk.green(t.symbol);
+        console.log(`    ${label.padEnd(18)}  ${chalk.white(val)}`);
+        // Accumulate stablecoin total
+        if (t.symbol === "USDC" || t.symbol === "USDT") usdcTotal += t.balance;
+      }
+    } else {
+      // Fallback: USDC only
+      const bal = signer.balance ? await signer.balance().catch(() => 0) : 0;
+      usdcTotal += bal;
+      console.log(`    ${chalk.green("USDC".padEnd(18))}  ${chalk.white(`$${bal.toFixed(4)}`)}`);
+    }
+    console.log("");
   }
 
-  for (const r of rows) {
-    console.log(
-      `  ${chalk.bold(r.network.padEnd(10))}  ${chalk.cyan(r.address)}  ${chalk.green(
-        `$${r.balance.toFixed(4)}`,
-      )} ${chalk.dim("USDC")}`,
-    );
-  }
-  console.log("");
-  console.log(`  ${" ".repeat(10)}  ${" ".repeat(44)}  ${chalk.bold(`$${total.toFixed(4)} total`)}`);
+  console.log(`  ${chalk.bold(`$${usdcTotal.toFixed(4)}`)} ${chalk.dim("stablecoin total (USDC + USDT)")}`);
 }
