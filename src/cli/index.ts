@@ -26,6 +26,7 @@ import { runPay } from "./pay.js";
 import { runHistory } from "./history.js";
 import { runTransfer } from "./transfer.js";
 import { runGuardrailShow, runGuardrailSet, runGuardrailClear } from "./guardrail.js";
+import { runSanaLink, runSanaUnlink, runSanaStatus } from "./sana.js";
 import { startMcpServer } from "./mcp-server.js";
 
 const program = new Command();
@@ -155,6 +156,29 @@ program
   .action(async (opts) => {
     await runBalance(opts);
   });
+
+// ---------------------------------------------------------------- sana
+const sana = program
+  .command("sana")
+  .description("Manage the Sana agent wallet card integration (optional).");
+
+sana
+  .command("link <apiKey>")
+  .description("Link a Sana API key — enables sana_* tools in the MCP server.")
+  .option("--profile <name>", "Profile to link to (defaults to active)")
+  .action((apiKey: string, opts) => runSanaLink(apiKey, opts));
+
+sana
+  .command("unlink")
+  .description("Remove the Sana API key from the active profile.")
+  .option("--profile <name>", "Profile to unlink from (defaults to active)")
+  .action((opts) => runSanaUnlink(opts));
+
+sana
+  .command("status", { isDefault: true })
+  .description("Show whether a Sana key is configured for the active profile.")
+  .option("--profile <name>", "Profile to check (defaults to active)")
+  .action((opts) => runSanaStatus(opts));
 
 // ---------------------------------------------------------------- mcp
 program

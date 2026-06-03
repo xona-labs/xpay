@@ -159,6 +159,35 @@ export function setProfileGuardrail(
   return current;
 }
 
+// -----------------------------------------------------------------------------
+// Sana integration
+// -----------------------------------------------------------------------------
+
+/** Persist a Sana API key for the profile. MCP picks it up on next start. */
+export function setSanaApiKey(
+  name: string,
+  apiKey: string,
+  opts: { workspace?: boolean | string } = {},
+): ProfileConfig {
+  const dir = profilePath(name, opts);
+  const current = readConfigFile(dir);
+  current.sana = { apiKey };
+  writeConfigFile(dir, current);
+  return current;
+}
+
+/** Remove the Sana API key — sana_* tools will no longer be registered. */
+export function clearSanaApiKey(
+  name: string,
+  opts: { workspace?: boolean | string } = {},
+): ProfileConfig {
+  const dir = profilePath(name, opts);
+  const current = readConfigFile(dir);
+  delete current.sana;
+  writeConfigFile(dir, current);
+  return current;
+}
+
 /** Drop the guardrail entirely (calls now run unconstrained). */
 export function clearProfileGuardrail(
   name: string,

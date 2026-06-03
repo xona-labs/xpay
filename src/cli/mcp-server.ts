@@ -40,7 +40,8 @@ import type { XPay } from "../index.js";
 
 export async function startMcpServer(): Promise<void> {
   const xpay = await buildXPay();
-  const { tools, handlers } = forClaude(xpay);
+  const sanaApiKey = await resolveSanaApiKey();
+  const { tools, handlers } = forClaude(xpay, { sanaApiKey });
 
   const server = new Server(
     { name: "xpay", version: "0.1.0" },
@@ -118,6 +119,25 @@ async function buildXPay(): Promise<XPay> {
       allowedHosts: process.env.XPAY_ALLOWED_HOSTS?.split(","),
     },
   });
+}
+
+/**
+ * Resolve the Sana API key. Preference:
+ *   1. Profile config.json → sana.apiKey  (set via `xpay sana link`)
+ *   2. Env SANABOT_API_KEY                (standard Sana env var)
+ */
+async function resolveSanaApiKey(): Promise<string | undefined> {
+  try {
+    const profileName = process.env.XPAY_PROFILE ?? getActiveProfile();
+    const profile = await loadProfile({
+      name: profileName,
+      passphrase: process.env.XPAY_PASSPHRASE,
+    });
+    if (profile.config.sana?.apiKey) return profile.config.sana.apiKey;
+  } catch {
+    // profile not found or locked — fall through to env
+  }
+  return process.env.SANABOT_API_KEY || undefined;
 }
 
 function numericEnv(name: string): number | undefined {

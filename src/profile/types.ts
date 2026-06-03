@@ -51,6 +51,14 @@ export interface ProfileConfig {
     apiKey: string;
     endpoint: string;
   };
+  /**
+   * Sana agent wallet card integration.
+   * Activate with `xpay sana link <key>` or set env SANABOT_API_KEY.
+   * When present, the MCP server registers sana_* tools automatically.
+   */
+  sana?: {
+    apiKey: string;
+  };
 }
 
 /** Runtime handle returned by {@link initProfile}/{@link loadProfile}. */

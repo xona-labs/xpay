@@ -12,6 +12,7 @@
  */
 
 import type { XPay } from "../index.js";
+import { forSana } from "../sana/tools.js";
 
 export interface ToolBundle<TDef> {
   tools: TDef[];
@@ -24,8 +25,13 @@ export interface ClaudeToolDef {
   input_schema: Record<string, unknown>;
 }
 
+export interface ToolOptions {
+  /** Sana API key — when present, registers sana_* tools alongside xpay_* tools. */
+  sanaApiKey?: string;
+}
+
 /** Anthropic Claude tool definitions. */
-export function forClaude(xpay: XPay): ToolBundle<ClaudeToolDef> {
+export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<ClaudeToolDef> {
   const tools: ClaudeToolDef[] = [
     {
       name: "xpay_discover",
@@ -158,6 +164,15 @@ export function forClaude(xpay: XPay): ToolBundle<ClaudeToolDef> {
 
     xpay_guardrail: async () => xpay.guardrail,
   };
+
+  // Merge Sana tools if an API key is configured.
+  if (opts.sanaApiKey) {
+    const sana = forSana(opts.sanaApiKey);
+    return {
+      tools: [...tools, ...sana.tools],
+      handlers: { ...handlers, ...sana.handlers },
+    };
+  }
 
   return { tools, handlers };
 }

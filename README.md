@@ -62,6 +62,7 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay transfer <amount> USDC <to>` | Direct USDC transfer, subject to the guardrail. `--network`, `-y`. |
 | `xpay history` | Recent on-chain USDC activity across all networks. `--network`, `--limit`, `--evm-window`. |
 | `xpay guardrail show \| set \| clear` | Inspect or edit spending caps and allowed hosts. |
+| `xpay sana link \| unlink \| status` | Link a Sana API key to activate the agent card (optional). |
 | `xpay mcp` | Start the MCP server on stdio (for Claude Desktop / Cursor / Codex). |
 
 All commands run from a single profile. Switch with `xpay accounts use <name>`.
@@ -151,7 +152,7 @@ Drop xPay into any MCP host's config — no code changes on the agent side.
 }
 ```
 
-The host then sees seven tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_history`, `xpay_guardrail`. The server reads the same `~/.xpay/<profile>/` you created with `xpay init`.
+The host sees seven core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_history`, `xpay_guardrail`. If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically. The server reads the same `~/.xpay/<profile>/` you created with `xpay init`.
 
 ## Profiles
 
@@ -183,6 +184,61 @@ xpay guardrail set \
 - **`allowedHosts`** — apply only to x402 calls (transfers go to addresses, not hosts).
 - **`requireApprovalAbove`** — calls ≥ threshold call your `onApprovalRequired` hook (SDK only — wire to a push notification, biometric prompt, or webhook).
 
+## Sana agent wallet card (optional)
+
+xPay supports an optional integration with [Sana](https://sana.bot) — an agent-native card that lets your AI spend at the point of sale, anywhere Visa is accepted.
+
+Activating it adds a second wallet surface to xPay: your on-chain USDC (xpay) for agentic x402 payments, and a Sana card (fiat) for everything else. The two compose naturally — an agent can top up the card from the xPay wallet when the balance runs low.
+
+### Activate
+
+1. Sign up at [sana.bot](https://sana.bot) and generate an API key at `sana.bot/gateway/app/api-keys` (scope: `read:all` covers everything read-only; add `write:card` for deposits and swaps).
+2. Link it to your xPay profile:
+
+```bash
+xpay sana link sana_live_...
+xpay sana status          # confirm it's stored
+```
+
+3. Restart your MCP client — eight `sana_*` tools appear automatically alongside the standard `xpay_*` tools.
+
+### Tools registered
+
+| Tool | What it does |
+|---|---|
+| `sana_card` | Card metadata — type, status, last 4, expiry |
+| `sana_card_balance` | Available spending power on the card |
+| `sana_card_deposit` | Top up the card with USDC from the Sana wallet |
+| `sana_card_transactions` | Card spending history (paginated) |
+| `sana_portfolio` | Sana wallet net worth + token holdings with 24h changes |
+| `sana_price` | Live USD price and 24h change for any token |
+| `sana_swap` | Swap tokens inside the Sana wallet |
+| `sana_notifications` | Recent Sana wallet activity feed |
+
+### SDK usage
+
+Pass the API key to `forClaude` / `forOpenAI` / `forGemini` to include Sana tools in your agent loop:
+
+```ts
+import { createXPay, loadProfile, forClaude } from "@xona-labs/xpay";
+
+const xpay = createXPay({ profile: await loadProfile({ passphrase }) });
+const { tools, handlers } = forClaude(xpay, {
+  sanaApiKey: process.env.SANABOT_API_KEY,
+});
+// tools now includes both xpay_* and sana_* entries
+```
+
+Or set `SANABOT_API_KEY` in the environment — the MCP server picks it up without any code change.
+
+### Unlink
+
+```bash
+xpay sana unlink          # removes the key from the profile
+```
+
+The `sana_*` tools disappear from the MCP server on next restart.
+
 ## Multi-network
 
 `init` configures Solana and Base by default. Add or change via `~/.xpay/<name>/config.json`:
@@ -213,8 +269,9 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 **v0.1 (current):**
 - ✅ CLI: init, accounts, balance, discover, pay, transfer, history, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
-- ✅ MCP server on stdio with 7 tools
+- ✅ MCP server on stdio with 7 core tools
 - ✅ Solana + Base mainnet with disk caching
+- ✅ Optional Sana agent card integration (`xpay sana link`) — 8 additional `sana_*` tools
 
 **v0.2 planned:**
 - `bridge` — USDC EVM ↔ SVM via CCTP (Circle's native burn/mint)
