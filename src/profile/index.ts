@@ -188,6 +188,35 @@ export function clearSanaApiKey(
   return current;
 }
 
+// -----------------------------------------------------------------------------
+// MagicBlock integration
+// -----------------------------------------------------------------------------
+
+/** Persist MagicBlock platform config for the profile. */
+export function setMagicBlockConfig(
+  name: string,
+  config: NonNullable<ProfileConfig["magicblock"]>,
+  opts: { workspace?: boolean | string } = {},
+): ProfileConfig {
+  const dir = profilePath(name, opts);
+  const current = readConfigFile(dir);
+  current.magicblock = { ...current.magicblock, ...config };
+  writeConfigFile(dir, current);
+  return current;
+}
+
+/** Remove the MagicBlock platform config (falls back to env/defaults). */
+export function clearMagicBlockConfig(
+  name: string,
+  opts: { workspace?: boolean | string } = {},
+): ProfileConfig {
+  const dir = profilePath(name, opts);
+  const current = readConfigFile(dir);
+  delete current.magicblock;
+  writeConfigFile(dir, current);
+  return current;
+}
+
 /** Drop the guardrail entirely (calls now run unconstrained). */
 export function clearProfileGuardrail(
   name: string,

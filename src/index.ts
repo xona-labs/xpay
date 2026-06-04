@@ -81,8 +81,8 @@ export interface XPay {
   do(query: string, opts?: { body?: unknown }): Promise<UseResult>;
   /** Recent USDC activity across all configured networks (merged + sorted). */
   history(opts?: HistoryOptions): Promise<HistoryEntry[]>;
-  /** Direct USDC transfer (no x402). Subject to the same guardrail. */
-  transfer(args: { amount: number; to: string; network?: Network; token?: "USDC" }): Promise<TransferResult>;
+  /** Direct USDC transfer (no x402). Subject to the same guardrail. Pass private:true for MagicBlock PER privacy (Solana only). */
+  transfer(args: { amount: number; to: string; network?: Network; token?: "USDC"; private?: boolean }): Promise<TransferResult>;
 }
 
 /**
@@ -122,6 +122,11 @@ export function createXPay(options: XPayOptions): XPay {
     useByUrl: (url, opts) => useByUrl({ url, wallet, guardrail, ...opts }),
     do: (query, opts) => doIt({ query, wallet, guardrail, ...opts }),
     history: (opts) => getHistory(wallet, opts),
-    transfer: (args) => transfer({ ...args, wallet, guardrail }),
+    transfer: (args) => transfer({
+      ...args,
+      wallet,
+      guardrail,
+      magicBlockConfig: options.profile?.config.magicblock,
+    }),
   };
 }

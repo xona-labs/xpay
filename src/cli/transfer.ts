@@ -20,6 +20,7 @@ export interface TransferCmdOptions {
   passphrase?: string;
   network?: Network;
   yes?: boolean;
+  private?: boolean;
 }
 
 export async function runTransfer(
@@ -65,12 +66,16 @@ export async function runTransfer(
   }
 
   try {
+    if (opts.private) {
+      console.log(chalk.dim("  Routing through MagicBlock Private Ephemeral Rollup..."));
+    }
     const t0 = Date.now();
     const result = await xpay.transfer({
       amount,
       to,
       network: opts.network,
-      token: "USDC",
+      token:   "USDC",
+      private: opts.private,
     });
     const elapsed = Date.now() - t0;
     console.log("");

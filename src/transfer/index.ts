@@ -8,6 +8,7 @@
 import type { Network, PaymentRequirement } from "../types.js";
 import type { Wallet } from "../wallet/index.js";
 import type { Guardrail } from "../guardrail/index.js";
+import { magicBlockPrivateTransfer, type MagicBlockConfig } from "../magicblock/client.js";
 
 /** Mint / contract addresses for the only token we support in v1. */
 const USDC_ASSETS: Record<string, string> = {
@@ -27,6 +28,14 @@ export interface TransferArgs {
   network?: Network;
   /** v1 only supports "USDC" — leaving it explicit for future-proofing. */
   token?: "USDC";
+  /**
+   * Route through MagicBlock's Private Ephemeral Rollup (Solana only).
+   * Uses delayed execution + fund splitting to obscure amount and recipient
+   * on the base chain.
+   */
+  private?: boolean;
+  /** Platform-level MagicBlock config (sourced from the active xpay profile). */
+  magicBlockConfig?: MagicBlockConfig;
   wallet: Wallet;
   guardrail: Guardrail;
 }
@@ -78,8 +87,23 @@ export async function transfer(args: TransferArgs): Promise<TransferResult> {
   });
 
   const signer = args.wallet.signer(network);
-  const txSig = await signer.pay(requirement);
 
+  // Private mode: delegate to MagicBlock PER (Solana only).
+  if (args.private) {
+    if (network !== "solana") {
+      throw new Error(`transfer: private mode is only supported on Solana (requested network: "${network}")`);
+    }
+    const result = await magicBlockPrivateTransfer({
+      signer,
+      mint:   asset,
+      amount: BigInt(atoms),
+      to:     args.to,
+      config: args.magicBlockConfig,
+    });
+    return { network, txSig: result.txSig, amount: args.amount, token: "USDC", to: args.to };
+  }
+
+  const txSig = await signer.pay(requirement);
   return { network, txSig, amount: args.amount, token: "USDC", to: args.to };
 }
 

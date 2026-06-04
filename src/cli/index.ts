@@ -31,6 +31,11 @@ import {
   runSanaCard, runSanaCardBalance, runSanaCardDeposit, runSanaCardTransactions,
   runSanaPortfolio, runSanaPrice, runSanaSwap, runSanaNotifications,
 } from "./sana.js";
+import {
+  runMagicBlockStatus,
+  runMagicBlockInitMint,
+  runMagicBlockConfigure,
+} from "./magicblock.js";
 import { startMcpServer } from "./mcp-server.js";
 
 const program = new Command();
@@ -120,6 +125,7 @@ program
   .option("--profile <name>", "Profile to send from (defaults to active)")
   .option("--passphrase <value>", "Non-interactive passphrase")
   .option("--network <net>", "Force network (solana, base, ethereum, ...)")
+  .option("--private", "Route through MagicBlock Private Ephemeral Rollup (Solana only)")
   .option("-y, --yes", "Skip the confirmation prompt")
   .action(async (amount: string, token: string, to: string, opts) => {
     await runTransfer(amount, token, to, opts);
@@ -232,6 +238,35 @@ sana
   .description("Recent Sana wallet activity feed.")
   .option("--profile <name>")
   .action((opts) => runSanaNotifications(opts));
+
+// ---------------------------------------------------------------- magicblock
+const magicblock = program
+  .command("magicblock")
+  .description("MagicBlock Private Ephemeral Rollup — platform-level privacy setup (operator commands).");
+
+magicblock
+  .command("status", { isDefault: true })
+  .description("Show MagicBlock PER integration status and mint initialization state.")
+  .option("--profile <name>", "Profile to check (defaults to active)")
+  .action(async (opts) => runMagicBlockStatus(opts));
+
+magicblock
+  .command("init-mint")
+  .description("Register USDC on MagicBlock's rollup (one-time platform setup, signed by your wallet).")
+  .option("--profile <name>", "Profile to use (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--mint <address>", "SPL mint to initialize (defaults to USDC mainnet)")
+  .option("-y, --yes", "Skip confirmation prompt")
+  .action(async (opts) => runMagicBlockInitMint(opts));
+
+magicblock
+  .command("configure")
+  .description("Save custom MagicBlock API endpoints to the profile (for self-hosted or staging instances).")
+  .option("--profile <name>", "Profile to configure (defaults to active)")
+  .option("--api-url <url>", "MagicBlock Payments API base URL")
+  .option("--ephemeral-rpc <url>", "Ephemeral rollup RPC endpoint")
+  .option("--clear", "Remove custom config and revert to defaults")
+  .action((opts) => runMagicBlockConfigure(opts));
 
 // ---------------------------------------------------------------- mcp
 program

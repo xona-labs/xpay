@@ -59,6 +59,17 @@ export interface ProfileConfig {
   sana?: {
     apiKey: string;
   };
+  /**
+   * MagicBlock Private Ephemeral Rollup integration.
+   * Platform-level config — set once by the xpay operator via `xpay magicblock configure`.
+   * End users never need a MagicBlock account; they just pass private:true.
+   */
+  magicblock?: {
+    /** Override the MagicBlock Payments API base URL. */
+    apiUrl?: string;
+    /** Override the ephemeral rollup RPC endpoint. */
+    ephemeralRpc?: string;
+  };
 }
 
 /** Runtime handle returned by {@link initProfile}/{@link loadProfile}. */

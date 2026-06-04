@@ -78,13 +78,16 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
     {
       name: "xpay_transfer",
       description:
-        "Send USDC directly to an address (no x402, no provider). Subject to the user's guardrail.",
+        "Send USDC directly to an address (no x402, no provider). Subject to the user's guardrail. " +
+        "Pass private:true on Solana to route through MagicBlock's Private Ephemeral Rollup, " +
+        "which obscures the amount and recipient via delayed execution + fund splitting.",
       input_schema: {
         type: "object",
         properties: {
-          amount: { type: "number", description: "USDC amount in human units, e.g. 1.5 for $1.50." },
-          to: { type: "string", description: "Recipient address (Solana base58 or EVM 0x...)." },
-          network: { type: "string", description: "Force network if address is ambiguous." },
+          amount:  { type: "number",  description: "USDC amount in human units, e.g. 1.5 for $1.50." },
+          to:      { type: "string",  description: "Recipient address (Solana base58 or EVM 0x...)." },
+          network: { type: "string",  description: "Force network if address is ambiguous." },
+          private: { type: "boolean", description: "Route through MagicBlock Private Ephemeral Rollup for on-chain privacy (Solana only)." },
         },
         required: ["amount", "to"],
       },
@@ -136,10 +139,11 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
 
     xpay_transfer: async (input) =>
       xpay.transfer({
-        amount: input.amount as number,
-        to: input.to as string,
+        amount:  input.amount  as number,
+        to:      input.to      as string,
         network: input.network as string | undefined,
-        token: "USDC",
+        private: input.private as boolean | undefined,
+        token:   "USDC",
       }),
 
     xpay_balance: async (input) => {
