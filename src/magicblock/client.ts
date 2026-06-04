@@ -88,10 +88,11 @@ export interface MagicBlockPrivateTransferResult {
 interface ChallengeResponse  { challenge: string }
 interface LoginResponse      { token: string }
 interface TransferBuildResponse {
-  transactionBase64: string;
-  sendTo: "base" | "ephemeral";
-  recentBlockhash: string;
-  requiredSigners: string[];
+  transactionBase64:   string;
+  sendTo:              "base" | "ephemeral";
+  recentBlockhash:     string;
+  lastValidBlockHeight: number;
+  requiredSigners:     string[];
 }
 
 export async function magicBlockPrivateTransfer(
@@ -155,20 +156,26 @@ export async function magicBlockPrivateTransfer(
       `MagicBlock transfer build failed (${buildRes.status}): ${await buildRes.text().catch(() => "")}`,
     );
   }
-  const { transactionBase64, sendTo } = (await buildRes.json()) as TransferBuildResponse;
+  const { transactionBase64, sendTo, recentBlockhash, lastValidBlockHeight } =
+    (await buildRes.json()) as TransferBuildResponse;
 
   // ── Step 4: sign the unsigned transaction ────────────────────────────────
-  const tx       = Transaction.from(Buffer.from(transactionBase64, "base64"));
-  const msgBytes = tx.serializeMessage();
+  const tx         = Transaction.from(Buffer.from(transactionBase64, "base64"));
+  const msgBytes   = tx.serializeMessage();
   const txSigBytes = await params.signer.signMessage(msgBytes);
   tx.addSignature(new PublicKey(pubkey), Buffer.from(txSigBytes));
 
-  // ── Step 5: submit to the correct RPC ────────────────────────────────────
+  // ── Step 5: submit + confirm via HTTP polling ─────────────────────────────
+  // Use blockhash-based confirmation so we never need signatureSubscribe (WebSocket).
+  // MagicBlock's ephemeral RPC is HTTP-only and doesn't implement that method.
   const rpcUrl     = sendTo === "ephemeral" ? resolveEphemeralRpc(params.config) : resolveSolanaRpc(params.config);
   const connection = new Connection(rpcUrl, "confirmed");
 
   const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false });
-  await connection.confirmTransaction(sig, "confirmed");
+  await connection.confirmTransaction(
+    { signature: sig, blockhash: recentBlockhash, lastValidBlockHeight },
+    "confirmed",
+  );
 
   return { txSig: sig, route: sendTo };
 }
@@ -205,7 +212,8 @@ export async function magicBlockInitializeMint(
       `MagicBlock initialize-mint failed (${res.status}): ${await res.text().catch(() => "")}`,
     );
   }
-  const { transactionBase64 } = (await res.json()) as { transactionBase64: string };
+  const { transactionBase64, recentBlockhash, lastValidBlockHeight } =
+    (await res.json()) as { transactionBase64: string; recentBlockhash: string; lastValidBlockHeight: number };
 
   const tx       = Transaction.from(Buffer.from(transactionBase64, "base64"));
   const msgBytes = tx.serializeMessage();
@@ -214,7 +222,10 @@ export async function magicBlockInitializeMint(
 
   const connection = new Connection(resolveSolanaRpc(params.config), "confirmed");
   const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false });
-  await connection.confirmTransaction(sig, "confirmed");
+  await connection.confirmTransaction(
+    { signature: sig, blockhash: recentBlockhash, lastValidBlockHeight },
+    "confirmed",
+  );
 
   return sig;
 }

@@ -78,14 +78,17 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
     {
       name: "xpay_transfer",
       description:
-        "Send USDC directly to an address (no x402, no provider). Subject to the user's guardrail. " +
+        "Send tokens directly to an address (no x402, no provider). Subject to the user's guardrail. " +
+        "Solana supports any SPL token: USDC, USDT, wSOL, mSOL, JitoSOL, BONK, JUP, PYTH, or any mint address. " +
+        "EVM supports USDC only. " +
         "Pass private:true on Solana to route through MagicBlock's Private Ephemeral Rollup, " +
         "which obscures the amount and recipient via delayed execution + fund splitting.",
       input_schema: {
         type: "object",
         properties: {
-          amount:  { type: "number",  description: "USDC amount in human units, e.g. 1.5 for $1.50." },
+          amount:  { type: "number",  description: "Token amount in human units, e.g. 1.5 or 1000." },
           to:      { type: "string",  description: "Recipient address (Solana base58 or EVM 0x...)." },
+          token:   { type: "string",  description: "Token symbol (USDC, BONK, JUP, wSOL, …) or Solana mint address. Defaults to USDC." },
           network: { type: "string",  description: "Force network if address is ambiguous." },
           private: { type: "boolean", description: "Route through MagicBlock Private Ephemeral Rollup for on-chain privacy (Solana only)." },
         },

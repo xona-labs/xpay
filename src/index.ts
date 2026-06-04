@@ -81,8 +81,13 @@ export interface XPay {
   do(query: string, opts?: { body?: unknown }): Promise<UseResult>;
   /** Recent USDC activity across all configured networks (merged + sorted). */
   history(opts?: HistoryOptions): Promise<HistoryEntry[]>;
-  /** Direct USDC transfer (no x402). Subject to the same guardrail. Pass private:true for MagicBlock PER privacy (Solana only). */
-  transfer(args: { amount: number; to: string; network?: Network; token?: "USDC"; private?: boolean }): Promise<TransferResult>;
+  /**
+   * Direct token transfer (no x402). Subject to the same guardrail.
+   * Solana: USDC, USDT, wSOL, BONK, JUP, PYTH, or any mint address.
+   * EVM: USDC only.
+   * Pass private:true for MagicBlock PER privacy (Solana only).
+   */
+  transfer(args: { amount: number; to: string; network?: Network; token?: string; private?: boolean }): Promise<TransferResult>;
 }
 
 /**

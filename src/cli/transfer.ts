@@ -1,12 +1,15 @@
 /**
- * `xpay transfer <amount> <token> <to>` — send USDC.
+ * `xpay transfer <amount> <token> <to>` — send SPL tokens or USDC.
  *
  * Examples:
  *   xpay transfer 5 USDC 7G73PL...gC
+ *   xpay transfer 1000 BONK 7G73PL...gC --private
+ *   xpay transfer 0.5 JUP 7G73PL...gC
  *   xpay transfer 1 USDC 0x47ff...5552 --network base
  *
+ * Solana: USDC, USDT, wSOL, mSOL, JitoSOL, BONK, JUP, PYTH, or any mint address.
+ * EVM:    USDC only.
  * Network is auto-detected from the address shape (0x → EVM, else Solana).
- * If the wallet has multiple EVM signers, --network is required.
  */
 
 import chalk from "chalk";
@@ -35,12 +38,8 @@ export async function runTransfer(
     process.exit(1);
   }
   const token = tokenArg.toUpperCase();
-  if (token !== "USDC") {
-    console.error(chalk.red(`✗ only USDC supported in v1 (got "${tokenArg}")`));
-    process.exit(1);
-  }
   if (!to) {
-    console.error(chalk.red("✗ usage: xpay transfer <amount> USDC <to>"));
+    console.error(chalk.red("✗ usage: xpay transfer <amount> <token> <to>"));
     process.exit(1);
   }
 
@@ -53,9 +52,9 @@ export async function runTransfer(
       {
         type: "confirm",
         name: "go",
-        message: `Send ${chalk.bold(`$${amount.toFixed(4)} USDC`)} to ${chalk.cyan(shortAddress(to, 6, 6))}${
+        message: `Send ${chalk.bold(`${amount} ${token}`)} to ${chalk.cyan(shortAddress(to, 6, 6))}${
           opts.network ? ` on ${chalk.cyan(opts.network)}` : ""
-        }?`,
+        }${opts.private ? chalk.dim(" (private)") : ""}?`,
         default: false,
       },
     ]);
@@ -74,13 +73,13 @@ export async function runTransfer(
       amount,
       to,
       network: opts.network,
-      token:   "USDC",
+      token,
       private: opts.private,
     });
     const elapsed = Date.now() - t0;
     console.log("");
     console.log(
-      chalk.green(`✔ Sent ${formatUsd(result.amount)} USDC on ${chalk.cyan(result.network)} in ${elapsed}ms`),
+      chalk.green(`✔ Sent ${result.amount} ${result.token} on ${chalk.cyan(result.network)} in ${elapsed}ms`),
     );
     console.log(`  ${chalk.dim("→ to:")} ${result.to}`);
     console.log(`  ${chalk.dim("→ tx:")} ${result.txSig}`);
