@@ -16,7 +16,11 @@
 
 import "dotenv/config";
 import { basename } from "node:path";
+import { createRequire } from "node:module";
 import { Command } from "commander";
+
+const require = createRequire(import.meta.url);
+const { version: pkgVersion } = require("../../package.json") as { version: string };
 import chalk from "chalk";
 import { runInit } from "./init.js";
 import { runAccountsList, runAccountsShow, runAccountsUse } from "./accounts.js";
@@ -43,7 +47,7 @@ const program = new Command();
 program
   .name("xpay")
   .description("xPay — discovery, payments, and wallet for agentic commerce.")
-  .version("0.1.0");
+  .version(pkgVersion);
 
 // ---------------------------------------------------------------- init
 program

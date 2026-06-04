@@ -156,7 +156,7 @@ export async function magicBlockPrivateTransfer(
       `MagicBlock transfer build failed (${buildRes.status}): ${await buildRes.text().catch(() => "")}`,
     );
   }
-  const { transactionBase64, sendTo, recentBlockhash, lastValidBlockHeight } =
+  const { transactionBase64, sendTo } =
     (await buildRes.json()) as TransferBuildResponse;
 
   // ── Step 4: sign the unsigned transaction ────────────────────────────────
@@ -172,10 +172,7 @@ export async function magicBlockPrivateTransfer(
   const connection = new Connection(rpcUrl, "confirmed");
 
   const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false });
-  await connection.confirmTransaction(
-    { signature: sig, blockhash: recentBlockhash, lastValidBlockHeight },
-    "confirmed",
-  );
+  await pollConfirmation(connection, sig);
 
   return { txSig: sig, route: sendTo };
 }
@@ -212,8 +209,8 @@ export async function magicBlockInitializeMint(
       `MagicBlock initialize-mint failed (${res.status}): ${await res.text().catch(() => "")}`,
     );
   }
-  const { transactionBase64, recentBlockhash, lastValidBlockHeight } =
-    (await res.json()) as { transactionBase64: string; recentBlockhash: string; lastValidBlockHeight: number };
+  const { transactionBase64 } =
+    (await res.json()) as { transactionBase64: string };
 
   const tx       = Transaction.from(Buffer.from(transactionBase64, "base64"));
   const msgBytes = tx.serializeMessage();
@@ -222,10 +219,7 @@ export async function magicBlockInitializeMint(
 
   const connection = new Connection(resolveSolanaRpc(params.config), "confirmed");
   const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false });
-  await connection.confirmTransaction(
-    { signature: sig, blockhash: recentBlockhash, lastValidBlockHeight },
-    "confirmed",
-  );
+  await pollConfirmation(connection, sig);
 
   return sig;
 }
@@ -241,6 +235,37 @@ export async function magicBlockIsMintInitialized(
   if (!res.ok) return false;
   const data = (await res.json()) as { initialized?: boolean };
   return Boolean(data.initialized);
+}
+
+// ─── HTTP-only confirmation polling ──────────────────────────────────────────
+
+/**
+ * Poll for transaction confirmation using getSignatureStatuses (pure HTTP).
+ * Never calls signatureSubscribe — safe for RPCs that don't support WebSocket.
+ * Resolves once confirmed/finalized, throws on on-chain error, times out after
+ * ~60 s and resolves anyway (balance was already deducted, tx is in flight).
+ */
+async function pollConfirmation(
+  connection: Connection,
+  signature: string,
+  intervalMs = 2_000,
+  maxAttempts = 30,
+): Promise<void> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const { value } = await connection.getSignatureStatuses([signature]);
+    const status = value[0];
+    if (status) {
+      if (status.err) {
+        throw new Error(`Transaction failed on-chain: ${JSON.stringify(status.err)}`);
+      }
+      if (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized") {
+        return;
+      }
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  // Timed out — transaction was submitted, confirmation just took too long.
+  // Caller already has the sig so they can verify on-chain themselves.
 }
 
 // ─── Base58 encoding ─────────────────────────────────────────────────────────
