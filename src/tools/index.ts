@@ -176,14 +176,41 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       const networks = input.network
         ? [input.network as string]
         : xpay.wallet.networks;
-      const out: Record<string, number> = {};
-      let total = 0;
+
+      const perNetwork: Record<string, unknown> = {};
+      let stablecoinTotal = 0;
+
       for (const n of networks) {
-        const b = await xpay.wallet.balance(n);
-        out[n] = b;
-        total += b;
+        if (!xpay.wallet.has(n)) continue;
+        const signer = xpay.wallet.signer(n);
+
+        if (typeof signer.tokenBalances === "function") {
+          // Full token breakdown — same path as the CLI.
+          const tokens = await signer.tokenBalances().catch(() => []);
+          perNetwork[n] = {
+            address: signer.address,
+            tokens: tokens.map((t) => ({
+              symbol: t.symbol,
+              name: t.name,
+              balance: t.balance,
+              native: t.isNative ?? false,
+              address: t.address,
+            })),
+          };
+          for (const t of tokens) {
+            if (t.symbol === "USDC" || t.symbol === "USDT") stablecoinTotal += t.balance;
+          }
+        } else {
+          // Fallback: USDC only.
+          const usdc = typeof signer.balance === "function"
+            ? await signer.balance().catch(() => 0)
+            : 0;
+          perNetwork[n] = { address: signer.address, tokens: [{ symbol: "USDC", balance: usdc, native: false }] };
+          stablecoinTotal += usdc;
+        }
       }
-      return { perNetwork: out, totalUsdc: total };
+
+      return { perNetwork, stablecoinTotal };
     },
 
     xpay_history: async (input) =>
