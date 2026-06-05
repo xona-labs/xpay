@@ -57,14 +57,6 @@
     "tweetnacl": "^1.0.3",
     "zod": "^3.23.0"
   },
-  "peerDependencies": {
-    "@privy-io/react-auth": "^2.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@privy-io/react-auth": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@types/inquirer": "^9.0.9",
     "@types/node": "^22.15.0",
