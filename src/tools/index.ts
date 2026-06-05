@@ -167,9 +167,9 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       xpay.transfer({
         amount:  input.amount  as number,
         to:      input.to      as string,
+        token:   (input.token as string | undefined) ?? "USDC",
         network: input.network as string | undefined,
         private: input.private as boolean | undefined,
-        token:   "USDC",
       }),
 
     xpay_balance: async (input) => {
