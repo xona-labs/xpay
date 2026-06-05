@@ -23,6 +23,7 @@
  *   XPAY_SOLANA_SECRET, XPAY_EVM_KEY, XPAY_EVM_NETWORK
  */
 
+import { randomInt } from "crypto";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -38,10 +39,110 @@ import { getActiveProfile } from "./accounts.js";
 import type { Network, Signer } from "../types.js";
 import type { XPay } from "../index.js";
 
+interface PendingTransfer {
+  amount: number;
+  to: string;
+  token?: string;
+  network?: string;
+  private?: boolean;
+  expiresAt: number;
+}
+
+/** Pending transfers waiting for user confirmation. Keyed by 6-digit code. */
+const pendingTransfers = new Map<string, PendingTransfer>();
+const TRANSFER_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function startMcpServer(): Promise<void> {
   const xpay = await buildXPay();
   const sanaApiKey = await resolveSanaApiKey();
   const { tools, handlers } = forClaude(xpay, { sanaApiKey });
+
+  // --- MCP-only: two-step confirmation for transfers ---
+  // Override xpay_transfer to stage a pending request instead of executing immediately.
+  // xpay_transfer_confirm (defined below) is the only path that actually moves funds.
+  // The CLI is unaffected — it uses its own inquirer confirm in cli/transfer.ts.
+  handlers["xpay_transfer"] = async (input) => {
+    const amount = input.amount as number;
+    const to = input.to as string;
+    const token = (input.token as string | undefined) ?? "USDC";
+    const network = input.network as string | undefined;
+    const isPrivate = input.private as boolean | undefined;
+
+    // Purge any expired codes before generating a new one.
+    const now = Date.now();
+    for (const [k, v] of pendingTransfers) {
+      if (v.expiresAt < now) pendingTransfers.delete(k);
+    }
+
+    let code: string;
+    do {
+      code = String(randomInt(100000, 999999));
+    } while (pendingTransfers.has(code));
+
+    pendingTransfers.set(code, {
+      amount,
+      to,
+      token,
+      network,
+      private: isPrivate,
+      expiresAt: now + TRANSFER_EXPIRY_MS,
+    });
+
+    const summary = `${amount} ${token} → ${to}${network ? ` on ${network}` : ""}${isPrivate ? " (private)" : ""}`;
+    return {
+      status: "pending_confirmation",
+      summary,
+      message:
+        `Transfer staged: ${summary}. ` +
+        `To authorise, call xpay_transfer_confirm with confirmationCode: "${code}". ` +
+        `Code expires in 5 minutes. Do NOT proceed unless you initiated this request.`,
+    };
+  };
+
+  const mcpTools = [
+    ...tools,
+    {
+      name: "xpay_transfer_confirm",
+      description:
+        "Confirm and execute a staged transfer. " +
+        "Call this only after xpay_transfer returns a confirmationCode and the user explicitly approves the transfer details.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          confirmationCode: {
+            type: "string",
+            description: "The 6-digit code returned by xpay_transfer.",
+          },
+        },
+        required: ["confirmationCode"],
+      },
+    },
+  ];
+
+  handlers["xpay_transfer_confirm"] = async (input) => {
+    const code = String(input.confirmationCode ?? "").trim();
+    const pending = pendingTransfers.get(code);
+
+    if (!pending) {
+      throw new Error(
+        "Invalid or expired confirmation code. Call xpay_transfer again to get a new code.",
+      );
+    }
+    if (pending.expiresAt < Date.now()) {
+      pendingTransfers.delete(code);
+      throw new Error("Confirmation code has expired. Call xpay_transfer again to stage a new transfer.");
+    }
+
+    pendingTransfers.delete(code);
+    return xpay.transfer({
+      amount: pending.amount,
+      to: pending.to,
+      token: pending.token,
+      network: pending.network as Network | undefined,
+      private: pending.private,
+    });
+  };
+  // --- end MCP-only confirmation ---
 
   const server = new Server(
     { name: "xpay", version: "0.1.0" },
@@ -49,10 +150,10 @@ export async function startMcpServer(): Promise<void> {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: tools.map((t) => ({
+    tools: mcpTools.map((t) => ({
       name: t.name,
       description: t.description,
-      inputSchema: t.input_schema,
+      inputSchema: "input_schema" in t ? t.input_schema : t.inputSchema,
     })),
   }));
 

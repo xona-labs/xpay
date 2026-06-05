@@ -12,6 +12,7 @@
  */
 
 import type { XPay } from "../index.js";
+import { ResourceSchema } from "../types.js";
 import { forSana } from "../sana/tools.js";
 
 export interface ToolBundle<TDef> {
@@ -51,14 +52,26 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
     {
       name: "xpay_use",
       description:
-        "Call a specific resource (by URL) from the catalog. Handles x402 payment automatically.",
+        "Call a specific resource from the catalog. Handles x402 payment automatically. " +
+        "Prefer passing the full `resource` object returned by xpay_discover — it includes " +
+        "pre-fetched payment requirements so payment goes through without a probe round-trip. " +
+        "Fall back to `resourceUrl` only when you have a URL but no catalog entry.",
       input_schema: {
         type: "object",
         properties: {
-          resourceUrl: { type: "string", description: "URL of the resource to call." },
+          resource: {
+            type: "object",
+            description:
+              "Full resource object from xpay_discover (preferred). " +
+              "Must include `resource` (URL), `type`, `method`, and `accepts` fields.",
+          },
+          resourceUrl: {
+            type: "string",
+            description:
+              "URL of the resource to call. Used only when `resource` object is not available.",
+          },
           body: { type: "object", description: "Optional JSON body for POST endpoints." },
         },
-        required: ["resourceUrl"],
       },
     },
     {
@@ -133,7 +146,17 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       }),
 
     xpay_use: async (input) => {
+      // Prefer the full resource object from xpay_discover — it carries
+      // pre-fetched accepts[] so we take the catalog path (no probe round-trip).
+      if (input.resource && typeof input.resource === "object") {
+        const parsed = ResourceSchema.safeParse(input.resource);
+        if (parsed.success) {
+          return xpay.use(parsed.data, { body: input.body as unknown });
+        }
+      }
+      // Fallback: only a URL was provided — probe the resource for a 402 challenge.
       const url = input.resourceUrl as string;
+      if (!url) throw new Error("xpay_use: provide either `resource` (full object from xpay_discover) or `resourceUrl`");
       return xpay.useByUrl(url, { body: input.body as unknown });
     },
 
