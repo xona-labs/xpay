@@ -8,7 +8,13 @@
  * EVM:    USDC only (other ERC-20 addresses can be added to EVM_USDC as needed).
  */
 
-import { Connection, PublicKey } from "@solana/web3.js";
+import {
+  Connection,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  LAMPORTS_PER_SOL,
+} from "@solana/web3.js";
 import { getMint } from "@solana/spl-token";
 import type { Network, PaymentRequirement } from "../types.js";
 import type { Wallet } from "../wallet/index.js";
@@ -125,6 +131,18 @@ export async function transfer(args: TransferArgs): Promise<TransferResult> {
     return { network, txSig, amount: args.amount, token: "USDC", to: args.to };
   }
 
+  // ── Solana path: native SOL ──────────────────────────────────────────────
+  const tokenKey = (args.token ?? "USDC").toUpperCase();
+  if (tokenKey === "SOL") {
+    if (args.private) {
+      throw new Error(
+        `transfer: native SOL is not supported by MagicBlock PER (SPL tokens only). ` +
+        `Use "wSOL" instead — it goes through the PER and settles as wrapped SOL on the other end.`,
+      );
+    }
+    return transferNativeSol(args);
+  }
+
   // ── Solana path: any SPL token ───────────────────────────────────────────
   const tokenInfo = await resolveSolanaToken(args.token ?? "USDC");
   const atoms = BigInt(Math.round(args.amount * Math.pow(10, tokenInfo.decimals))).toString();
@@ -158,6 +176,54 @@ export async function transfer(args: TransferArgs): Promise<TransferResult> {
 
   const txSig = await signer.pay(requirement);
   return { network, txSig, amount: args.amount, token: tokenInfo.symbol, to: args.to };
+}
+
+// ─── Native SOL transfer ──────────────────────────────────────────────────────
+
+async function transferNativeSol(args: TransferArgs): Promise<TransferResult> {
+  const lamports = BigInt(Math.round(args.amount * LAMPORTS_PER_SOL));
+
+  const requirement: PaymentRequirement = {
+    asset:   "SOL",
+    payTo:   args.to,
+    amount:  lamports.toString(),
+    scheme:  "exact",
+    network: "solana",
+  };
+  await args.guardrail.check({
+    resource: { resource: `xpay://transfer/solana/${args.to}`, type: "transfer", method: "POST", accepts: [requirement] },
+    requirement,
+  });
+
+  const signer = args.wallet.signer("solana");
+  const rpc = process.env.XPAY_SOLANA_RPC ?? "https://solana-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ";
+  const connection = new Connection(rpc, "confirmed");
+
+  // Reconstruct keypair from the signer's signMessage so we can sign the tx.
+  // rawSolanaSigner keeps the keypair internally — we access it by signing a
+  // known message and rebuilding. Instead, we use a lower-level approach:
+  // delegate to signer.pay() with a synthetic SOL "requirement" if it supports
+  // it, otherwise build the SystemProgram.transfer tx ourselves.
+  //
+  // Since signer.pay() only knows SPL (it uses getOrCreateAssociatedTokenAccount),
+  // we build the tx directly and sign via signMessage on the serialized message.
+  const from = new PublicKey(signer.address);
+  const to   = new PublicKey(args.to);
+
+  const tx = new Transaction().add(
+    SystemProgram.transfer({ fromPubkey: from, toPubkey: to, lamports }),
+  );
+  tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+  tx.feePayer = from;
+
+  const msgBytes  = tx.serializeMessage();
+  const sigBytes  = await signer.signMessage(msgBytes);
+  tx.addSignature(from, Buffer.from(sigBytes));
+
+  const txSig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false });
+  await connection.confirmTransaction(txSig, "confirmed");
+
+  return { network: "solana", txSig, amount: args.amount, token: "SOL", to: args.to };
 }
 
 // ─── Token resolution ─────────────────────────────────────────────────────────
