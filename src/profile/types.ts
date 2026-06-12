@@ -46,6 +46,14 @@ export interface ProfileConfig {
     allowedHosts?: string[];
     requireApprovalAbove?: number;
   };
+  /**
+   * Biometric unlock (macOS Touch ID). When enabled, the wallet passphrase is
+   * held in the login keychain and released after a biometric check via
+   * `xpay biometric enable`. The passphrase itself remains the recovery path.
+   */
+  biometric?: {
+    enabled: boolean;
+  };
   /** Linked API key for opt-in dashboard sync. */
   link?: {
     apiKey: string;

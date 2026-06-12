@@ -8,7 +8,7 @@
 import chalk from "chalk";
 import inquirer from "inquirer";
 import { createXPay } from "../index.js";
-import { unlockActive, formatUsd } from "./common.js";
+import { unlockActive, guardrailWithApproval, formatUsd } from "./common.js";
 
 export interface PayCmdOptions {
   profile?: string;
@@ -35,7 +35,7 @@ export async function runPay(url: string, opts: PayCmdOptions): Promise<void> {
     };
   }
 
-  const xpay = createXPay({ profile });
+  const xpay = createXPay({ profile, guardrail: guardrailWithApproval(profile) });
 
   // Pre-flight: parse the body if supplied.
   let body: unknown;

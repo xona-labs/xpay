@@ -36,6 +36,7 @@ import { rawSolanaSigner } from "../signers/raw-solana.js";
 import { rawEvmSigner } from "../signers/raw-evm.js";
 import { forClaude } from "../tools/index.js";
 import { getActiveProfile } from "./accounts.js";
+import { guardrailWithApproval } from "./common.js";
 import type { Network, Signer } from "../types.js";
 import type { XPay } from "../index.js";
 
@@ -190,9 +191,11 @@ async function buildXPay(): Promise<XPay> {
   if (profileExists(profileName)) {
     const profile = await loadProfile({
       name: profileName,
-      passphrase: process.env.XPAY_PASSPHRASE,
+      passphrase: process.env.XPAY_PASSPHRASE ?? (await biometricMcpPassphrase(profileName)),
     });
-    return createXPay({ profile });
+    // No TTY here — approvals above the guardrail threshold surface as a
+    // system Touch ID dialog when the profile has biometric unlock enabled.
+    return createXPay({ profile, guardrail: guardrailWithApproval(profile, { interactive: false }) });
   }
 
   // Fallback: ephemeral raw signers.
@@ -239,6 +242,26 @@ async function resolveSanaApiKey(): Promise<string | undefined> {
     // profile not found or locked — fall through to env
   }
   return process.env.SANABOT_API_KEY || undefined;
+}
+
+/**
+ * Touch ID unlock at MCP startup — lets hosts omit XPAY_PASSPHRASE from
+ * their config when the profile has `xpay biometric enable` set. Shows one
+ * system dialog as the server boots; resolves undefined on any failure so
+ * loadProfile produces its normal "passphrase required" error.
+ */
+async function biometricMcpPassphrase(profileName: string): Promise<string | undefined> {
+  try {
+    const { readProfileConfig } = await import("../profile/index.js");
+    if (!readProfileConfig(profileName).biometric?.enabled) return undefined;
+    const { readBiometricPassphrase } = await import("../biometric/index.js");
+    return (
+      (await readBiometricPassphrase(profileName, `unlock the xPay profile "${profileName}"`)) ??
+      undefined
+    );
+  } catch {
+    return undefined;
+  }
 }
 
 function numericEnv(name: string): number | undefined {

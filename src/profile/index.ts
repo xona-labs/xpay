@@ -160,6 +160,27 @@ export function setProfileGuardrail(
 }
 
 // -----------------------------------------------------------------------------
+// Biometric unlock
+// -----------------------------------------------------------------------------
+
+/** Toggle the biometric-unlock flag. The keychain item itself is managed by the CLI. */
+export function setProfileBiometric(
+  name: string,
+  enabled: boolean,
+  opts: { workspace?: boolean | string } = {},
+): ProfileConfig {
+  const dir = profilePath(name, opts);
+  const current = readConfigFile(dir);
+  if (enabled) {
+    current.biometric = { enabled: true };
+  } else {
+    delete current.biometric;
+  }
+  writeConfigFile(dir, current);
+  return current;
+}
+
+// -----------------------------------------------------------------------------
 // Sana integration
 // -----------------------------------------------------------------------------
 

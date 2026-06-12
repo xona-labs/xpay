@@ -16,7 +16,7 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import { createXPay } from "../index.js";
 import type { Network } from "../types.js";
-import { unlockActive, formatUsd, shortAddress } from "./common.js";
+import { unlockActive, guardrailWithApproval, formatUsd, shortAddress } from "./common.js";
 
 export interface TransferCmdOptions {
   profile?: string;
@@ -44,7 +44,7 @@ export async function runTransfer(
   }
 
   const profile = await unlockActive(opts);
-  const xpay = createXPay({ profile });
+  const xpay = createXPay({ profile, guardrail: guardrailWithApproval(profile) });
 
   // Confirm.
   if (process.stdin.isTTY && !opts.yes) {

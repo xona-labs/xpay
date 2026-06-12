@@ -62,6 +62,7 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay transfer <amount> USDC <to>` | Direct USDC transfer, subject to the guardrail. `--network`, `-y`. |
 | `xpay history` | Recent on-chain USDC activity across all networks. `--network`, `--limit`, `--evm-window`. |
 | `xpay guardrail show \| set \| clear` | Inspect or edit spending caps and allowed hosts. |
+| `xpay biometric status \| enable \| disable` | Touch ID unlock for the wallet passphrase (macOS). |
 | `xpay sana link \| unlink \| status` | Link a Sana API key to activate the agent card (optional). |
 | `xpay mcp` | Start the MCP server on stdio (for Claude Desktop / Cursor / Codex). |
 
@@ -154,6 +155,8 @@ Drop xPay into any MCP host's config — no code changes on the agent side.
 
 The host sees seven core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_history`, `xpay_guardrail`. If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically. The server reads the same `~/.xpay/<profile>/` you created with `xpay init`.
 
+On macOS you can omit `XPAY_PASSPHRASE` entirely: with [biometric unlock](#biometric-unlock-macos) enabled, the server shows one Touch ID dialog at startup instead of keeping the passphrase in plaintext host config.
+
 ## Profiles
 
 Each profile is a directory under `~/.xpay/` with:
@@ -167,6 +170,30 @@ Each profile is a directory under `~/.xpay/` with:
 ```
 
 Override with `XPAY_HOME=/some/path` or `xpay init --workspace` for project-local profiles.
+
+## Biometric unlock (macOS)
+
+Skip typing the passphrase on every command — unlock with Touch ID instead:
+
+```bash
+xpay biometric enable     # verifies your passphrase, then stores it Touch ID-gated
+xpay balance              # → Touch ID prompt instead of a passphrase prompt
+xpay biometric status     # availability + current state
+xpay biometric disable    # removes the keychain entry
+```
+
+How it works: the wallet's scrypt + AES-256-GCM encryption is unchanged. `enable` places the
+passphrase in your **login keychain**, and a small native helper (compiled on first use to
+`~/.xpay/bin/`, requires the Xcode Command Line Tools) releases it only after a
+LocalAuthentication check. Biometrics never replace the passphrase — they gate access to it.
+
+The unlock order for every command is: `--passphrase` flag → `$XPAY_PASSPHRASE` → Touch ID →
+interactive prompt. Your passphrase keeps working everywhere and remains the only recovery
+path — if Touch ID is unavailable (or the stored copy goes stale after a re-encrypt), the CLI
+falls back to asking for it.
+
+> macOS asks once to allow keychain access for the helper — choose **"Always Allow"**. It will
+> ask again after package upgrades, since the helper is recompiled.
 
 ## Guardrail
 
@@ -182,7 +209,11 @@ xpay guardrail set \
 
 - **`maxPerTx` / `maxPerDay`** — apply to every paid call *and* direct transfers.
 - **`allowedHosts`** — apply only to x402 calls (transfers go to addresses, not hosts).
-- **`requireApprovalAbove`** — calls ≥ threshold call your `onApprovalRequired` hook (SDK only — wire to a push notification, biometric prompt, or webhook).
+- **`requireApprovalAbove`** — calls ≥ threshold need explicit approval. In the CLI this is a
+  Touch ID prompt when [biometric unlock](#biometric-unlock-macos) is enabled, otherwise a y/n
+  confirm; in the MCP server it is Touch ID only (no terminal), so an agent's large payment
+  surfaces as a system dialog you physically approve. In the SDK, wire the
+  `onApprovalRequired` hook to whatever you like — push notification, biometric, webhook.
 
 ## Sana agent wallet card (optional)
 

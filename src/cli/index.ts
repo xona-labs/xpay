@@ -30,6 +30,7 @@ import { runPay } from "./pay.js";
 import { runHistory } from "./history.js";
 import { runTransfer } from "./transfer.js";
 import { runGuardrailShow, runGuardrailSet, runGuardrailClear } from "./guardrail.js";
+import { runBiometricEnable, runBiometricDisable, runBiometricStatus } from "./biometric.js";
 import {
   runSanaLink, runSanaUnlink, runSanaStatus,
   runSanaCard, runSanaCardBalance, runSanaCardDeposit, runSanaCardTransactions,
@@ -159,6 +160,29 @@ guardrail
   .command("clear [profile]")
   .description("Remove the guardrail entirely.")
   .action((profile?: string) => runGuardrailClear(profile));
+
+// ---------------------------------------------------------------- biometric
+const biometric = program
+  .command("biometric")
+  .description("Touch ID unlock for profile passphrases (macOS only).");
+
+biometric
+  .command("status [profile]", { isDefault: true })
+  .description("Show biometric availability + whether unlock is enabled.")
+  .action(async (profile?: string) => runBiometricStatus(profile));
+
+biometric
+  .command("enable")
+  .description("Store the wallet passphrase in the keychain, gated by Touch ID.")
+  .option("--profile <name>", "Profile to enable (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase (scripts/tests)")
+  .action(async (opts) => runBiometricEnable(opts));
+
+biometric
+  .command("disable")
+  .description("Remove the keychain entry and turn Touch ID unlock off.")
+  .option("--profile <name>", "Profile to disable (defaults to active)")
+  .action(async (opts) => runBiometricDisable(opts));
 
 // ---------------------------------------------------------------- balance
 program
