@@ -6,6 +6,20 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Discovery searches server-side.** `discover({ query })` now passes the
+  query to the OrbitX402 API (`?query=`), which searches and ranks the
+  catalog and returns only the matches — one small request instead of
+  downloading the entire 33k-item catalog (~2 minutes of sequential page
+  fetches) to filter locally. Cold `xpay discover <query>` drops from
+  minutes to ~2s. Local filtering remains as a fallback for endpoints that
+  ignore the query param; no-query browsing still fetches the full catalog.
+
+### Fixed
+- **MCP server no longer unlocks the wallet just to read the Sana API key** —
+  `config.json` is plaintext, so `sana_*` tools now register correctly when
+  the server starts without `XPAY_PASSPHRASE` (e.g. biometric-unlock setups).
+
 ## [0.1.18] – 2026-06-12
 
 ### Fixed

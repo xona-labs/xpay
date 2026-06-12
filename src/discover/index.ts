@@ -16,14 +16,24 @@ interface InternalDiscoverOptions extends DiscoverOptions {
   endpoint?: string;
 }
 
+/**
+ * Above this many results for a query, assume the endpoint ignored the
+ * `query` param (older/custom deployments return the full catalog) and fall
+ * back to local filtering. The real API returns a few dozen ranked matches.
+ */
+const SERVER_QUERY_MAX = 1000;
+
 export async function discover(opts: InternalDiscoverOptions = {}): Promise<Resource[]> {
+  // The query is sent to the API, which searches and ranks server-side —
+  // a ~50KB response instead of the full multi-MB catalog download.
+  const query = opts.query?.trim().toLowerCase() || undefined;
   let results = await cached(
-    `orbitx402:${opts.endpoint ?? "default"}`,
-    () => fetchOrbitX402Resources({ endpoint: opts.endpoint }),
+    `orbitx402:${opts.endpoint ?? "default"}${query ? `:q=${query}` : ""}`,
+    () => fetchOrbitX402Resources({ endpoint: opts.endpoint, query }),
   );
 
   // Network filter — prefix match so "solana" matches "solana:5eykt4..."
-  // and "eip155:8453" matches exactly.
+  // and "eip155:8453" matches exactly. The API has no network param yet.
   if (opts.networks?.length) {
     results = results.filter((r) =>
       r.accepts.some((a) =>
@@ -32,9 +42,9 @@ export async function discover(opts: InternalDiscoverOptions = {}): Promise<Reso
     );
   }
 
-  // Query filter + ranking.
-  if (opts.query) {
-    const terms = opts.query.toLowerCase().split(/\s+/).filter(Boolean);
+  // Local filter + ranking, only when the server didn't do it for us.
+  if (query && results.length > SERVER_QUERY_MAX) {
+    const terms = query.split(/\s+/).filter(Boolean);
     results = results
       .map((r) => ({ r, score: scoreResource(r, terms) }))
       .filter((x) => x.score > 0)

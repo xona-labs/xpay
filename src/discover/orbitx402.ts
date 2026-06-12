@@ -15,6 +15,8 @@ export interface OrbitX402ClientOptions {
   endpoint?: string;
   maxItems?: number;
   limit?: number;
+  /** Server-side search — the API ranks and returns only matching resources. */
+  query?: string;
   fetch?: typeof fetch;
 }
 
@@ -37,6 +39,7 @@ export async function fetchOrbitX402Resources(opts: OrbitX402ClientOptions = {})
     const url = new URL(endpoint);
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("offset", String(offset));
+    if (opts.query) url.searchParams.set("query", opts.query);
 
     const res = await fetchImpl(url.toString(), {
       headers: { accept: "application/json" },

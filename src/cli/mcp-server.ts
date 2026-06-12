@@ -233,13 +233,12 @@ async function buildXPay(): Promise<XPay> {
 async function resolveSanaApiKey(): Promise<string | undefined> {
   try {
     const profileName = process.env.XPAY_PROFILE ?? getActiveProfile();
-    const profile = await loadProfile({
-      name: profileName,
-      passphrase: process.env.XPAY_PASSPHRASE,
-    });
-    if (profile.config.sana?.apiKey) return profile.config.sana.apiKey;
+    // config.json is plaintext — no need to unlock the wallet to read it.
+    const { readProfileConfig } = await import("../profile/index.js");
+    const key = readProfileConfig(profileName).sana?.apiKey;
+    if (key) return key;
   } catch {
-    // profile not found or locked — fall through to env
+    // profile not found — fall through to env
   }
   return process.env.SANABOT_API_KEY || undefined;
 }
