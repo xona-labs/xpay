@@ -7,12 +7,8 @@
  */
 
 import chalk from "chalk";
-import inquirer from "inquirer";
-import { loadProfile, signersFromProfile } from "../profile/index.js";
-import { profileExists } from "../profile/storage.js";
-import { readWalletFile } from "../profile/storage.js";
-import { profilePath } from "../profile/storage.js";
-import { getActiveProfile } from "./accounts.js";
+import { signersFromProfile } from "../profile/index.js";
+import { unlockActive } from "./common.js";
 
 export interface BalanceCmdOptions {
   profile?: string;
@@ -21,28 +17,8 @@ export interface BalanceCmdOptions {
 }
 
 export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
-  const name = opts.profile ?? getActiveProfile();
-  if (!profileExists(name)) {
-    console.error(chalk.red(`✗ Profile "${name}" not found. Run \`xpay init\` first.`));
-    process.exit(1);
-  }
-
-  const wallet = readWalletFile(profilePath(name));
-  let passphrase = opts.passphrase ?? process.env.XPAY_PASSPHRASE;
-  if (wallet.encrypted && !passphrase) {
-    const a = await inquirer.prompt<{ p: string }>([
-      { type: "password", name: "p", message: `Passphrase for "${name}":`, mask: "*" },
-    ]);
-    passphrase = a.p;
-  }
-
-  let profile;
-  try {
-    profile = await loadProfile({ name, passphrase });
-  } catch (err) {
-    console.error(chalk.red(`✗ ${(err as Error).message}`));
-    process.exit(1);
-  }
+  const profile = await unlockActive(opts);
+  const name = profile.name;
 
   const signers = signersFromProfile(profile);
   const networks = opts.network ? [opts.network] : profile.config.networks;
