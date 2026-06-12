@@ -6,6 +6,13 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.18] – 2026-06-12
+
+### Fixed
+- **`xpay balance` now unlocks via Touch ID** — it had its own inline
+  passphrase prompt instead of the shared unlock path, so it never offered
+  biometric unlock. It now uses `unlockActive` like every other command.
+
 ## [0.1.17] – 2026-06-12
 
 ### Added
