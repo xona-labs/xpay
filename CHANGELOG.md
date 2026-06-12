@@ -6,6 +6,25 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.17] – 2026-06-12
+
+### Added
+- **Biometric unlock (macOS Touch ID)** — `xpay biometric enable|disable|status`.
+  When enabled, the wallet passphrase is stored in the login keychain and
+  released by a native LocalAuthentication helper (compiled on first use to
+  `~/.xpay/bin/`, requires Xcode Command Line Tools) after a Touch ID check.
+  The scrypt/AES wallet encryption is unchanged — the passphrase remains the
+  fallback and recovery path. Unlock order is now: `--passphrase` flag →
+  `$XPAY_PASSPHRASE` → Touch ID → interactive prompt.
+- **Guardrail approval hook is now wired in the CLI and MCP server.**
+  `requireApprovalAbove` previously always threw ("no onApprovalRequired hook
+  configured"); `xpay pay` / `xpay transfer` now resolve it via Touch ID (when
+  biometric unlock is enabled) or a y/n confirm on a TTY. The MCP server uses
+  Touch ID only (no TTY) and denies above-threshold calls otherwise.
+- **MCP server can start without `XPAY_PASSPHRASE`** — when the profile has
+  biometric unlock enabled, the server prompts Touch ID once at startup
+  instead of requiring the passphrase in plaintext host config.
+
 ## [0.1.5] – 2026-05-26
 
 ### Added
