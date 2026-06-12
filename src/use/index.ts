@@ -31,12 +31,28 @@ export interface UseArgs {
 }
 
 export async function use(args: UseArgs): Promise<UseResult> {
-  // If we have accepts up front, take the fast path.
-  if (args.resource.accepts.length > 0) {
+  // If we have accepts up front, take the fast path — unless the catalog
+  // entry is missing fields that only a live 402 challenge carries.
+  if (args.resource.accepts.length > 0 && !needsLiveChallenge(args, args.resource.accepts)) {
     return useWithRequirements(args, args.resource.accepts);
   }
   // Otherwise probe the resource for a 402 challenge.
   return useWithLiveChallenge(args);
+}
+
+/**
+ * Catalog entries are snapshots — they carry payTo/asset/amount but not the
+ * per-facilitator settlement fields. SVM v2 settlement needs
+ * `extra.feePayer` (the facilitator's fee-payer pubkey), which only a fresh
+ * 402 challenge provides. When it's missing, pay via the live flow instead
+ * of failing with "feePayer is required in paymentRequirements.extra".
+ */
+function needsLiveChallenge(args: UseArgs, reqs: PaymentRequirement[]): boolean {
+  const req = args.wallet.pickRequirement(reqs);
+  if (!req || !isSvmNetwork(req.network)) return false;
+  const signer = args.wallet.signer(normalizeNetwork(req.network));
+  const usesSvmV2 = typeof signer?.getKitSigner === "function";
+  return usesSvmV2 && !req.extra?.feePayer;
 }
 
 /**
