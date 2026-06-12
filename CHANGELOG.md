@@ -6,6 +6,16 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.20] – 2026-06-12
+
+### Fixed
+- **Catalog payments no longer fail with "feePayer is required in
+  paymentRequirements.extra for SVM transactions".** Catalog entries are
+  snapshots and don't carry the facilitator's per-challenge settlement
+  fields. When the picked requirement is SVM v2 and `extra.feePayer` is
+  missing, `use()` now falls back to the live 402 challenge flow (probe the
+  URL, pay against the fresh requirements) instead of erroring.
+
 ## [0.1.19] – 2026-06-12
 
 ### Changed
