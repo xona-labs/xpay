@@ -6,6 +6,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.19] – 2026-06-12
+
 ### Changed
 - **Discovery searches server-side.** `discover({ query })` now passes the
   query to the OrbitX402 API (`?query=`), which searches and ranks the
