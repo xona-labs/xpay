@@ -9,7 +9,7 @@ xpay discover "research API"               # 21k catalog, ranked
 xpay pay  https://api.example.com/x402     # x402 one-liner
 xpay transfer 5 USDC 7G73PL...gC           # direct USDC transfer
 xpay balance                               # unified across networks
-xpay history                               # recent activity, on-chain
+xpay report                                # daily / weekly / monthly report via OrbitX402
 ```
 
 ```ts
@@ -60,7 +60,7 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay discover [query]` | Search 21k+ x402 services across chains — Solana, Base, **BNB Chain**, and other EVM networks (cached on disk). `--network`, `--limit`, `--json`. |
 | `xpay pay <url>` | Pay an x402 endpoint. Works on catalog URLs and any URL that returns 402. `--max-usd`, `--body`, `-y`. |
 | `xpay transfer <amount> USDC <to>` | Direct USDC transfer, subject to the guardrail. `--network`, `-y`. |
-| `xpay history` | Recent on-chain USDC activity across all networks. `--network`, `--limit`, `--evm-window`. |
+| `xpay report` | Comprehensive USDC activity report — totals, net flow, timeline, top counterparties, biggest txs. `--period daily\|weekly\|monthly`, `--network`, `--json`. |
 | `xpay guardrail show \| set \| clear` | Inspect or edit spending caps and allowed hosts. |
 | `xpay biometric status \| enable \| disable` | Touch ID unlock for the wallet passphrase (macOS). |
 | `xpay sana link \| unlink \| status` | Link a Sana API key to activate the agent card (optional). |
@@ -103,7 +103,7 @@ await xpay.discover({ query: "weather" });
 await xpay.useByUrl("https://...");
 await xpay.do("translate this PDF to Japanese");
 await xpay.transfer({ amount: 1, to: "7G73PL...", token: "USDC" });
-await xpay.history({ limit: 10 });
+await xpay.report({ period: "weekly" });   // via OrbitX402 — no RPC calls from your code
 await xpay.wallet.balance("solana");
 ```
 
@@ -153,7 +153,7 @@ Drop xPay into any MCP host's config — no code changes on the agent side.
 }
 ```
 
-The host sees seven core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_history`, `xpay_guardrail`. If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically. The server reads the same `~/.xpay/<profile>/` you created with `xpay init`.
+The host sees seven core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`. If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically. The server reads the same `~/.xpay/<profile>/` you created with `xpay init`.
 
 On macOS you can omit `XPAY_PASSPHRASE` entirely: with [biometric unlock](#biometric-unlock-macos) enabled, the server shows one Touch ID dialog at startup instead of keeping the passphrase in plaintext host config.
 
@@ -293,12 +293,12 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 - **Keys** — One BIP-39 mnemonic per profile derives Solana (`m/44'/501'/0'/0'`, Phantom-compatible) and EVM (`m/44'/60'/0'/0/0`, MetaMask-compatible) keypairs. Encrypted at rest with scrypt + AES-256-GCM.
 - **Discovery** — the catalog spans 21k+ x402 endpoints across multiple chains — **Solana, Base, BNB Chain, and other EVM networks** — so `discover()` surfaces BNB Chain x402 resources alongside everything else. The fetcher walks the offset-pagination, validates each entry against a Zod schema, and persists to `~/.xpay/cache/` so repeat lookups skip the cold-fetch tax. (Filter with `--network` / `discover({ networks })`.)
 - **Pay** — `use()` and `useByUrl()` both go: guardrail check → signer.pay(USDC) on the right network → `X-Payment` header → retry. The signer abstraction means the same code path works for Solana SPL transfers and EVM ERC-20 transfers.
-- **History** — Solana via `getSignaturesForAddress` + `getParsedTransaction` on the USDC ATA. EVM via chunked `eth_getLogs` for ERC-20 `Transfer` events. No indexer required.
+- **Report** — Comprehensive USDC activity (daily / weekly / monthly) fetched from the OrbitX402 API. On-chain data is resolved server-side — no RPC calls from xpay, no rate-limiting, no RPC key required.
 
 ## Project status
 
 **v0.1 (current):**
-- ✅ CLI: init, accounts, balance, discover, pay, transfer, history, guardrail, mcp
+- ✅ CLI: init, accounts, balance, discover, pay, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
 - ✅ MCP server on stdio with 7 core tools
 - ✅ Solana + Base mainnet with disk caching

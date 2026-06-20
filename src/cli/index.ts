@@ -27,7 +27,7 @@ import { runAccountsList, runAccountsShow, runAccountsUse } from "./accounts.js"
 import { runBalance } from "./balance.js";
 import { runDiscover } from "./discover.js";
 import { runPay } from "./pay.js";
-import { runHistory } from "./history.js";
+import { runReport } from "./report.js";
 import { runTransfer } from "./transfer.js";
 import { runGuardrailShow, runGuardrailSet, runGuardrailClear } from "./guardrail.js";
 import { runBiometricEnable, runBiometricDisable, runBiometricStatus } from "./biometric.js";
@@ -109,18 +109,17 @@ program
     await runPay(url, opts);
   });
 
-// ---------------------------------------------------------------- history
+// ---------------------------------------------------------------- report
 program
-  .command("history")
-  .description("Recent USDC activity across all configured networks.")
+  .command("report")
+  .description("Comprehensive USDC activity report (daily / weekly / monthly) via OrbitX402.")
   .option("--profile <name>", "Profile to query (defaults to active)")
   .option("--passphrase <value>", "Non-interactive passphrase")
-  .option("--network <net>", "Restrict to one network")
-  .option("--limit <n>", "Max entries (default 25)")
-  .option("--evm-window <blocks>", "Block window for EVM scans (default 100000)")
+  .option("--network <net>", "Network to report on (default: solana)")
+  .option("--period <p>", "Report window: daily | weekly | monthly (default: weekly)")
   .option("--json", "Emit raw JSON")
   .action(async (opts) => {
-    await runHistory(opts);
+    await runReport(opts);
   });
 
 // ---------------------------------------------------------------- transfer

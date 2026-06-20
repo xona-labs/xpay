@@ -21,7 +21,7 @@ import { use, useByUrl } from "./use/index.js";
 import { doIt } from "./do/index.js";
 import { Guardrail, type GuardrailConfig } from "./guardrail/index.js";
 import { signersFromProfile, type LoadedProfile } from "./profile/index.js";
-import { getHistory, type HistoryEntry, type HistoryOptions } from "./history/index.js";
+import { fetchReport, type WalletReport, type ReportOptions } from "./report/index.js";
 import { transfer, type TransferResult } from "./transfer/index.js";
 import type {
   DiscoverOptions,
@@ -35,7 +35,7 @@ export * from "./types.js";
 export * from "./signers/index.js";
 export * from "./tools/index.js";
 export * from "./profile/index.js";
-export * from "./history/index.js";
+export * from "./report/index.js";
 export * from "./transfer/index.js";
 export { Guardrail } from "./guardrail/index.js";
 /**
@@ -79,8 +79,8 @@ export interface XPay {
   useByUrl(url: string, opts?: { method?: string; body?: unknown; headers?: Record<string, string> }): Promise<UseResult>;
   /** Search by intent, pick the top result, and call it. The thesis in one method. */
   do(query: string, opts?: { body?: unknown }): Promise<UseResult>;
-  /** Recent USDC activity across all configured networks (merged + sorted). */
-  history(opts?: HistoryOptions): Promise<HistoryEntry[]>;
+  /** Comprehensive USDC activity report (daily / weekly / monthly) via OrbitX402. */
+  report(opts?: ReportOptions): Promise<WalletReport>;
   /**
    * Direct token transfer (no x402). Subject to the same guardrail.
    * Solana: USDC, USDT, wSOL, BONK, JUP, PYTH, or any mint address.
@@ -126,7 +126,12 @@ export function createXPay(options: XPayOptions): XPay {
     use: (resource, opts) => use({ resource, wallet, guardrail, ...opts }),
     useByUrl: (url, opts) => useByUrl({ url, wallet, guardrail, ...opts }),
     do: (query, opts) => doIt({ query, wallet, guardrail, ...opts }),
-    history: (opts) => getHistory(wallet, opts),
+    report: (opts) => {
+      // Pick the primary network's address for the report (first configured network).
+      const net = opts?.network ?? networks[0] ?? "solana";
+      const address = wallet.address(net);
+      return fetchReport(address, opts);
+    },
     transfer: (args) => transfer({
       ...args,
       wallet,

@@ -86,6 +86,18 @@ export interface SettleEnvelope {
   extra?: Record<string, unknown>;
 }
 
+/** Platform fee charged on every {@link XPay.use} call. */
+export interface PlatformFeeResult {
+  /** Amount charged in USDC (always 0.01). */
+  amount: number;
+  /** Settlement tx signature from the platform-fee endpoint. */
+  txSig?: string;
+  /** Whether the fee was successfully charged. */
+  success: boolean;
+  /** Error message if the fee charge failed (non-fatal — the use result is still returned). */
+  error?: string;
+}
+
 /** Result returned by {@link XPay.use}. */
 export interface UseResult {
   /** Decoded response body (JSON if possible, else string). */
@@ -107,6 +119,8 @@ export interface UseResult {
    * Useful for reconciliation (payer address, actual settled amount, …).
    */
   settlement?: SettleEnvelope;
+  /** xPay platform fee of $0.01 USDC charged per pay-per-use call. */
+  platformFee?: PlatformFeeResult;
 }
 
 /** Options passed to {@link XPay.discover}. */

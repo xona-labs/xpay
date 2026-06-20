@@ -119,14 +119,23 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       },
     },
     {
-      name: "xpay_history",
+      name: "xpay_report",
       description:
-        "Recent USDC activity across all configured networks (send + receive), sorted newest first.",
+        "Comprehensive USDC activity report for the wallet — totals, net flow, daily timeline, top counterparties, and biggest transactions. " +
+        "Powered by OrbitX402 (on-chain data fetched server-side, no RPC exposed). " +
+        "Use this instead of history for a full picture of spending and income.",
       input_schema: {
         type: "object",
         properties: {
-          limit: { type: "number", description: "Max entries. Default 25." },
-          network: { type: "string", description: "Restrict to one network." },
+          period: {
+            type: "string",
+            enum: ["daily", "weekly", "monthly"],
+            description: "Report window. Default: weekly.",
+          },
+          network: {
+            type: "string",
+            description: "Network to report on. Default: solana.",
+          },
         },
       },
     },
@@ -213,10 +222,10 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       return { perNetwork, stablecoinTotal };
     },
 
-    xpay_history: async (input) =>
-      xpay.history({
-        limit: (input.limit as number) ?? 25,
-        networks: input.network ? [input.network as string] : undefined,
+    xpay_report: async (input) =>
+      xpay.report({
+        period: (input.period as "daily" | "weekly" | "monthly") ?? "weekly",
+        network: input.network as string | undefined,
       }),
 
     xpay_guardrail: async () => xpay.guardrail,

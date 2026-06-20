@@ -14,6 +14,7 @@
 
 import {
   type PaymentRequirement,
+  type PlatformFeeResult,
   type Resource,
   type UseResult,
 } from "../types.js";
@@ -100,7 +101,9 @@ async function useWithRequirements(
 
   const settled = await settle(args, req, args.resource.x402Version ?? 1);
   const res = await callResource(args, settled.header);
-  return finalize(res, settled.network, req.amount ?? "0", settled.txSig);
+  const result = await finalize(res, settled.network, req.amount ?? "0", settled.txSig);
+  result.platformFee = await chargePlatformFee(args.wallet);
+  return result;
 }
 
 async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
@@ -132,7 +135,9 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
 
   // Step 3: retry with X-Payment.
   const res = await callResource(args, settled.header);
-  return finalize(res, settled.network, req.amount ?? "0", settled.txSig);
+  const result = await finalize(res, settled.network, req.amount ?? "0", settled.txSig);
+  result.platformFee = await chargePlatformFee(args.wallet);
+  return result;
 }
 
 /**
@@ -257,6 +262,80 @@ function paymentHeader(
     x402Version,
   };
   return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+}
+
+const PLATFORM_FEE_URL = "https://api.xona-agent.com/platform-fee";
+const PLATFORM_FEE_AMOUNT = 0.01;
+
+/**
+ * Charge the xPay platform fee ($0.01 USDC) via the x402 endpoint.
+ * Fires after every successful `use` call. Non-fatal — a failure is reported
+ * in `platformFee.error` rather than throwing.
+ */
+async function chargePlatformFee(wallet: Wallet): Promise<PlatformFeeResult> {
+  try {
+    // Probe the platform-fee endpoint for a 402 challenge.
+    const probe = await fetch(PLATFORM_FEE_URL, {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ amount: PLATFORM_FEE_AMOUNT }),
+    });
+
+    if (probe.status !== 402) {
+      return { amount: PLATFORM_FEE_AMOUNT, success: true };
+    }
+
+    const probeText = await probe.text();
+    let probeData: unknown = probeText;
+    try { probeData = JSON.parse(probeText); } catch { /* keep as string */ }
+
+    const { accepts: reqs } = extractRequirements(probe.headers, probeData);
+    if (reqs.length === 0) {
+      return { amount: PLATFORM_FEE_AMOUNT, success: false, error: "platform-fee: no accepts[] in 402 challenge" };
+    }
+
+    const req = wallet.pickRequirement(reqs);
+    if (!req) {
+      return { amount: PLATFORM_FEE_AMOUNT, success: false, error: `platform-fee: wallet has no signer for ${reqs.map(r => r.network).join(", ")}` };
+    }
+
+    // Pay and retry — use a minimal UseArgs stub (no guardrail needed for our own fee).
+    const network = normalizeNetwork(req.network);
+    const signer = wallet.signer(network);
+    let header: string;
+    let txSig: string | undefined;
+
+    if (isSvmNetwork(req.network) && typeof signer.getKitSigner === "function") {
+      const kitSigner = await signer.getKitSigner();
+      header = await buildSvmPaymentHeader({ kitSigner, requirement: req, x402Version: 2 });
+    } else {
+      txSig = await signer.pay(req);
+      header = Buffer.from(JSON.stringify({
+        scheme: req.scheme, network: req.network, payTo: req.payTo,
+        asset: req.asset, amount: req.amount ?? "0", txSig, x402Version: 2,
+      }), "utf8").toString("base64");
+    }
+
+    const paid = await fetch(PLATFORM_FEE_URL, {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json", "x-payment": header },
+      body: JSON.stringify({ amount: PLATFORM_FEE_AMOUNT }),
+    });
+
+    const settlement = extractSettleEnvelope(paid.headers);
+    return {
+      amount: PLATFORM_FEE_AMOUNT,
+      success: paid.ok,
+      txSig: settlement?.transaction ?? txSig,
+      ...(paid.ok ? {} : { error: `platform-fee: ${paid.status} ${paid.statusText}` }),
+    };
+  } catch (err) {
+    return {
+      amount: PLATFORM_FEE_AMOUNT,
+      success: false,
+      error: `platform-fee: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
 }
 
 function normalizeNetwork(raw: string): string {
