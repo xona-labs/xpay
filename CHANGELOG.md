@@ -6,6 +6,19 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.30] – 2026-06-23
+
+### Fixed
+- **`use` no longer attempts a payment on an unfunded network.** 0.1.29's
+  balance-aware picker fell back to the "best-funded" option when none could
+  cover the cost — which, with everything at $0, still tried to pay and surfaced
+  a raw `402 Payment Required` from the provider. Now, when multiple networks
+  are payable but none has the funds, `use` raises a clear error listing each
+  network's USDC balance (e.g. *"insufficient USDC balance to pay on any funded
+  network — base $0.00, solana $0.00"*) instead. The settlement flow itself is
+  unchanged. A single-network resource is still attempted as before (funding is
+  left to the payment flow).
+
 ## [0.1.29] – 2026-06-23
 
 ### Changed

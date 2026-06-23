@@ -32,8 +32,11 @@ export interface Wallet {
   /**
    * Balance-aware picker. Among requirements we have a signer for, prefer the
    * first (in listed order) whose wallet balance covers the cost — so a $0
-   * Base wallet falls through to a funded Solana one. Falls back to the
-   * highest-balance candidate when none can cover the cost outright.
+   * Base wallet falls through to a funded Solana one. When there are multiple
+   * payable networks but none can cover the cost, returns `undefined` so the
+   * caller can raise a clear "insufficient balance" error instead of attempting
+   * a doomed payment. A single payable option is returned as-is (the payment
+   * flow handles funding the normal way).
    */
   pickRequirementByBalance(reqs: PaymentRequirement[]): Promise<PaymentRequirement | undefined>;
 }
@@ -90,10 +93,12 @@ export function createWallet(opts: WalletOptions): Wallet {
     async pickRequirementByBalance(reqs) {
       // Keep only options we can actually sign for, preserving listed order.
       const candidates = reqs.filter((r) => matchNetwork(r.network));
+      // 0 → no signer; 1 → the only option, leave funding to the payment flow.
       if (candidates.length <= 1) return candidates[0];
 
-      // Read balances for each candidate's network in parallel. Cost compare
-      // assumes USDC (6 decimals) — the asset for virtually all x402 calls.
+      // Multiple payable networks: read each balance in parallel and pick the
+      // first (listed order) that covers the cost. Compare assumes USDC
+      // (6 decimals) — the asset for virtually all x402 calls.
       const scored = await Promise.all(
         candidates.map(async (req) => {
           const net = matchNetwork(req.network)!;
@@ -103,10 +108,8 @@ export function createWallet(opts: WalletOptions): Wallet {
         }),
       );
 
-      // First (in listed order) that can cover the cost; else best-funded.
-      const affordable = scored.find((c) => c.bal > 0 && c.bal >= c.need);
-      if (affordable) return affordable.req;
-      return scored.reduce((a, b) => (b.bal > a.bal ? b : a)).req;
+      // First that can cover the cost; undefined when none can (caller errors).
+      return scored.find((c) => c.bal >= c.need)?.req;
     },
   };
 }

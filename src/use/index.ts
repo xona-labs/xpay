@@ -37,8 +37,12 @@ export async function use(args: UseArgs): Promise<UseResult> {
   // missing fields that only a live 402 challenge carries.
   if (args.resource.accepts.length > 0) {
     const req = await args.wallet.pickRequirementByBalance(args.resource.accepts);
-    if (req && !reqNeedsLiveChallenge(args, req)) {
-      return useWithRequirements(args, req);
+    if (req) {
+      if (!reqNeedsLiveChallenge(args, req)) return useWithRequirements(args, req);
+      // Chosen option needs a live 402 (SVM v2 missing feePayer) — fall through.
+    } else if (args.wallet.pickRequirement(args.resource.accepts)) {
+      // We can sign for an option but no payable network has the funds.
+      throw await insufficientBalanceError(args.resource.accepts, args.wallet);
     }
   }
   // Otherwise probe the resource for a 402 challenge.
@@ -121,6 +125,10 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
 
   const req = await args.wallet.pickRequirementByBalance(reqs);
   if (!req) {
+    // Distinguish "can't sign anywhere" from "can sign but unfunded".
+    if (args.wallet.pickRequirement(reqs)) {
+      throw await insufficientBalanceError(reqs, args.wallet);
+    }
     throw new Error(
       `xpay.use: ${args.resource.resource} accepts ${reqs.map((r) => r.network).join(", ")} but wallet has no matching signer`,
     );
@@ -332,6 +340,26 @@ async function chargePlatformFee(wallet: Wallet): Promise<PlatformFeeResult> {
       error: `platform-fee: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
+}
+
+/**
+ * Build a clear "you can't afford this" error listing the USDC balance on each
+ * network the wallet could have paid on. Raised only when every payable option
+ * is underfunded — better than attempting a doomed payment and surfacing a raw
+ * 402 from the upstream provider.
+ */
+async function insufficientBalanceError(
+  reqs: PaymentRequirement[],
+  wallet: UseArgs["wallet"],
+): Promise<Error> {
+  const nets = [...new Set(reqs.map((r) => normalizeNetwork(r.network)).filter((n) => wallet.has(n)))];
+  const parts = await Promise.all(
+    nets.map(async (n) => `${n} $${(await wallet.balance(n).catch(() => 0)).toFixed(2)}`),
+  );
+  return new Error(
+    `xpay.use: insufficient USDC balance to pay on any funded network — ${parts.join(", ")}. ` +
+      `Fund one of these and retry.`,
+  );
 }
 
 function normalizeNetwork(raw: string): string {
