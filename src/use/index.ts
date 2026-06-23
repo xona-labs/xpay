@@ -192,7 +192,13 @@ async function callResource(
     accept: "application/json",
     ...args.headers,
   };
-  if (paymentHeader) headers["x-payment"] = paymentHeader;
+  if (paymentHeader) {
+    // Most x402 servers read `X-PAYMENT`; some (e.g. Nansen) read
+    // `Payment-Signature`. The payload is identical, so send both — servers
+    // ignore the header name they don't recognise.
+    headers["x-payment"] = paymentHeader;
+    headers["payment-signature"] = paymentHeader;
+  }
 
   let body: BodyInit | undefined;
   if (args.body !== undefined && args.resource.method !== "GET") {

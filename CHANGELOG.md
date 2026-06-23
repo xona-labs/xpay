@@ -6,6 +6,19 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.31] – 2026-06-23
+
+### Fixed
+- **Payments now work against x402 servers that expect a `Payment-Signature`
+  header.** The retry attaches the payment payload under both `X-PAYMENT` (the
+  common name) and `Payment-Signature` — some providers (e.g. Nansen) only read
+  the latter and were silently returning `402 Payment Required` even though the
+  payload was valid. Confirmed against the live Nansen endpoint: the same
+  payload that was ignored under `X-PAYMENT` is accepted under
+  `Payment-Signature` (reaching settlement). The payload is identical and
+  servers ignore the header name they don't recognise, so existing endpoints
+  are unaffected.
+
 ## [0.1.30] – 2026-06-23
 
 ### Fixed
