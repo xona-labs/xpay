@@ -6,6 +6,25 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.26] – 2026-06-23
+
+### Added
+- **Zero-config wallet onboarding for the MCP server.** Drop xPay into any
+  agent host with no env at all — on first boot the agent is given its own
+  persistent wallet (generated, saved under `~/.xpay`/`XPAY_HOME`, address
+  printed to stderr to fund). Reused on every later boot, so the agent keeps a
+  stable address. The wallet source order is: existing profile → raw key env
+  (`XPAY_SOLANA_SECRET` / `XPAY_EVM_KEY`) → auto-provision. Bring-your-own-key
+  always takes precedence; auto-provision is only the last resort.
+  - Encrypts at rest when `XPAY_PASSPHRASE` is set, plaintext otherwise.
+  - Opt out with `XPAY_NO_AUTO_WALLET=1` to restore the strict "no wallet"
+    error.
+
+### Changed
+- **`mcp-server.ts` header now documents the zero-config form as primary.** The
+  previous example showed `XPAY_PASSPHRASE` alone, which only works once a
+  profile already exists — a setup trap for fresh hosts.
+
 ## [0.1.25] – 2026-06-23
 
 ### Fixed

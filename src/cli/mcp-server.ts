@@ -1,25 +1,30 @@
 /**
  * xPay MCP server.
  *
- * Exposes every CLI capability as an MCP tool over stdio. Designed to be
- * dropped into Claude Desktop / Cursor / Codex configs verbatim:
+ * Exposes every CLI capability as an MCP tool over stdio. Zero-config — drop
+ * this into any Claude Desktop / Cursor / Codex / agent-framework config and
+ * on first boot the agent is given its own persistent wallet:
  *
  *   {
  *     "mcpServers": {
  *       "xpay": {
  *         "command": "npx",
- *         "args": ["-y", "@xona-labs/xpay"],
- *         "env": { "XPAY_PASSPHRASE": "<your-passphrase>" }
+ *         "args": ["-y", "@xona-labs/xpay", "mcp"]
  *       }
  *     }
  *   }
  *
- * Configuration via env:
- *   XPAY_PROFILE     profile to load (default: active profile, else "default")
- *   XPAY_PASSPHRASE  passphrase for encrypted wallets
- *   XPAY_HOME        override ~/.xpay/ root (mirrors the CLI)
+ * The generated wallet's address is printed to stderr on first run — fund the
+ * Solana address with USDC to let the agent pay. It persists under ~/.xpay and
+ * is reused on every later boot.
  *
- * For ephemeral / test setups you can still bypass profiles with:
+ * Configuration via env (all optional):
+ *   XPAY_PROFILE        profile to load/create (default: active, else "default")
+ *   XPAY_PASSPHRASE     encrypt the wallet at rest (also unlocks an existing one)
+ *   XPAY_HOME           override ~/.xpay/ root (mirrors the CLI)
+ *   XPAY_NO_AUTO_WALLET error instead of auto-generating when nothing is configured
+ *
+ * To use a wallet you already hold instead of a generated one:
  *   XPAY_SOLANA_SECRET, XPAY_EVM_KEY, XPAY_EVM_NETWORK
  */
 
@@ -30,7 +35,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { createXPay, loadProfile } from "../index.js";
+import { createXPay, loadProfile, initProfile } from "../index.js";
 import { profileExists } from "../profile/storage.js";
 import { rawSolanaSigner } from "../signers/raw-solana.js";
 import { rawEvmSigner } from "../signers/raw-evm.js";
@@ -184,7 +189,8 @@ export async function startMcpServer(): Promise<void> {
 /**
  * Build the XPay client the MCP host will use. Preference order:
  *   1. A loaded profile (the common case after `xpay init`).
- *   2. Raw signer envs (for tests / ephemeral pods that skip the profile flow).
+ *   2. Raw signer envs (for a wallet the operator already holds).
+ *   3. Auto-provision a fresh wallet (zero-config onboarding) and persist it.
  */
 async function buildXPay(): Promise<XPay> {
   const profileName = process.env.XPAY_PROFILE ?? getActiveProfile();
@@ -209,9 +215,15 @@ async function buildXPay(): Promise<XPay> {
     signers[evmNet] = rawEvmSigner({ privateKey: process.env.XPAY_EVM_KEY, network: evmNet });
   }
   if (Object.keys(signers).length === 0) {
+    // Nothing configured — give the agent its own wallet (zero-config
+    // onboarding). Opt out with XPAY_NO_AUTO_WALLET for the strict behaviour.
+    if (!process.env.XPAY_NO_AUTO_WALLET) {
+      return autoProvisionXPay(profileName);
+    }
     throw new Error(
       `xpay-mcp: no profile "${profileName}" found and no raw signer env set. ` +
-        `Run \`xpay init\` first, or set XPAY_SOLANA_SECRET / XPAY_EVM_KEY.`,
+        `Run \`xpay init\`, set XPAY_SOLANA_SECRET / XPAY_EVM_KEY, or unset ` +
+        `XPAY_NO_AUTO_WALLET to auto-generate a wallet.`,
     );
   }
   return createXPay({
@@ -223,6 +235,35 @@ async function buildXPay(): Promise<XPay> {
       allowedHosts: process.env.XPAY_ALLOWED_HOSTS?.split(","),
     },
   });
+}
+
+/**
+ * Zero-config onboarding: no profile and no key configured, so generate a
+ * fresh wallet for the agent, persist it under ~/.xpay (or XPAY_HOME), and
+ * surface the address. Encrypted when XPAY_PASSPHRASE is set, otherwise
+ * plaintext (file-permission protected) — fine for a low-balance agent wallet.
+ *
+ * Runs once: the next boot finds the profile and loads it via the normal path,
+ * so the agent keeps the same address across restarts. All notices go to
+ * stderr — stdout is the MCP JSON-RPC channel and must stay clean.
+ */
+async function autoProvisionXPay(profileName: string): Promise<XPay> {
+  const passphrase = process.env.XPAY_PASSPHRASE || undefined;
+  const created = await initProfile({ name: profileName, passphrase });
+
+  process.stderr.write(
+    `\n[xpay-mcp] No wallet found — generated one for this agent.\n` +
+      `[xpay-mcp]   profile:  ${profileName}\n` +
+      `[xpay-mcp]   Solana:   ${created.addresses.solana}\n` +
+      `[xpay-mcp]   Base/EVM: ${created.addresses.evm}\n` +
+      `[xpay-mcp]   stored:   ${created.path}` +
+      (passphrase ? " (encrypted)\n" : " (UNENCRYPTED — set XPAY_PASSPHRASE to encrypt at rest)\n") +
+      `[xpay-mcp] Fund the Solana address with USDC so the agent can pay.\n` +
+      `[xpay-mcp] The recovery phrase lives in ${created.path} — back it up.\n\n`,
+  );
+
+  const profile = await loadProfile({ name: profileName, passphrase });
+  return createXPay({ profile, guardrail: guardrailWithApproval(profile, { interactive: false }) });
 }
 
 /**
