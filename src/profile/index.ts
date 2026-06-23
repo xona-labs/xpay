@@ -210,6 +210,31 @@ export function clearSanaApiKey(
 }
 
 // -----------------------------------------------------------------------------
+// Bento intent firewall
+// -----------------------------------------------------------------------------
+
+/**
+ * Toggle the Bento intent-firewall flag for a profile. When enabled,
+ * createXPay wires Bento's protect() into the guardrail and exposes the
+ * wallet key to @bentoguard/sdk via AGENT_WALLET_PRIVATE_KEY.
+ */
+export function setProfileBento(
+  name: string,
+  enabled: boolean,
+  opts: { workspace?: boolean | string } = {},
+): ProfileConfig {
+  const dir = profilePath(name, opts);
+  const current = readConfigFile(dir);
+  if (enabled) {
+    current.bento = { enabled: true };
+  } else {
+    delete current.bento;
+  }
+  writeConfigFile(dir, current);
+  return current;
+}
+
+// -----------------------------------------------------------------------------
 // MagicBlock integration
 // -----------------------------------------------------------------------------
 

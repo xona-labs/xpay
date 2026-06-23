@@ -20,7 +20,7 @@ import { discover } from "./discover/index.js";
 import { use, useByUrl } from "./use/index.js";
 import { doIt } from "./do/index.js";
 import { Guardrail, type GuardrailConfig } from "./guardrail/index.js";
-import { signersFromProfile, type LoadedProfile } from "./profile/index.js";
+import { signersFromProfile, deriveKeysFromMnemonic, type LoadedProfile } from "./profile/index.js";
 import { fetchReport, type WalletReport, type ReportOptions } from "./report/index.js";
 import { transfer, type TransferResult } from "./transfer/index.js";
 import type {
@@ -106,6 +106,19 @@ export function createXPay(options: XPayOptions): XPay {
     networks ??= options.profile.config.networks;
     signers ??= signersFromProfile(options.profile);
     guardrailConfig ??= options.profile.config.guardrail;
+
+    // Bento intent firewall: thread the enable flag into the guardrail and
+    // expose the wallet key to @bentoguard/sdk, which reads it from
+    // AGENT_WALLET_PRIVATE_KEY. Bento authenticates by signing a challenge
+    // with this key — there is no separate API key.
+    if (options.profile.config.bento?.enabled) {
+      guardrailConfig = { ...guardrailConfig, bento: { enabled: true } };
+      if (!process.env.AGENT_WALLET_PRIVATE_KEY) {
+        process.env.AGENT_WALLET_PRIVATE_KEY = deriveKeysFromMnemonic(
+          options.profile.mnemonic,
+        ).solana.secretKeyBase58;
+      }
+    }
   }
 
   if (!networks?.length) {

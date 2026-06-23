@@ -1,6 +1,6 @@
 {
   "name": "@xona-labs/xpay",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "description": "Discovery and usage layer for agentic commerce — multi-network wallet, x402 payments, 20k+ services via PayAI and other catalogs",
   "type": "module",
   "main": "dist/index.js",
@@ -62,5 +62,8 @@
     "@types/node": "^22.15.0",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
+  },
+  "optionalDependencies": {
+    "@bentoguard/sdk": "^1.2.8"
   }
 }

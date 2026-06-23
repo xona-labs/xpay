@@ -68,6 +68,17 @@ export interface ProfileConfig {
     apiKey: string;
   };
   /**
+   * Bento Guard intent firewall (optional).
+   * Activate with `xpay bento enable` after registering this wallet's address
+   * at https://app.bentoguard.xyz. When enabled, every pay / transfer is
+   * screened by Bento's protect() for prompt-injection / wallet-drain intent
+   * before signing — a second gate on top of the local guardrail caps.
+   * Bento authenticates with the wallet's own key, so there is no API key.
+   */
+  bento?: {
+    enabled: boolean;
+  };
+  /**
    * MagicBlock Private Ephemeral Rollup integration.
    * Platform-level config — set once by the xpay operator via `xpay magicblock configure`.
    * End users never need a MagicBlock account; they just pass private:true.

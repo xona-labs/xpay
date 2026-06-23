@@ -41,6 +41,7 @@ import {
   runMagicBlockInitMint,
   runMagicBlockConfigure,
 } from "./magicblock.js";
+import { runBentoEnable, runBentoDisable, runBentoStatus } from "./bento.js";
 import { startMcpServer } from "./mcp-server.js";
 
 const program = new Command();
@@ -265,6 +266,29 @@ sana
   .description("Recent Sana wallet activity feed.")
   .option("--profile <name>")
   .action((opts) => runSanaNotifications(opts));
+
+// ---------------------------------------------------------------- bento
+const bento = program
+  .command("bento")
+  .description("Bento Guard intent firewall — screen payments for malicious intent (optional).");
+
+bento
+  .command("status", { isDefault: true })
+  .description("Show whether the Bento intent firewall is enabled.")
+  .option("--profile <name>", "Profile to check (defaults to active)")
+  .action((opts) => runBentoStatus(opts));
+
+bento
+  .command("enable")
+  .description("Enable Bento intent screening for payments (register your wallet first).")
+  .option("--profile <name>", "Profile to enable (defaults to active)")
+  .action((opts) => runBentoEnable(opts));
+
+bento
+  .command("disable")
+  .description("Disable Bento intent screening — payments rely on local caps only.")
+  .option("--profile <name>", "Profile to disable (defaults to active)")
+  .action((opts) => runBentoDisable(opts));
 
 // ---------------------------------------------------------------- magicblock
 const magicblock = program

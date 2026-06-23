@@ -6,6 +6,26 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.24] – 2026-06-23
+
+### Added
+- **Bento Guard intent firewall (optional).** A second enforcement gate on top
+  of the local guardrail caps. When enabled, every `use` / `transfer` is
+  screened by Bento's `protect()` for malicious *intent* — prompt-injection,
+  wallet-drain, intent-vs-execution mismatch — before signing. The local
+  guardrail still owns spend caps; Bento adds the AI intent layer xPay can't
+  compute itself.
+  - Enable per-profile with `xpay bento enable` (also `disable` / `status`).
+  - No API key: Bento authenticates with the wallet's own key, which
+    `createXPay` exposes to the SDK via `AGENT_WALLET_PRIVATE_KEY`.
+  - One-time manual step: register the wallet address at
+    [app.bentoguard.xyz](https://app.bentoguard.xyz/); `enable` prints it.
+  - `BLOCKED` verdicts throw a `GuardrailError`; `ESCALATED` verdicts defer to
+    the existing `onApprovalRequired` hook, or fail closed if none is set.
+  - `@bentoguard/sdk` is an **optional** dependency loaded lazily — installs
+    that can't build its native bindings won't break `npm i @xona-labs/xpay`,
+    and the SDK is only required once a profile turns the firewall on.
+
 ## [0.1.20] – 2026-06-12
 
 ### Fixed
