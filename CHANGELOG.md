@@ -6,6 +6,36 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] – 2026-06-23
+
+Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
+
+### Easiest onboarding
+- **Zero-config wallet provisioning.** Drop the MCP server into any agent host
+  with no env — the agent is given its own persistent wallet on first boot
+  (address printed to stderr to fund). Bring-your-own-key and existing profiles
+  still take precedence.
+- **`SKILL.md`** — a framework-agnostic guide so any agent (Claude, Codex,
+  OpenAI, Gemini, custom) can drive xPay's tools, kept current with this release.
+
+### Smart pay routing
+- **Balance-aware network selection.** When a service accepts multiple networks,
+  `use` / `do` pay from the first network whose balance covers the cost (a $0
+  Base wallet falls through to a funded Solana one). When none can cover it, the
+  call fails fast with a clear per-network balance error instead of a raw 402.
+- **Broader x402 compatibility.** The payment payload is sent under both
+  `X-PAYMENT` and `Payment-Signature`, so providers that read the latter
+  (e.g. Nansen) now settle.
+
+### Spending guardrail
+- Surfaced as a first-class feature: per-tx / per-day USD caps, allowed-host
+  list, and an approval threshold, all enforced **before signing**. Two-step
+  confirmation guards MCP transfers.
+
+### Reporting
+- Comprehensive on-chain USDC usage report (daily / weekly / monthly) via
+  OrbitX402 — summary, timeline, top counterparties, and biggest transactions.
+
 ## [0.1.31] – 2026-06-23
 
 ### Fixed

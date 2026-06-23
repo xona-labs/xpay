@@ -155,7 +155,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** — fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [Bento intent firewall](#guardrail). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees seven core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`. If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** — the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -314,7 +314,7 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 **v0.1 (current):**
 - ✅ CLI: init, accounts, balance, discover, pay, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
-- ✅ MCP server on stdio with 10 core tools (incl. Bento firewall controls)
+- ✅ MCP server on stdio with 7 core tools
 - ✅ Solana + Base mainnet with disk caching
 - ✅ Optional Sana agent card integration (`xpay sana link`) — 8 additional `sana_*` tools
 

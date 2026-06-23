@@ -45,9 +45,6 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_balance` | The wallet's balance per network, plus its addresses (use this to tell the user where to send funds). |
 | `xpay_report` | Spending/income report (daily / weekly / monthly). |
 | `xpay_guardrail` | Read the active spending caps (per-tx, per-day, allowed hosts, approval threshold). |
-| `xpay_bento_status` | Check whether the Bento intent firewall is on (read-only). |
-| `xpay_bento_enable` | Turn the Bento intent firewall on. Returns the agent wallet address to register at app.bentoguard.xyz. |
-| `xpay_bento_disable` | Turn the Bento firewall off — use if the wallet isn't registered and payments are rejected. |
 
 ## How payment works
 
@@ -55,6 +52,12 @@ Services price calls in **USDC** over the **x402** protocol (typically fractions
 of a cent to a few cents per call). `xpay_use` / `xpay_do` settle the payment
 and call the service in one round-trip — the agent just receives the result. A
 small platform fee ($0.01 USDC) applies per paid call.
+
+When a service accepts more than one network (e.g. Base **and** Solana), xPay
+**routes automatically to a funded network** — it pays from the first one whose
+balance covers the cost, so a $0 Base wallet falls through to a funded Solana
+one. If no network has the funds, the call fails fast with a clear
+"insufficient balance" message naming each network's balance.
 
 The agent pays from its own wallet, so **it must be funded first**. If a call
 fails for lack of funds, ask the user to send USDC to the address from
@@ -68,12 +71,6 @@ fails for lack of funds, ask the user to send USDC to the address from
 - **Transfers need confirmation.** `xpay_transfer` only *stages* a transfer; it
   returns a code. Show the user the amount + destination and only call
   `xpay_transfer_confirm` after they approve. Never move funds unprompted.
-- **Bento intent firewall (optional).** When enabled, every payment is screened
-  for malicious intent (prompt-injection, wallet-drain) before signing. A
-  `BLOCKED` result means stop. Toggle with `xpay_bento_enable` /
-  `xpay_bento_disable`; it requires a one-time wallet registration at
-  app.bentoguard.xyz, and until then payments are rejected — disable it to fall
-  back to local caps if you don't want to register.
 
 ## Recipes
 
