@@ -6,6 +6,21 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.27] – 2026-06-23
+
+### Added
+- **`SKILL.md` — framework-agnostic onboarding guide.** A single page that
+  teaches any agent (Claude, Codex, OpenAI, Gemini, custom) how to drive xPay:
+  zero-config setup, the tool surface, the pay-per-call model, the safety rules
+  (guardrail, transfer confirmation, Bento), and copy-paste recipes. Shipped in
+  the npm package so hosts can read it from `node_modules/@xona-labs/xpay`.
+
+### Changed
+- **README MCP section leads with zero-config onboarding.** The primary example
+  is now the no-env "agent gets its own wallet" config; bring-your-own-wallet
+  (`XPAY_SOLANA_SECRET` / `XPAY_PASSPHRASE` / `XPAY_NO_AUTO_WALLET`) is shown as
+  the override, matching the wallet-source precedence.
+
 ## [0.1.26] – 2026-06-23
 
 ### Added

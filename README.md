@@ -136,7 +136,8 @@ for (const block of response.content) {
 
 ## MCP server (Claude Desktop / Cursor / Codex)
 
-Drop xPay into any MCP host's config — no code changes on the agent side.
+Drop xPay into any MCP host's config — **no code, no keys, no `xpay init`.** On
+first boot the agent is given its own wallet automatically:
 
 ```jsonc
 // ~/Library/Application Support/Claude/claude_desktop_config.json
@@ -144,18 +145,31 @@ Drop xPay into any MCP host's config — no code changes on the agent side.
   "mcpServers": {
     "xpay": {
       "command": "npx",
-      "args": ["-y", "@xona-labs/xpay", "mcp"],
-      "env": {
-        "XPAY_PASSPHRASE": "<your-passphrase>"
-      }
+      "args": ["-y", "@xona-labs/xpay", "mcp"]
     }
   }
 }
 ```
 
-The host sees seven core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`. If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically. The server reads the same `~/.xpay/<profile>/` you created with `xpay init`.
+That's the whole setup. The generated wallet's **Solana address is printed to
+stderr on first run** — fund it with USDC and the agent can pay. It persists
+under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-On macOS you can omit `XPAY_PASSPHRASE` entirely: with [biometric unlock](#biometric-unlock-macos) enabled, the server shows one Touch ID dialog at startup instead of keeping the passphrase in plaintext host config.
+The host sees seven core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`. If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+
+**Bring your own wallet instead** — the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
+
+```jsonc
+"env": {
+  "XPAY_SOLANA_SECRET": "<base58 key>",  // use a wallet you already hold
+  "XPAY_PASSPHRASE":    "<passphrase>",  // or unlock/encrypt a profile
+  "XPAY_NO_AUTO_WALLET": "1"             // or disable auto-generation entirely
+}
+```
+
+On macOS, with [biometric unlock](#biometric-unlock-macos) enabled on a profile, the server shows one Touch ID dialog at startup instead of keeping the passphrase in host config.
+
+See **[SKILL.md](SKILL.md)** for a framework-agnostic guide to driving these tools from any agent.
 
 ## Profiles
 

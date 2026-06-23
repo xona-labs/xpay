@@ -1,6 +1,6 @@
 {
   "name": "@xona-labs/xpay",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "description": "Discovery and usage layer for agentic commerce — multi-network wallet, x402 payments, 20k+ services via PayAI and other catalogs",
   "type": "module",
   "main": "dist/index.js",
@@ -12,6 +12,7 @@
   "files": [
     "dist",
     "README.md",
+    "SKILL.md",
     "CHANGELOG.md",
     "LICENSE"
   ],
