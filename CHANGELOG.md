@@ -6,6 +6,22 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.25] – 2026-06-23
+
+### Fixed
+- **Bento "agent not registered" detection.** Verified against the live Bento
+  relayer: an unregistered agent wallet is rejected with `Agent not found` /
+  `Agent security check failed`, not the `not registered` string the v0.1.24
+  handler matched. The guardrail now detects the real message and surfaces the
+  actionable fix (register the agent wallet in the Dashboard) instead of a raw
+  relayer error.
+
+### Changed
+- **`xpay bento enable` spells out the owner-vs-agent wallet distinction.** The
+  address to register is the *agent* wallet (the one the SDK signs with), which
+  is usually different from the *owner* wallet used to log into the Dashboard.
+  Registration is an on-chain tx paid by the owner wallet.
+
 ## [0.1.24] – 2026-06-23
 
 ### Added

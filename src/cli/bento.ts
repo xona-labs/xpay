@@ -37,13 +37,19 @@ export function runBentoEnable(opts: { profile?: string }): void {
   console.log("");
   console.log(chalk.green(`✔ Bento intent firewall enabled for "${name}".`));
   console.log("");
-  console.log(chalk.bold("  One-time setup — register this wallet:"));
-  console.log(`    1. Open  ${chalk.cyan(DASHBOARD)}`);
-  console.log(`    2. Register your agent wallet address:`);
+  console.log(chalk.bold("  One-time setup — register this AGENT wallet:"));
+  console.log(`    1. Log in to ${chalk.cyan(DASHBOARD)} with your owner wallet (e.g. Phantom).`);
+  console.log(`    2. Register THIS agent wallet address (an on-chain tx — owner pays gas):`);
   console.log(`       ${chalk.yellow(addresses.solana)}`);
   console.log(
     `    3. Leave spend limits unset — xPay's own guardrail handles caps; Bento adds intent screening.`,
   );
+  console.log(
+    chalk.dim(
+      "    Note: the owner wallet (dashboard login) and this agent wallet are usually different —",
+    ),
+  );
+  console.log(chalk.dim("    register the address shown above, not your login wallet."));
   console.log("");
   console.log(chalk.dim("  From now on every pay / transfer is screened by Bento's intent"));
   console.log(chalk.dim("  analysis (prompt-injection / wallet-drain) before signing."));

@@ -142,12 +142,15 @@ export class Guardrail {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // The most common first-run failure: the wallet hasn't been onboarded.
-      // Surface the fix instead of a raw relayer error.
-      if (/not\s+(?:been\s+)?registered/i.test(msg)) {
+      // The most common first-run failure: the agent wallet hasn't been
+      // registered in the Bento Dashboard. The relayer reports this as
+      // "Agent not found" / "Agent security check failed" (confirmed against
+      // the live relayer). Surface the fix instead of a raw error.
+      if (/agent not found|security check failed|not\s+(?:been\s+)?registered/i.test(msg)) {
         throw new GuardrailError(
-          "Bento is enabled but this wallet isn't registered. Register its address " +
-            "at https://app.bentoguard.xyz, then retry — or run `xpay bento disable`.",
+          "Bento is enabled but this agent wallet isn't registered. Log in to " +
+            "https://app.bentoguard.xyz with your owner wallet and register this agent " +
+            "address, then retry — or run `xpay bento disable`.",
         );
       }
       throw new GuardrailError(`Bento intent check failed: ${msg}`);
