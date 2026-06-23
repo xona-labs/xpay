@@ -6,6 +6,19 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.28] – 2026-06-23
+
+### Added
+- **Bento firewall controls exposed as MCP tools.** Agents can now manage the
+  intent firewall directly, not just via the CLI:
+  - `xpay_bento_status` — read whether screening is on (and the agent wallet to register).
+  - `xpay_bento_enable` — turn it on; returns the agent wallet address to register at app.bentoguard.xyz.
+  - `xpay_bento_disable` — turn it off; the escape hatch when the wallet isn't registered and payments are being rejected.
+  Enable/disable take effect live on the running guardrail (no restart) and
+  persist to the profile. Only available on profile-backed wallets — raw-key
+  (`XPAY_SOLANA_SECRET`) mode reports `profileBacked: false`.
+- **`Guardrail.bentoEnabled()` / `setBentoEnabled()`** for runtime toggling.
+
 ## [0.1.27] – 2026-06-23
 
 ### Added

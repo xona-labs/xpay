@@ -45,6 +45,9 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_balance` | The wallet's balance per network, plus its addresses (use this to tell the user where to send funds). |
 | `xpay_report` | Spending/income report (daily / weekly / monthly). |
 | `xpay_guardrail` | Read the active spending caps (per-tx, per-day, allowed hosts, approval threshold). |
+| `xpay_bento_status` | Check whether the Bento intent firewall is on (read-only). |
+| `xpay_bento_enable` | Turn the Bento intent firewall on. Returns the agent wallet address to register at app.bentoguard.xyz. |
+| `xpay_bento_disable` | Turn the Bento firewall off — use if the wallet isn't registered and payments are rejected. |
 
 ## How payment works
 
@@ -67,7 +70,10 @@ fails for lack of funds, ask the user to send USDC to the address from
   `xpay_transfer_confirm` after they approve. Never move funds unprompted.
 - **Bento intent firewall (optional).** When enabled, every payment is screened
   for malicious intent (prompt-injection, wallet-drain) before signing. A
-  `BLOCKED` result means stop.
+  `BLOCKED` result means stop. Toggle with `xpay_bento_enable` /
+  `xpay_bento_disable`; it requires a one-time wallet registration at
+  app.bentoguard.xyz, and until then payments are rejected — disable it to fall
+  back to local caps if you don't want to register.
 
 ## Recipes
 

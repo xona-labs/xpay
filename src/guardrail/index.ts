@@ -188,6 +188,22 @@ export class Guardrail {
     const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
     return this.history.filter((h) => h.at >= dayAgo).reduce((s, h) => s + h.usd, 0);
   }
+
+  /** Whether the Bento intent firewall is active on this instance. */
+  bentoEnabled(): boolean {
+    return Boolean(this.config.bento?.enabled);
+  }
+
+  /**
+   * Toggle the Bento firewall on this live instance — lets the MCP
+   * `xpay_bento_enable` tool activate screening for the current session
+   * without a server restart. Persisting the flag to disk is separate
+   * (the caller does that via `setProfileBento`). Requires
+   * `AGENT_WALLET_PRIVATE_KEY` in the environment for `protect()` to run.
+   */
+  setBentoEnabled(enabled: boolean): void {
+    this.config.bento = { ...this.config.bento, enabled };
+  }
 }
 
 export class GuardrailError extends Error {

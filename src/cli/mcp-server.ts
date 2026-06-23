@@ -35,8 +35,9 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { createXPay, loadProfile, initProfile } from "../index.js";
+import { createXPay, loadProfile, initProfile, deriveKeysFromMnemonic } from "../index.js";
 import { profileExists } from "../profile/storage.js";
+import { readProfileConfig, setProfileBento } from "../profile/index.js";
 import { rawSolanaSigner } from "../signers/raw-solana.js";
 import { rawEvmSigner } from "../signers/raw-evm.js";
 import { forClaude } from "../tools/index.js";
@@ -59,7 +60,7 @@ const pendingTransfers = new Map<string, PendingTransfer>();
 const TRANSFER_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function startMcpServer(): Promise<void> {
-  const xpay = await buildXPay();
+  const { xpay, profileName } = await buildXPay();
   const sanaApiKey = await resolveSanaApiKey();
   const { tools, handlers } = forClaude(xpay, { sanaApiKey });
 
@@ -123,6 +124,29 @@ export async function startMcpServer(): Promise<void> {
         required: ["confirmationCode"],
       },
     },
+    {
+      name: "xpay_bento_status",
+      description:
+        "Check whether the Bento intent firewall is active. When on, every payment is " +
+        "screened for malicious intent (prompt-injection, wallet-drain) before signing. Read-only.",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "xpay_bento_enable",
+      description:
+        "Turn ON the Bento intent firewall for this agent's wallet. Returns the agent wallet " +
+        "address, which must be registered once at app.bentoguard.xyz (logging in with the " +
+        "owner wallet) before protection takes effect — until then payments are rejected.",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "xpay_bento_disable",
+      description:
+        "Turn OFF the Bento intent firewall. Use this if the wallet isn't registered at the " +
+        "Bento dashboard and payments are being rejected with 'Agent not found'. Payments then " +
+        "fall back to the local spending caps only.",
+      inputSchema: { type: "object", properties: {} },
+    },
   ];
 
   handlers["xpay_transfer_confirm"] = async (input) => {
@@ -149,6 +173,62 @@ export async function startMcpServer(): Promise<void> {
     });
   };
   // --- end MCP-only confirmation ---
+
+  // --- MCP-only: Bento intent firewall controls ---
+  // status + enable + disable. Disable is intentionally available so the agent
+  // can recover when the wallet isn't registered and payments are rejected.
+  const BENTO_DASHBOARD = "https://app.bentoguard.xyz/";
+  const agentSolanaAddress = (): string => {
+    try {
+      return xpay.wallet.address("solana");
+    } catch {
+      return "";
+    }
+  };
+
+  handlers["xpay_bento_status"] = async () => {
+    const persisted = profileName ? Boolean(readProfileConfig(profileName).bento?.enabled) : false;
+    return {
+      enabled: xpay.guardrail.bentoEnabled(),
+      persisted,
+      profileBacked: Boolean(profileName),
+      agentWallet: agentSolanaAddress(),
+      dashboard: BENTO_DASHBOARD,
+    };
+  };
+
+  handlers["xpay_bento_enable"] = async () => {
+    if (!profileName) {
+      return {
+        ok: false,
+        error:
+          "Bento requires a profile-backed wallet. This server is running with a raw key " +
+          "(XPAY_SOLANA_SECRET), so there's no profile to enable it on.",
+      };
+    }
+    setProfileBento(profileName, true); // persist for future boots
+    xpay.guardrail.setBentoEnabled(true); // activate for this session
+    return {
+      ok: true,
+      enabled: true,
+      agentWallet: agentSolanaAddress(),
+      action_required:
+        `Register this agent wallet at ${BENTO_DASHBOARD} (log in with your owner wallet). ` +
+        `Until it's registered, payments are rejected with "Agent not found" — call ` +
+        `xpay_bento_disable to fall back to local caps if you don't want to register.`,
+    };
+  };
+
+  handlers["xpay_bento_disable"] = async () => {
+    if (profileName) setProfileBento(profileName, false); // persist
+    xpay.guardrail.setBentoEnabled(false); // deactivate for this session
+    return {
+      ok: true,
+      enabled: false,
+      note: "Bento intent screening is off. Payments now rely on the local spending caps only.",
+    };
+  };
+  // --- end Bento controls ---
 
   const server = new Server(
     { name: "xpay", version: "0.1.0" },
@@ -192,16 +272,20 @@ export async function startMcpServer(): Promise<void> {
  *   2. Raw signer envs (for a wallet the operator already holds).
  *   3. Auto-provision a fresh wallet (zero-config onboarding) and persist it.
  */
-async function buildXPay(): Promise<XPay> {
+async function buildXPay(): Promise<{ xpay: XPay; profileName: string | null }> {
   const profileName = process.env.XPAY_PROFILE ?? getActiveProfile();
   if (profileExists(profileName)) {
     const profile = await loadProfile({
       name: profileName,
       passphrase: process.env.XPAY_PASSPHRASE ?? (await biometricMcpPassphrase(profileName)),
     });
+    // Expose the agent's own key so a runtime `xpay_bento_enable` can activate
+    // protect() without a restart. In-process only; it's the wallet's own key.
+    process.env.AGENT_WALLET_PRIVATE_KEY ??= deriveKeysFromMnemonic(profile.mnemonic).solana.secretKeyBase58;
     // No TTY here — approvals above the guardrail threshold surface as a
     // system Touch ID dialog when the profile has biometric unlock enabled.
-    return createXPay({ profile, guardrail: guardrailWithApproval(profile, { interactive: false }) });
+    const xpay = createXPay({ profile, guardrail: guardrailWithApproval(profile, { interactive: false }) });
+    return { xpay, profileName };
   }
 
   // Fallback: ephemeral raw signers.
@@ -226,7 +310,9 @@ async function buildXPay(): Promise<XPay> {
         `XPAY_NO_AUTO_WALLET to auto-generate a wallet.`,
     );
   }
-  return createXPay({
+  // Raw-key mode: no profile on disk, so bento's profile-gated flag can't be
+  // toggled — profileName is null and the bento tools report that.
+  const xpay = createXPay({
     networks,
     signers,
     guardrail: {
@@ -235,6 +321,7 @@ async function buildXPay(): Promise<XPay> {
       allowedHosts: process.env.XPAY_ALLOWED_HOSTS?.split(","),
     },
   });
+  return { xpay, profileName: null };
 }
 
 /**
@@ -247,7 +334,7 @@ async function buildXPay(): Promise<XPay> {
  * so the agent keeps the same address across restarts. All notices go to
  * stderr — stdout is the MCP JSON-RPC channel and must stay clean.
  */
-async function autoProvisionXPay(profileName: string): Promise<XPay> {
+async function autoProvisionXPay(profileName: string): Promise<{ xpay: XPay; profileName: string }> {
   const passphrase = process.env.XPAY_PASSPHRASE || undefined;
   const created = await initProfile({ name: profileName, passphrase });
 
@@ -263,7 +350,9 @@ async function autoProvisionXPay(profileName: string): Promise<XPay> {
   );
 
   const profile = await loadProfile({ name: profileName, passphrase });
-  return createXPay({ profile, guardrail: guardrailWithApproval(profile, { interactive: false }) });
+  process.env.AGENT_WALLET_PRIVATE_KEY ??= deriveKeysFromMnemonic(profile.mnemonic).solana.secretKeyBase58;
+  const xpay = createXPay({ profile, guardrail: guardrailWithApproval(profile, { interactive: false }) });
+  return { xpay, profileName };
 }
 
 /**
