@@ -32,10 +32,14 @@ export interface UseArgs {
 }
 
 export async function use(args: UseArgs): Promise<UseResult> {
-  // If we have accepts up front, take the fast path — unless the catalog
-  // entry is missing fields that only a live 402 challenge carries.
-  if (args.resource.accepts.length > 0 && !needsLiveChallenge(args, args.resource.accepts)) {
-    return useWithRequirements(args, args.resource.accepts);
+  // If we have accepts up front, pick the network we can actually pay on
+  // (balance-aware) and take the fast path — unless the chosen option is
+  // missing fields that only a live 402 challenge carries.
+  if (args.resource.accepts.length > 0) {
+    const req = await args.wallet.pickRequirementByBalance(args.resource.accepts);
+    if (req && !reqNeedsLiveChallenge(args, req)) {
+      return useWithRequirements(args, req);
+    }
   }
   // Otherwise probe the resource for a 402 challenge.
   return useWithLiveChallenge(args);
@@ -48,9 +52,8 @@ export async function use(args: UseArgs): Promise<UseResult> {
  * 402 challenge provides. When it's missing, pay via the live flow instead
  * of failing with "feePayer is required in paymentRequirements.extra".
  */
-function needsLiveChallenge(args: UseArgs, reqs: PaymentRequirement[]): boolean {
-  const req = args.wallet.pickRequirement(reqs);
-  if (!req || !isSvmNetwork(req.network)) return false;
+function reqNeedsLiveChallenge(args: UseArgs, req: PaymentRequirement): boolean {
+  if (!isSvmNetwork(req.network)) return false;
   const signer = args.wallet.signer(normalizeNetwork(req.network));
   const usesSvmV2 = typeof signer?.getKitSigner === "function";
   return usesSvmV2 && !req.extra?.feePayer;
@@ -87,15 +90,8 @@ export async function useByUrl(args: UseByUrlArgs): Promise<UseResult> {
 
 async function useWithRequirements(
   args: UseArgs,
-  reqs: PaymentRequirement[],
+  req: PaymentRequirement,
 ): Promise<UseResult> {
-  const req = args.wallet.pickRequirement(reqs);
-  if (!req) {
-    throw new Error(
-      `xpay.use: no compatible payment option. Resource accepts: ${reqs.map((a) => a.network).join(", ")}`,
-    );
-  }
-
   // Guardrail runs *before* signing — this is the security boundary.
   await args.guardrail.check({ resource: args.resource, requirement: req });
 
@@ -123,7 +119,7 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
     );
   }
 
-  const req = args.wallet.pickRequirement(reqs);
+  const req = await args.wallet.pickRequirementByBalance(reqs);
   if (!req) {
     throw new Error(
       `xpay.use: ${args.resource.resource} accepts ${reqs.map((r) => r.network).join(", ")} but wallet has no matching signer`,

@@ -6,7 +6,21 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.1.28] – 2026-06-23
+## [0.1.29] – 2026-06-23
+
+### Changed
+- **`use` now picks the payment network by balance, not by list order.** When a
+  resource accepts multiple networks (e.g. Base *and* Solana), xPay reads the
+  wallet balance on each and pays from the first option that can cover the cost
+  — so a $0 Base wallet automatically falls through to a funded Solana one.
+  Previously it always took the first listed option (usually Base) and failed
+  if that wallet was empty. Both the catalog and live-402 paths use the new
+  picker. Single-network resources are unaffected (no extra balance lookups).
+  Falls back to the best-funded option when none can cover the cost outright.
+
+### Added
+- **`Wallet.pickRequirementByBalance()`** — the async, balance-aware selector
+  behind the above. `pickRequirement()` (first-match, sync) is retained.
 
 ### Added
 - **Bento firewall controls exposed as MCP tools.** Agents can now manage the
