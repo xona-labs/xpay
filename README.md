@@ -160,7 +160,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** — fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees seven core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`. If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** — the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -228,11 +228,41 @@ xpay guardrail set \
 
 - **`maxPerTx` / `maxPerDay`** — apply to every paid call *and* direct transfers.
 - **`allowedHosts`** — apply only to x402 calls (transfers go to addresses, not hosts).
+- **`maxPerTx` / `maxPerDay`** — apply to every paid call *and* direct transfers.
+- **`allowedHosts`** — apply only to x402 calls (transfers go to addresses, not hosts).
 - **`requireApprovalAbove`** — calls ≥ threshold need explicit approval. In the CLI this is a
   Touch ID prompt when [biometric unlock](#biometric-unlock-macos) is enabled, otherwise a y/n
   confirm; in the MCP server it is Touch ID only (no terminal), so an agent's large payment
   surfaces as a system dialog you physically approve. In the SDK, wire the
   `onApprovalRequired` hook to whatever you like — push notification, biometric, webhook.
+
+## Security — Bento intent firewall (optional)
+
+Spend caps stop an agent spending *too much* — they can't tell a legitimate payment from a
+prompt-injected one. The optional [Bento](https://app.bentoguard.xyz/) layer adds an **AI intent
+firewall**: every paid call and transfer is screened for malicious intent (prompt-injection,
+wallet-drain, intent-vs-execution mismatch) *before signing*. It runs inside the guardrail, right
+after the local caps pass.
+
+```bash
+xpay bento enable      # prints the agent wallet address to register
+xpay bento status      # whether screening is active
+xpay bento disable     # turn off — falls back to local caps only
+```
+
+There's **no API key** — Bento authenticates with the wallet's own key. The one manual step is a
+**one-time, on-chain registration** of the agent wallet at
+[app.bentoguard.xyz](https://app.bentoguard.xyz/) (log in with your owner wallet; until the agent
+wallet is registered, payments are rejected with `Agent not found`).
+
+Each screened call returns a verdict:
+
+- **`ALLOW`** — cleared; xPay signs as normal.
+- **`BLOCKED`** — flagged as a critical threat; xPay throws before signing, no funds move.
+- **`ESCALATED`** — ambiguous; xPay defers to your `onApprovalRequired` hook, or fails closed.
+
+Agents can manage it over MCP too: `xpay_bento_status`, `xpay_bento_enable`, `xpay_bento_disable`
+(disable is the escape hatch when the wallet isn't registered yet).
 
 ## Sana agent wallet card (optional)
 
@@ -319,7 +349,7 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 **v0.1 (current):**
 - ✅ CLI: init, accounts, balance, discover, pay, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
-- ✅ MCP server on stdio with 7 core tools
+- ✅ MCP server on stdio with 10 tools (incl. the Bento intent firewall)
 - ✅ Solana + Base mainnet with disk caching
 - ✅ Optional Sana agent card integration (`xpay sana link`) — 8 additional `sana_*` tools
 

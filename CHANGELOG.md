@@ -6,6 +6,17 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] – 2026-06-24
+
+### Docs
+- **Documented the Bento intent firewall as an optional security layer.** README
+  gains a "Security" section (enable / status / disable, no API key, one-time
+  on-chain wallet registration, and the ALLOW / BLOCKED / ESCALATED verdicts),
+  the MCP tool list re-includes `xpay_bento_status` / `xpay_bento_enable` /
+  `xpay_bento_disable`, and SKILL.md re-adds the tools plus a safety note. No
+  code change — the firewall shipped in 0.1.28; this release publishes the docs
+  to npm.
+
 ## [0.2.0] – 2026-06-23
 
 Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
