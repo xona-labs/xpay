@@ -6,6 +6,28 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.2] – 2026-06-30
+
+### Fixed
+- **MCP transfers now execute on the first call instead of silently staging.**
+  The MCP server previously overrode `xpay_transfer` to only *stage* a request
+  and return a 6-digit code, requiring a second `xpay_transfer_confirm` call to
+  actually move funds. Agents routinely skipped the follow-up call, read the
+  `"Transfer staged…"` response as a receipt, and reported success with a
+  **hallucinated transaction hash** — a hash that never hit the chain (not on
+  Solscan, no funds moved). This affected private (MagicBlock PER) transfers in
+  particular. The terminal path was never affected because it executes directly.
+  `xpay_transfer` now runs the same direct path as the CLI, and
+  `xpay_transfer_confirm` has been removed.
+
+### Changed
+- **The transfer spending gate no longer depends on the agent making a second
+  tool call.** Safety comes from the guardrail (per-tx / per-day caps +
+  `requireApprovalAbove`), which on MCP surfaces as a Touch ID prompt when
+  biometric unlock is enabled — a gate the model cannot fake or skip. Set
+  `xpay guardrail --require-approval-above 0` with biometric enabled to require
+  approval on every transfer.
+
 ## [0.2.1] – 2026-06-24
 
 ### Docs
