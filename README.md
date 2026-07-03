@@ -5,13 +5,14 @@
 [![license](https://img.shields.io/npm/l/@xona-labs/xpay)](https://github.com/xona-labs/xpay/blob/main/LICENSE)
 ![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
 
-> **Agentic-commerce wallet.** Multi-network USDC wallet, x402 payments, and discovery across 20,000+ services — as a CLI, an SDK, and an MCP server.
+> **Agentic-commerce wallet.** Multi-network USDC wallet, x402 payments, AgenC marketplace hires, and discovery across 20,000+ services — as a CLI, an SDK, and an MCP server.
 
 ```bash
 npm install -g @xona-labs/xpay
 xpay init                                  # creates Solana + EVM keys, encrypted
-xpay discover "research API"               # 21k catalog, ranked
+xpay discover "research API"               # 21k x402 catalog + AgenC agent listings, ranked
 xpay pay  https://api.example.com/x402     # x402 one-liner
+xpay agenc hire <listingPda>               # hire an on-chain agent (SOL escrow)
 xpay transfer 5 USDC 7G73PL...gC           # direct USDC transfer
 xpay balance                               # unified across networks
 xpay report                                # daily / weekly / monthly report via OrbitX402
@@ -62,8 +63,10 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay init [name]` | Create a profile (Solana + EVM keys from one BIP-39 seed). `--import` to restore from a phrase, `--no-encrypt` for dev wallets, `--workspace` to store locally. |
 | `xpay accounts list \| show \| use` | List profiles, inspect one, or set the active profile. |
 | `xpay balance` | USDC balance per network for the active profile. |
-| `xpay discover [query]` | Search 21k+ x402 services across chains — Solana, Base, **BNB Chain**, and other EVM networks (cached on disk). `--network`, `--limit`, `--json`. |
+| `xpay discover [query]` | Search 21k+ x402 services across chains — Solana, Base, **BNB Chain**, and other EVM networks — plus **AgenC marketplace** agent listings (cached on disk). `--network`, `--limit`, `--json`. |
 | `xpay pay <url>` | Pay an x402 endpoint. Works on catalog URLs and any URL that returns 402. `--max-usd`, `--body`, `-y`. |
+| `xpay agenc hire <listingPda>` | Hire an [AgenC marketplace](#agenc-marketplace-hire-on-chain-agents) listing — escrows its SOL price on-chain; the provider works asynchronously. `--max-usd`, `--review-window`, `-y`. |
+| `xpay agenc status <taskPda>` | Check a hire's progress (read-only, no wallet). `--json`. |
 | `xpay transfer <amount> USDC <to>` | Direct USDC transfer, subject to the guardrail. `--network`, `-y`. |
 | `xpay report` | Comprehensive USDC activity report — totals, net flow, timeline, top counterparties, biggest txs. `--period daily\|weekly\|monthly`, `--network`, `--json`. |
 | `xpay guardrail show \| set \| clear` | Inspect or edit spending caps and allowed hosts. |
@@ -160,7 +163,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** — fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** — the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -319,6 +322,31 @@ xpay sana unlink          # removes the key from the profile
 
 The `sana_*` tools disappear from the MCP server on next restart.
 
+## AgenC marketplace — hire on-chain agents
+
+[AgenC](https://agenc.ag) is a Solana-mainnet marketplace where registered agents sell services with on-chain escrow. Its hireable listings appear in `xpay discover` alongside x402 services — but they **execute differently**, and xpay routes them automatically:
+
+| | x402 service | AgenC listing |
+|---|---|---|
+| Priced in | USDC | native **SOL** |
+| Payment | HTTP `X-Payment` header | on-chain **escrow** (program `HJsZ…w1xK`) |
+| Result | immediate HTTP response | **hire receipt** — the provider works asynchronously |
+| Settlement | instant | after your review window (default 24h) |
+
+```bash
+xpay discover "research"                   # AgenC listings show as “agenc escrow”, priced in ◎SOL
+xpay agenc hire <listingPda>               # confirm → escrow SOL → get a task PDA
+xpay agenc status <taskPda>                # poll: open → claimed → review → settled
+```
+
+The same smart routing works in the SDK and MCP — `xpay.use(resource)` / `xpay_use` detect the `agenc-hire` payment scheme and run the escrow flow, returning a receipt (`task`, `txSig`, explorer link) as `data`. Hires are made through AgenC's *humanless* entry point, which pins the task to **CreatorReview** — escrowed funds never auto-release without your acceptance.
+
+Notes:
+- The guardrail applies to hires too: SOL prices are converted to USD at spot (multi-feed, cached) and checked against `maxPerTx`/`maxPerDay` **before signing**. If no price feed is reachable and caps are set, the hire fails closed.
+- The wallet needs **SOL** (escrow + fees), not just USDC.
+- Reviewing/accepting results happens on [agenc.ag](https://agenc.ag) for now; `xpay agenc accept` is planned.
+- Config (optional): `agenc: { rpcUrl, reviewWindowSecs, endpoint }` in the profile, or `XPAY_AGENC_ENDPOINT`. Opt out of the discovery source with `XPAY_DISCOVERY_SOURCES=orbitx402`.
+
 ## Multi-network
 
 `init` configures Solana and Base by default. Add or change via `~/.xpay/<name>/config.json`:
@@ -340,23 +368,25 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 ## How it works
 
 - **Keys** — One BIP-39 mnemonic per profile derives Solana (`m/44'/501'/0'/0'`, Phantom-compatible) and EVM (`m/44'/60'/0'/0/0`, MetaMask-compatible) keypairs. Encrypted at rest with scrypt + AES-256-GCM.
-- **Discovery** — the catalog spans 21k+ x402 endpoints across multiple chains — **Solana, Base, BNB Chain, and other EVM networks** — so `discover()` surfaces BNB Chain x402 resources alongside everything else. The fetcher walks the offset-pagination, validates each entry against a Zod schema, and persists to `~/.xpay/cache/` so repeat lookups skip the cold-fetch tax. (Filter with `--network` / `discover({ networks })`.)
-- **Pay** — `use()` and `useByUrl()` both go: guardrail check → signer.pay(USDC) on the right network → `X-Payment` header → retry. The signer abstraction means the same code path works for Solana SPL transfers and EVM ERC-20 transfers.
+- **Discovery** — the catalog spans 21k+ x402 endpoints across multiple chains — **Solana, Base, BNB Chain, and other EVM networks** — plus AgenC marketplace listings, merged from independent sources (`Promise.allSettled`, so one source failing never kills discovery). The fetcher walks each API's pagination, validates every entry against a Zod schema, and persists to `~/.xpay/cache/` so repeat lookups skip the cold-fetch tax. (Filter with `--network` / `discover({ networks })`; pick sources with `discover({ sources })` or `XPAY_DISCOVERY_SOURCES`.)
+- **Pay** — `use()` and `useByUrl()` both go: guardrail check → signer.pay(USDC) on the right network → `X-Payment` header → retry. The signer abstraction means the same code path works for Solana SPL transfers and EVM ERC-20 transfers. AgenC resources are detected by their `agenc-hire` payment scheme and routed to the on-chain escrow flow instead — same `use()` call, different rail.
 - **Report** — Comprehensive USDC activity (daily / weekly / monthly) fetched from the OrbitX402 API. On-chain data is resolved server-side — no RPC calls from xpay, no rate-limiting, no RPC key required.
 
 ## Project status
 
-**v0.1 (current):**
-- ✅ CLI: init, accounts, balance, discover, pay, transfer, report, guardrail, mcp
+**v0.2.3 (current):**
+- ✅ CLI: init, accounts, balance, discover, pay, agenc, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
-- ✅ MCP server on stdio with 10 tools (incl. the Bento intent firewall)
+- ✅ MCP server on stdio with 11 tools (incl. the Bento intent firewall)
 - ✅ Solana + Base mainnet with disk caching
 - ✅ Optional Sana agent card integration (`xpay sana link`) — 8 additional `sana_*` tools
+- ✅ AgenC marketplace as a discovery source + smart-routed SOL escrow hires (`xpay agenc hire|status`)
 
-**v0.2 planned:**
+**Planned:**
 - `bridge` — USDC EVM ↔ SVM via CCTP (Circle's native burn/mint)
 - `link / unlink` — opt-in cloud sync (audit log, dashboard)
 - Pay catalog + xona-labs catalog as additional discovery sources
+- `xpay agenc accept|rate` — review AgenC hire results without leaving the CLI
 
 ## License
 

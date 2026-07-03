@@ -6,6 +6,38 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.3] – 2026-07-03
+
+### Added
+- **AgenC marketplace (agenc.ag) as a discovery source with smart-routed
+  execution.** Hireable AgenC listings now appear in `xpay discover` /
+  `xpay_discover` alongside x402 services (marked `metadata.source: "agenc"`,
+  priced in SOL). Discovery merges sources with failure isolation — one
+  catalog going down no longer breaks discovery — and reserves result slots so
+  marketplace listings aren't drowned out by the 21k-item x402 catalog. Opt
+  out with `XPAY_DISCOVERY_SOURCES=orbitx402` or `discover({ sources })`.
+- **Smart execution routing in `use()`.** AgenC resources are detected by
+  their `agenc-hire` payment scheme and executed as on-chain SOL escrow hires
+  via `@tetsuo-ai/marketplace-sdk` (humanless entry point — tasks pin to
+  CreatorReview, so escrow never auto-releases without the buyer's
+  acceptance). x402 resources keep the existing payment path; same
+  `use()`/`do()` API for both. The result of a hire is a receipt
+  (`task`, `hireRecord`, `txSig`, explorer link) — the provider works
+  asynchronously.
+- **CLI `xpay agenc hire <listingPda>` / `xpay agenc status <taskPda>`** and
+  MCP tool `xpay_agenc_status` for tracking hire progress.
+- **Guardrail SOL pricing.** AgenC hires are converted lamports → USD at spot
+  (multi-feed: CoinGecko → Coinbase → Kraken, 60s cache) and enforced against
+  the existing USD caps before signing; fails closed if no feed is reachable
+  while caps are configured.
+- Examples: `examples/agenc-hire.ts` (live discover → hire → poll) and
+  `examples/agenc-local-sandbox.ts` (full hire lifecycle against the real
+  compiled program in-process via litesvm — no RPC, no SOL spent).
+
+### Changed
+- `@solana/kit` bumped `^5.5.1` → `^6.9.0` (required by the AgenC SDK;
+  `@x402/svm` accepts `>=5.1.0`).
+
 ## [0.2.2] – 2026-06-30
 
 ### Fixed

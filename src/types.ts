@@ -131,6 +131,11 @@ export interface DiscoverOptions {
   networks?: Network[];
   /** Max results to return. */
   limit?: number;
+  /**
+   * Catalog sources to query. Defaults to all (`["orbitx402", "agenc"]`);
+   * also overridable via the XPAY_DISCOVERY_SOURCES env var (csv).
+   */
+  sources?: string[];
 }
 
 /** A single token balance entry returned by {@link Signer.tokenBalances}. */

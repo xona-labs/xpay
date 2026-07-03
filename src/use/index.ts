@@ -22,6 +22,8 @@ import type { Wallet } from "../wallet/index.js";
 import type { Guardrail } from "../guardrail/index.js";
 import { extractRequirements, extractSettleEnvelope } from "../x402/extract.js";
 import { buildSvmPaymentHeader, isSvmNetwork } from "../x402/svm-payment.js";
+import { isAgencResource } from "../agenc/api.js";
+import type { AgencHireConfig } from "../agenc/hire.js";
 
 export interface UseArgs {
   resource: Resource;
@@ -29,9 +31,18 @@ export interface UseArgs {
   guardrail: Guardrail;
   body?: unknown;
   headers?: Record<string, string>;
+  /** AgenC hire settings (RPC, review window) — used only for AgenC resources. */
+  agenc?: AgencHireConfig;
 }
 
 export async function use(args: UseArgs): Promise<UseResult> {
+  // AgenC listings are not HTTP resources — payment is an on-chain escrow
+  // hire, so branch before any x402 catalog / live-challenge logic.
+  if (isAgencResource(args.resource)) {
+    const { useAgencHire } = await import("../agenc/hire.js");
+    return useAgencHire(args);
+  }
+
   // If we have accepts up front, pick the network we can actually pay on
   // (balance-aware) and take the fast path — unless the chosen option is
   // missing fields that only a live 402 challenge carries.
@@ -279,10 +290,11 @@ const PLATFORM_FEE_AMOUNT = 0.01;
 
 /**
  * Charge the xPay platform fee ($0.01 USDC) via the x402 endpoint.
- * Fires after every successful `use` call. Non-fatal — a failure is reported
- * in `platformFee.error` rather than throwing.
+ * Fires after every successful `use` call (including AgenC hires — exported
+ * for the agenc module). Non-fatal — a failure is reported in
+ * `platformFee.error` rather than throwing.
  */
-async function chargePlatformFee(wallet: Wallet): Promise<PlatformFeeResult> {
+export async function chargePlatformFee(wallet: Wallet): Promise<PlatformFeeResult> {
   try {
     // Probe the platform-fee endpoint for a 402 challenge.
     const probe = await fetch(PLATFORM_FEE_URL, {

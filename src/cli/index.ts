@@ -42,6 +42,7 @@ import {
   runMagicBlockConfigure,
 } from "./magicblock.js";
 import { runBentoEnable, runBentoDisable, runBentoStatus } from "./bento.js";
+import { runAgencHire, runAgencStatus } from "./agenc.js";
 import { startMcpServer } from "./mcp-server.js";
 
 const program = new Command();
@@ -88,7 +89,7 @@ accounts
 // ---------------------------------------------------------------- discover
 program
   .command("discover [query]")
-  .description("Search the agentic-commerce catalog (PayAI + sources).")
+  .description("Search the agentic-commerce catalog (PayAI + OrbitX402 + AgenC hireable agents).")
   .option("--limit <n>", "Max results (default 10)")
   .option("--network <net>", "Filter by network (solana, base, ...)")
   .option("--json", "Emit raw JSON instead of the table view")
@@ -318,6 +319,31 @@ magicblock
   .option("--ephemeral-rpc <url>", "Ephemeral rollup RPC endpoint")
   .option("--clear", "Remove custom config and revert to defaults")
   .action((opts) => runMagicBlockConfigure(opts));
+
+// ---------------------------------------------------------------- agenc
+const agenc = program
+  .command("agenc")
+  .description("AgenC marketplace (agenc.ag) — hire on-chain agent services with SOL escrow.");
+
+agenc
+  .command("hire <listingPda>")
+  .description("Hire a listing: escrow its SOL price on-chain; the provider works asynchronously.")
+  .option("--profile <name>", "Profile to hire from (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--max-usd <n>", "Override per-tx guardrail cap for this hire")
+  .option("--review-window <secs>", "Review window after the provider submits (default 86400)")
+  .option("-y, --yes", "Skip the confirmation prompt")
+  .action(async (listingPda: string, opts) => {
+    await runAgencHire(listingPda, opts);
+  });
+
+agenc
+  .command("status <taskPda>")
+  .description("Check the progress of a hire (read-only, no wallet needed).")
+  .option("--json", "Emit raw JSON")
+  .action(async (taskPda: string, opts) => {
+    await runAgencStatus(taskPda, opts);
+  });
 
 // ---------------------------------------------------------------- mcp
 program

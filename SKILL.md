@@ -45,6 +45,7 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_balance` | The wallet's balance per network, plus its addresses (use this to tell the user where to send funds). |
 | `xpay_report` | Spending/income report (daily / weekly / monthly). |
 | `xpay_guardrail` | Read the active spending caps (per-tx, per-day, allowed hosts, approval threshold). |
+| `xpay_agenc_status` | Check the progress of an AgenC marketplace hire (see below). Read-only. |
 | `xpay_bento_status` | Check whether the Bento intent firewall is on (read-only). |
 | `xpay_bento_enable` | Turn the Bento intent firewall on. Returns the agent wallet address to register at app.bentoguard.xyz. |
 | `xpay_bento_disable` | Turn the Bento firewall off — use if the wallet isn't registered and payments are rejected. |
@@ -65,6 +66,28 @@ one. If no network has the funds, the call fails fast with a clear
 The agent pays from its own wallet, so **it must be funded first**. If a call
 fails for lack of funds, ask the user to send USDC to the address from
 `xpay_balance` (Solana mainnet or Base).
+
+## AgenC marketplace listings — a different execution rail
+
+`xpay_discover` results may include **AgenC marketplace** listings
+(`metadata.source === "agenc"`) — on-chain agent services priced in **SOL**,
+not USDC. Calling `xpay_use` on one is detected automatically and runs a
+Solana **escrow hire** instead of an HTTP payment:
+
+- The listing's SOL price is escrowed on-chain; the wallet needs **SOL**, not
+  USDC, for these.
+- The result is a **hire receipt** (`data.kind === "agenc-hire-receipt"` with
+  `task`, `txSig`, `explorer`), **not** the service's output — the provider
+  works asynchronously.
+- Poll `xpay_agenc_status { taskPda }` to track progress:
+  `open/claimed → review → settled`. A just-created task can 404 for ~a minute
+  (the API snapshot lags); retry, don't treat it as failure.
+- Tell the user the work is in progress and how to review it
+  (https://agenc.ag/tasks/<taskPda>) — escrow only settles after their review
+  window.
+
+The guardrail still applies (SOL converted to USD at spot, checked before
+signing), and hires never auto-release funds without the buyer's acceptance.
 
 ## Safety — built in, respect it
 
@@ -93,6 +116,11 @@ fails for lack of funds, ask the user to send USDC to the address from
 
 **Receive funds**
 - `xpay_balance` → give the user the Solana address to send USDC to.
+
+**Hire an on-chain agent (AgenC)**
+1. `xpay_discover { query: "..." }` → pick a result with `metadata.source === "agenc"`
+2. Confirm the SOL price with the user, then `xpay_use { resource: <that object> }`
+3. Report the receipt's `task` + `explorer` link; later, `xpay_agenc_status { taskPda }`.
 
 **Send funds (with approval)**
 1. `xpay_transfer { amount: 5, to: "<address>", token: "USDC" }` → returns a code

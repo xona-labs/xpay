@@ -1,7 +1,7 @@
 {
   "name": "@xona-labs/xpay",
-  "version": "0.2.2",
-  "description": "Discovery and usage layer for agentic commerce — multi-network wallet, x402 payments, 20k+ services via PayAI and other catalogs",
+  "version": "0.2.3",
+  "description": "Discovery and usage layer for agentic commerce — multi-network wallet, x402 payments, AgenC marketplace hires, 20k+ services via PayAI and other catalogs",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -30,6 +30,8 @@
   "keywords": [
     "x402",
     "agentic-commerce",
+    "agenc",
+    "agent-marketplace",
     "payai",
     "solana",
     "base",
@@ -43,9 +45,11 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@solana/kit": "^5.5.1",
+    "@solana/kit": "^6.9.0",
+    "@solana/program-client-core": "^6.4.0",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.95.0",
+    "@tetsuo-ai/marketplace-sdk": "^0.7.1",
     "@x402/core": "^2.13.0",
     "@x402/svm": "^2.13.0",
     "bip39": "^3.1.0",
@@ -60,6 +64,7 @@
   },
   "devDependencies": {
     "@types/inquirer": "^9.0.9",
+    "litesvm": "^1.1.0",
     "@types/node": "^22.15.0",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"

@@ -13,6 +13,7 @@
 
 import type { XPay } from "../index.js";
 import { ResourceSchema } from "../types.js";
+import { fetchAgencTask } from "../agenc/api.js";
 import { forSana } from "../sana/tools.js";
 
 export interface ToolBundle<TDef> {
@@ -38,7 +39,9 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       name: "xpay_discover",
       description:
         "Find paid HTTP services across the agentic-commerce catalog (PayAI + others). " +
-        "Returns ranked candidates with price, network, and payment recipient.",
+        "Returns ranked candidates with price, network, and payment recipient. " +
+        "Results may include AgenC marketplace agent listings (metadata.source === 'agenc') — " +
+        "those are priced in SOL lamports and execute as on-chain escrow hires, not HTTP calls.",
       input_schema: {
         type: "object",
         properties: {
@@ -55,7 +58,11 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         "Call a specific resource from the catalog. Handles x402 payment automatically. " +
         "Prefer passing the full `resource` object returned by xpay_discover — it includes " +
         "pre-fetched payment requirements so payment goes through without a probe round-trip. " +
-        "Fall back to `resourceUrl` only when you have a URL but no catalog entry.",
+        "Fall back to `resourceUrl` only when you have a URL but no catalog entry. " +
+        "If the resource is an AgenC marketplace listing it executes as a Solana escrow hire " +
+        "instead: SOL is escrowed on-chain and the result is a hire receipt (task PDA + tx " +
+        "signature), NOT an HTTP response — the provider works asynchronously; poll progress " +
+        "with xpay_agenc_status.",
       input_schema: {
         type: "object",
         properties: {
@@ -78,7 +85,9 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       name: "xpay_do",
       description:
         "Discover the best service for an intent and call it in one step. " +
-        "Use this when you don't need to compare options first.",
+        "Use this when you don't need to compare options first. " +
+        "If the best match is an AgenC listing, it executes as an async SOL escrow hire " +
+        "and returns a hire receipt (see xpay_use).",
       input_schema: {
         type: "object",
         properties: {
@@ -143,6 +152,21 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       name: "xpay_guardrail",
       description: "Read the active spending guardrail (caps, allowed hosts, approval threshold).",
       input_schema: { type: "object", properties: {} },
+    },
+    {
+      name: "xpay_agenc_status",
+      description:
+        "Check the progress of an AgenC marketplace hire (read-only, no wallet). " +
+        "Pass the task PDA from the hire receipt returned by xpay_use / xpay_do. " +
+        "Status flow: open/claimed → review (provider submitted, awaiting buyer review) → settled. " +
+        "The AgenC API snapshot rebuilds ~every 45s, so a just-created task may 404 briefly.",
+      input_schema: {
+        type: "object",
+        properties: {
+          taskPda: { type: "string", description: "Task PDA from the AgenC hire receipt." },
+        },
+        required: ["taskPda"],
+      },
     },
   ];
 
@@ -229,6 +253,8 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       }),
 
     xpay_guardrail: async () => xpay.guardrail,
+
+    xpay_agenc_status: async (input) => fetchAgencTask(input.taskPda as string),
   };
 
   // Merge Sana tools if an API key is configured.

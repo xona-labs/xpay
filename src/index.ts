@@ -45,6 +45,15 @@ export { Guardrail } from "./guardrail/index.js";
 export { discover } from "./discover/index.js";
 export { fetchPayAIResources } from "./discover/payai.js";
 export { fetchOrbitX402Resources } from "./discover/orbitx402.js";
+export {
+  fetchAgencResources,
+  fetchAgencListing,
+  fetchAgencTask,
+  listingToResource,
+  isAgencResource,
+  AGENC_SCHEME,
+} from "./agenc/api.js";
+export type { AgencHireConfig, AgencHireReceipt } from "./agenc/hire.js";
 
 /** Options for {@link createXPay}. */
 export interface XPayOptions {
@@ -132,13 +141,15 @@ export function createXPay(options: XPayOptions): XPay {
   const wallet = createWallet(walletOpts);
   const guardrail = new Guardrail(guardrailConfig);
 
+  const agencConfig = options.profile?.config.agenc;
+
   return {
     wallet,
     guardrail,
     discover: (opts) => discover({ ...opts, endpoint: options.discoveryEndpoint }),
-    use: (resource, opts) => use({ resource, wallet, guardrail, ...opts }),
+    use: (resource, opts) => use({ resource, wallet, guardrail, agenc: agencConfig, ...opts }),
     useByUrl: (url, opts) => useByUrl({ url, wallet, guardrail, ...opts }),
-    do: (query, opts) => doIt({ query, wallet, guardrail, ...opts }),
+    do: (query, opts) => doIt({ query, wallet, guardrail, agenc: agencConfig, ...opts }),
     report: (opts) => {
       // Pick the primary network's address for the report (first configured network).
       const net = opts?.network ?? networks[0] ?? "solana";

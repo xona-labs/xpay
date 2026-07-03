@@ -8,6 +8,8 @@
  */
 
 import type { PaymentRequirement, Resource } from "../types.js";
+import { AGENC_SCHEME } from "../agenc/api.js";
+import { solUsdPrice } from "../agenc/price.js";
 
 export interface GuardrailConfig {
   /** Max USD per single call. */
@@ -59,7 +61,7 @@ export class Guardrail {
    * Called by {@link use} before any on-chain action.
    */
   async check(args: { resource: Resource; requirement: PaymentRequirement }): Promise<void> {
-    const usd = estimateUsd(args.requirement);
+    const usd = await this.estimateUsd(args.requirement);
 
     // Host whitelist. Skipped for direct transfers (they target addresses, not
     // hosts) — amount caps still apply, so a leaked CLI can't drain the wallet.
@@ -183,6 +185,41 @@ export class Guardrail {
     }
   }
 
+  /**
+   * Best-effort USD estimate. USDC (6 decimals) everywhere, except AgenC
+   * hires which are priced in native SOL lamports (9 decimals) and converted
+   * at spot. Fails CLOSED: if any cap is configured and the SOL price can't
+   * be fetched, the call is blocked rather than passed through unpriced.
+   */
+  private async estimateUsd(req: PaymentRequirement): Promise<number> {
+    if (!req.amount) return 0;
+    if (req.scheme === AGENC_SCHEME) {
+      const sol = Number(req.amount) / 1e9;
+      try {
+        return sol * (await solUsdPrice());
+      } catch (err) {
+        if (this.hasCaps()) {
+          throw new GuardrailError(
+            `cannot price a ${sol} SOL AgenC hire — SOL/USD feed unavailable ` +
+              `(${err instanceof Error ? err.message : String(err)}). ` +
+              `Blocked because spending caps are configured.`,
+          );
+        }
+        return 0; // no caps to enforce — nothing to compare against
+      }
+    }
+    // USDC has 6 decimals on every chain we currently support.
+    return Number(req.amount) / 1_000_000;
+  }
+
+  private hasCaps(): boolean {
+    return (
+      this.config.maxPerTx !== undefined ||
+      this.config.maxPerDay !== undefined ||
+      this.config.requireApprovalAbove !== undefined
+    );
+  }
+
   /** Sum of recent spend, in USD, within the last 24h. */
   recentSpend(): number {
     const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
@@ -214,20 +251,10 @@ export class GuardrailError extends Error {
 }
 
 /**
- * Best-effort USD estimate. Assumes USDC (6 decimals) on Solana, USDC (6) on
- * Base/EVM. Future versions should consult a price oracle for non-USDC assets.
- */
-function estimateUsd(req: PaymentRequirement): number {
-  if (!req.amount) return 0;
-  // USDC has 6 decimals on every chain we currently support.
-  return Number(req.amount) / 1_000_000;
-}
-
-/**
  * Render a pending spend as the natural-language instruction Bento's
  * `protect()` expects. Bento screens *intent*, so we describe what the call
- * does in plain terms — amount, destination, and whether it's a service call
- * or a direct transfer (the case most prone to a drain attempt).
+ * does in plain terms — amount, destination, and whether it's a service call,
+ * an escrow hire, or a direct transfer (the case most prone to a drain attempt).
  */
 function describeSpend(resource: Resource, usd: number): string {
   const amount = usd > 0 ? `$${usd.toFixed(usd < 0.01 ? 6 : 2)} USDC` : "an unspecified amount";
@@ -235,6 +262,12 @@ function describeSpend(resource: Resource, usd: number): string {
     // Transfer resource URLs look like xpay://transfer/<network>/<address>.
     const to = resource.resource.split("/").filter(Boolean).pop() ?? "an unknown address";
     return `Transfer ${amount} directly to wallet address ${to}.`;
+  }
+  if (resource.type === "agenc") {
+    const name = typeof resource.metadata?.name === "string" ? resource.metadata.name : "a service";
+    const lamports = resource.accepts[0]?.amount;
+    const sol = lamports ? ` (◎${(Number(lamports) / 1e9).toFixed(4)} SOL)` : "";
+    return `Hire the AgenC marketplace listing "${name}" for roughly ${amount}${sol}, escrowed on-chain until the work is reviewed.`;
   }
   const host = safeHost(resource.resource) || resource.resource;
   return `Pay ${amount} to call the paid API at ${host} (${resource.method} ${resource.resource}).`;

@@ -10,12 +10,15 @@ import { discover } from "../discover/index.js";
 import { use } from "../use/index.js";
 import type { Wallet } from "../wallet/index.js";
 import type { Guardrail } from "../guardrail/index.js";
+import type { AgencHireConfig } from "../agenc/hire.js";
 
 export interface DoArgs {
   query: string;
   wallet: Wallet;
   guardrail: Guardrail;
   body?: unknown;
+  /** AgenC hire settings — forwarded to `use()` when the top match is an AgenC listing. */
+  agenc?: AgencHireConfig;
 }
 
 export async function doIt(args: DoArgs): Promise<UseResult> {
@@ -38,6 +41,7 @@ export async function doIt(args: DoArgs): Promise<UseResult> {
         wallet: args.wallet,
         guardrail: args.guardrail,
         body: args.body,
+        agenc: args.agenc,
       });
     }
   }

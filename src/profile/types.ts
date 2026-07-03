@@ -79,6 +79,18 @@ export interface ProfileConfig {
     enabled: boolean;
   };
   /**
+   * AgenC marketplace hire settings (optional). AgenC listings surface in
+   * discovery by default; these only tune how hires execute.
+   */
+  agenc?: {
+    /** Solana RPC for hire transactions. Falls back to XPAY_SOLANA_RPC, then the SDK default. */
+    rpcUrl?: string;
+    /** Buyer review window after the provider submits, in seconds. Default 86400 (24h). */
+    reviewWindowSecs?: number;
+    /** AgenC API base override (self-hosted indexer / tests). */
+    endpoint?: string;
+  };
+  /**
    * MagicBlock Private Ephemeral Rollup integration.
    * Platform-level config — set once by the xpay operator via `xpay magicblock configure`.
    * End users never need a MagicBlock account; they just pass private:true.

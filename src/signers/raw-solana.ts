@@ -38,7 +38,7 @@ import type { PaymentRequirement, Signer } from "../types.js";
 /** Mainnet USDC mint. Used for the default balance lookup. */
 const USDC_MINT_MAINNET = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
-const DEFAULT_RPC = "https://solana-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ";
+export const DEFAULT_RPC = "https://solana-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ";
 
 export interface RawSolanaSignerOptions {
   /** Base58 secret key (64 bytes) or a 64-byte Uint8Array. */
