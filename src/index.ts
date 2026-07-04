@@ -23,6 +23,8 @@ import { Guardrail, type GuardrailConfig } from "./guardrail/index.js";
 import { signersFromProfile, deriveKeysFromMnemonic, type LoadedProfile } from "./profile/index.js";
 import { fetchReport, type WalletReport, type ReportOptions } from "./report/index.js";
 import { transfer, type TransferResult } from "./transfer/index.js";
+import { findTokens, type TokenInfo } from "./token/index.js";
+import { swap, swapQuote, type SwapQuote, type SwapResult } from "./swap/index.js";
 import type {
   DiscoverOptions,
   Resource,
@@ -54,6 +56,22 @@ export {
   AGENC_SCHEME,
 } from "./agenc/api.js";
 export type { AgencHireConfig, AgencHireReceipt } from "./agenc/hire.js";
+export {
+  findTokens,
+  resolveTradeToken,
+  AmbiguousTokenError,
+  NATIVE_SOL_MINT,
+  type TokenInfo,
+  type TokenApiOptions,
+} from "./token/index.js";
+export {
+  swap as swapTokens,
+  swapQuote as quoteSwap,
+  type SwapArgs,
+  type SwapConfig,
+  type SwapQuote,
+  type SwapResult,
+} from "./swap/index.js";
 
 /** Options for {@link createXPay}. */
 export interface XPayOptions {
@@ -97,6 +115,12 @@ export interface XPay {
    * Pass private:true for MagicBlock PER privacy (Solana only).
    */
   transfer(args: { amount: number; to: string; network?: Network; token?: string; private?: boolean }): Promise<TransferResult>;
+  /** Search Solana tokens by ticker, name, or mint (Jupiter). Read-only, no signing. */
+  findTokens(query: string, opts?: { limit?: number }): Promise<TokenInfo[]>;
+  /** Quote a swap without executing — no guardrail, no signing, no funds moved. */
+  swapQuote(args: { amount: number; from: string; to: string; slippageBps?: number }): Promise<SwapQuote>;
+  /** Swap tokens inside the wallet (Solana only, Jupiter). Subject to the guardrail. */
+  swap(args: { amount: number; from: string; to: string; slippageBps?: number }): Promise<SwapResult>;
 }
 
 /**
@@ -162,5 +186,12 @@ export function createXPay(options: XPayOptions): XPay {
       guardrail,
       magicBlockConfig: options.profile?.config.magicblock,
     }),
+    findTokens: (query, opts) => findTokens(query, {
+      endpoint: options.profile?.config.swap?.endpoint,
+      apiKey: options.profile?.config.swap?.apiKey,
+      ...opts,
+    }),
+    swapQuote: (args) => swapQuote({ ...args, wallet, config: options.profile?.config.swap }),
+    swap: (args) => swap({ ...args, wallet, guardrail, config: options.profile?.config.swap }),
   };
 }

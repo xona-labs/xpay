@@ -41,7 +41,9 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_discover` | Find paid services by natural-language query. Returns ranked candidates with price, network, and payee. |
 | `xpay_use` | Pay for and call a specific service. Pass the full `resource` object from `xpay_discover` (preferred), or a `resourceUrl`. Handles the x402 402-challenge → pay → retry flow. |
 | `xpay_do` | One step: discover the best service for an intent **and** call it. Use when you don't need to compare options. |
-| `xpay_transfer` | Send USDC (or any Solana SPL token) directly to an address. In the MCP server this returns a confirmation code; you must then call `xpay_transfer_confirm` — never auto-confirm without the user's approval. |
+| `xpay_transfer` | Send USDC (or any Solana SPL token) directly to an address. Executes immediately, gated by the user's guardrail — confirm amount + destination with the user before calling. |
+| `xpay_token_find` | Find Solana tokens by ticker, name, or mint (price, mcap, liquidity, `verified` flag). Read-only. |
+| `xpay_swap` | Swap tokens inside the wallet via Jupiter (Solana only). Irreversible; guardrail-gated. Confirm with the user first. |
 | `xpay_balance` | The wallet's balance per network, plus its addresses (use this to tell the user where to send funds). |
 | `xpay_report` | Spending/income report (daily / weekly / monthly). |
 | `xpay_guardrail` | Read the active spending caps (per-tx, per-day, allowed hosts, approval threshold). |
@@ -94,9 +96,15 @@ signing), and hires never auto-release funds without the buyer's acceptance.
 - **Spending guardrail.** Per-tx and per-day USD caps and an allowed-host list
   are enforced *before* signing. A blocked call throws; don't try to route
   around it — surface the limit to the user.
-- **Transfers need confirmation.** `xpay_transfer` only *stages* a transfer; it
-  returns a code. Show the user the amount + destination and only call
-  `xpay_transfer_confirm` after they approve. Never move funds unprompted.
+- **Transfers and swaps move real funds immediately.** Show the user the
+  amount + destination (or the swap pair, USD value, and output-token mint)
+  and get their explicit approval *before* calling `xpay_transfer` or
+  `xpay_swap`. Never move funds unprompted. The guardrail enforces the user's
+  caps before signing either way.
+- **Check token verification.** Before any swap, confirm the output token's
+  `verified` flag from `xpay_token_find` — unverified tokens can be scams
+  reusing a real ticker. Never swap into an unverified token unless the user
+  explicitly confirms the exact mint address.
 - **Bento intent firewall (optional security layer).** When enabled, every
   payment is screened for malicious intent (prompt-injection, wallet-drain)
   before signing. A `BLOCKED` result means stop. Toggle with
@@ -123,9 +131,13 @@ signing), and hires never auto-release funds without the buyer's acceptance.
 3. Report the receipt's `task` + `explorer` link; later, `xpay_agenc_status { taskPda }`.
 
 **Send funds (with approval)**
-1. `xpay_transfer { amount: 5, to: "<address>", token: "USDC" }` → returns a code
-2. Confirm details with the user
-3. `xpay_transfer_confirm { confirmationCode: "<code>" }`
+1. Confirm the amount + destination with the user
+2. `xpay_transfer { amount: 5, to: "<address>", token: "USDC" }` — executes directly, guardrail-gated
+
+**Find and swap into a token (with approval)**
+1. `xpay_token_find { query: "BONK" }` → pick the intended token, check `verified`
+2. Show the user: amount, USD value, output token name + mint + verification — get approval
+3. `xpay_swap { amount: 0.5, from: "SOL", to: "<mint from step 1>" }`
 
 ## CLI / SDK
 

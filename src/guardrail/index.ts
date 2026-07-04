@@ -63,10 +63,11 @@ export class Guardrail {
   async check(args: { resource: Resource; requirement: PaymentRequirement }): Promise<void> {
     const usd = await this.estimateUsd(args.requirement);
 
-    // Host whitelist. Skipped for direct transfers (they target addresses, not
-    // hosts) — amount caps still apply, so a leaked CLI can't drain the wallet.
+    // Host whitelist. Skipped for direct transfers and swaps (they target
+    // addresses/tokens, not hosts — `xpay://swap/...` would parse to a bogus
+    // host) — amount caps still apply, so a leaked CLI can't drain the wallet.
     if (
-      args.resource.type !== "transfer" &&
+      !["transfer", "swap"].includes(args.resource.type) &&
       this.config.allowedHosts &&
       this.config.allowedHosts.length > 0
     ) {
@@ -193,6 +194,20 @@ export class Guardrail {
    */
   private async estimateUsd(req: PaymentRequirement): Promise<number> {
     if (!req.amount) return 0;
+    if (req.scheme === "swap") {
+      // The swap module computes the input-side USD (Jupiter's estimate or
+      // spot price) and passes it along — same trust boundary as the atomic
+      // amounts on any other requirement it builds.
+      const est = Number((req.extra as Record<string, unknown> | undefined)?.usdEstimate);
+      if (Number.isFinite(est) && est >= 0) return est;
+      if (this.hasCaps()) {
+        throw new GuardrailError(
+          "cannot price this swap in USD (no market price for the input token). " +
+            "Blocked because spending caps are configured.",
+        );
+      }
+      return 0;
+    }
     if (req.scheme === AGENC_SCHEME) {
       const sol = Number(req.amount) / 1e9;
       try {
@@ -262,6 +277,10 @@ function describeSpend(resource: Resource, usd: number): string {
     // Transfer resource URLs look like xpay://transfer/<network>/<address>.
     const to = resource.resource.split("/").filter(Boolean).pop() ?? "an unknown address";
     return `Transfer ${amount} directly to wallet address ${to}.`;
+  }
+  if (resource.type === "swap") {
+    const pair = resource.resource.split("/").pop() ?? "tokens";
+    return `Swap ${amount} worth of ${pair.replace("-", " into ")} inside the user's own wallet (no external recipient; the output token stays in the same wallet).`;
   }
   if (resource.type === "agenc") {
     const name = typeof resource.metadata?.name === "string" ? resource.metadata.name : "a service";

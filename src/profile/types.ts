@@ -91,6 +91,18 @@ export interface ProfileConfig {
     endpoint?: string;
   };
   /**
+   * Native token-swap settings (Jupiter). Optional — swaps work keyless with
+   * sensible defaults.
+   */
+  swap?: {
+    /** Default max slippage in bps (50 = 0.5%). Unset → Jupiter dynamic slippage. */
+    slippageBps?: number;
+    /** Jupiter API key for higher rate limits. Falls back to env JUPITER_API_KEY. */
+    apiKey?: string;
+    /** Jupiter API base override. Falls back to env XPAY_JUPITER_ENDPOINT. */
+    endpoint?: string;
+  };
+  /**
    * MagicBlock Private Ephemeral Rollup integration.
    * Platform-level config — set once by the xpay operator via `xpay magicblock configure`.
    * End users never need a MagicBlock account; they just pass private:true.

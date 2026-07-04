@@ -13,6 +13,8 @@ xpay init                                  # creates Solana + EVM keys, encrypte
 xpay discover "research API"               # 21k x402 catalog + AgenC agent listings, ranked
 xpay pay  https://api.example.com/x402     # x402 one-liner
 xpay agenc hire <listingPda>               # hire an on-chain agent (SOL escrow)
+xpay token find BONK                       # find any Solana token by ticker or mint
+xpay swap 0.5 SOL BONK                     # swap in your own wallet via Jupiter
 xpay transfer 5 USDC 7G73PL...gC           # direct USDC transfer
 xpay balance                               # unified across networks
 xpay report                                # daily / weekly / monthly report via OrbitX402
@@ -67,6 +69,8 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay pay <url>` | Pay an x402 endpoint. Works on catalog URLs and any URL that returns 402. `--max-usd`, `--body`, `-y`. |
 | `xpay agenc hire <listingPda>` | Hire an [AgenC marketplace](#agenc-marketplace-hire-on-chain-agents) listing — escrows its SOL price on-chain; the provider works asynchronously. `--max-usd`, `--review-window`, `-y`. |
 | `xpay agenc status <taskPda>` | Check a hire's progress (read-only, no wallet). `--json`. |
+| `xpay token find <query>` | Find a Solana token by ticker, name, or mint address (Jupiter) — price, mcap, liquidity, verification. Read-only. `--limit`, `--json`. |
+| `xpay swap <amount> <from> <to>` | Swap tokens in your wallet via Jupiter (Solana only), subject to the guardrail. `--slippage-bps`, `-y`. |
 | `xpay transfer <amount> USDC <to>` | Direct USDC transfer, subject to the guardrail. `--network`, `-y`. |
 | `xpay report` | Comprehensive USDC activity report — totals, net flow, timeline, top counterparties, biggest txs. `--period daily\|weekly\|monthly`, `--network`, `--json`. |
 | `xpay guardrail show \| set \| clear` | Inspect or edit spending caps and allowed hosts. |
@@ -163,7 +167,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** — fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** — the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -347,6 +351,29 @@ Notes:
 - Reviewing/accepting results happens on [agenc.ag](https://agenc.ag) for now; `xpay agenc accept` is planned.
 - Config (optional): `agenc: { rpcUrl, reviewWindowSecs, endpoint }` in the profile, or `XPAY_AGENC_ENDPOINT`. Opt out of the discovery source with `XPAY_DISCOVERY_SOURCES=orbitx402`.
 
+## Token discovery & swap (Solana)
+
+Find any Solana token by ticker or mint address and swap into it from your own wallet — keyless, via Jupiter's meta-aggregator:
+
+```bash
+xpay token find BONK                  # price, mcap, liquidity, mint, ✓ verified / ⚠ unverified
+xpay swap 0.5 SOL BONK                # quote → confirm → execute (guardrail-gated)
+xpay swap 1000 BONK USDC --slippage-bps 50
+```
+
+```ts
+const tokens = await xpay.findTokens("BONK");          // ranked verified-first
+const quote  = await xpay.swapQuote({ amount: 0.5, from: "SOL", to: tokens[0].mint });
+const result = await xpay.swap({ amount: 0.5, from: "SOL", to: tokens[0].mint });
+```
+
+Notes:
+- **Verification matters.** Anyone can mint a token reusing a real ticker. Bare tickers only resolve to Jupiter-**verified** tokens; ambiguous tickers error with a candidate list, and unverified tokens must be named by their exact mint. `xpay token find` shows the flag.
+- **The guardrail applies.** The input side is priced in USD (Jupiter's own estimate) and enforced against `maxPerTx` / `maxPerDay` **before signing** — fails closed if the token can't be priced while caps are set. Swaps stay inside your wallet (no external recipient), so `allowedHosts` doesn't apply.
+- **Slippage** defaults to Jupiter's dynamic slippage; override per call (`--slippage-bps`) or per profile (`swap.slippageBps`).
+- Keyless by default (~20 req/s shared bucket). Set `JUPITER_API_KEY` (or profile `swap.apiKey`) for higher limits; `XPAY_JUPITER_ENDPOINT` overrides the API base.
+- This is the **native** swap in your own xpay wallet. The separate `xpay sana swap` swaps inside a Sana-hosted wallet and needs a Sana API key.
+
 ## Multi-network
 
 `init` configures Solana and Base by default. Add or change via `~/.xpay/<name>/config.json`:
@@ -374,10 +401,11 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 
 ## Project status
 
-**v0.2.5 (current):**
-- ✅ CLI: init, accounts, balance, discover, pay, agenc, transfer, report, guardrail, mcp
+**v0.2.6 (current):**
+- ✅ CLI: init, accounts, balance, discover, pay, agenc, token, swap, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
-- ✅ MCP server on stdio with 11 tools (incl. the Bento intent firewall)
+- ✅ MCP server on stdio with 13 tools (incl. the Bento intent firewall)
+- ✅ Solana token discovery + native Jupiter swaps (`xpay token find`, `xpay swap`)
 - ✅ Solana + Base mainnet with disk caching
 - ✅ Optional Sana agent card integration (`xpay sana link`) — 8 additional `sana_*` tools
 - ✅ AgenC marketplace as a discovery source + smart-routed SOL escrow hires (`xpay agenc hire|status`)

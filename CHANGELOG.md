@@ -6,6 +6,32 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.6] – 2026-07-04
+
+### Added
+- **Solana token discovery.** `xpay token find <query>` / `xpay.findTokens()` /
+  MCP `xpay_token_find` — search any Solana token by ticker, name, or mint via
+  Jupiter Token API v2 (keyless). Returns price, market cap, liquidity, and
+  Jupiter's verification flag, ranked verified-first.
+- **Native token swap.** `xpay swap <amount> <from> <to>` / `xpay.swap()` /
+  MCP `xpay_swap` — swap tokens inside the user's own wallet via Jupiter Swap
+  API v2 (order → partial-sign → managed execute; keyless). Accepts symbols or
+  mint addresses; bare tickers resolve only to verified tokens (ambiguous
+  tickers error with a candidate list; unverified tokens require the exact
+  mint). `xpay.swapQuote()` quotes without executing. New profile config block
+  `swap: { slippageBps?, apiKey?, endpoint? }`; env `JUPITER_API_KEY` /
+  `XPAY_JUPITER_ENDPOINT`.
+- **Guardrail covers swaps.** The input side is priced in USD (Jupiter's
+  estimate) and enforced against the existing caps *before signing*; fails
+  closed when the input token can't be priced while caps are configured.
+  `allowedHosts` correctly does not apply (swaps have no external host), and
+  Bento receives an accurate swap intent description.
+- Example: `examples/token-swap-quote.ts` (find + quote, read-only).
+
+### Fixed
+- SKILL.md still documented the removed `xpay_transfer_confirm` staging flow
+  (dropped in 0.2.2) — rewritten for direct execution with guardrail gating.
+
 ## [0.2.5] – 2026-07-04
 
 ### Fixed

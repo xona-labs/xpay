@@ -43,6 +43,8 @@ import {
 } from "./magicblock.js";
 import { runBentoEnable, runBentoDisable, runBentoStatus } from "./bento.js";
 import { runAgencHire, runAgencStatus } from "./agenc.js";
+import { runTokenFind } from "./token.js";
+import { runSwap } from "./swap.js";
 import { startMcpServer } from "./mcp-server.js";
 
 const program = new Command();
@@ -122,6 +124,32 @@ program
   .option("--json", "Emit raw JSON")
   .action(async (opts) => {
     await runReport(opts);
+  });
+
+// ---------------------------------------------------------------- token
+const token = program
+  .command("token")
+  .description("Solana token discovery (Jupiter).");
+
+token
+  .command("find <query>", { isDefault: true })
+  .description("Find a token by ticker, name, or mint address. Read-only, no wallet.")
+  .option("--limit <n>", "Max results (default 10)")
+  .option("--json", "Emit raw JSON")
+  .action(async (query: string, opts) => {
+    await runTokenFind(query, opts);
+  });
+
+// ---------------------------------------------------------------- swap
+program
+  .command("swap <amount> <fromToken> <toToken>")
+  .description("Swap tokens in your wallet via Jupiter (Solana only). Subject to the guardrail.")
+  .option("--profile <name>", "Profile to swap from (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--slippage-bps <n>", "Max slippage in bps (default: Jupiter dynamic slippage)")
+  .option("-y, --yes", "Skip the confirmation prompt")
+  .action(async (amount: string, fromToken: string, toToken: string, opts) => {
+    await runSwap(amount, fromToken, toToken, opts);
   });
 
 // ---------------------------------------------------------------- transfer

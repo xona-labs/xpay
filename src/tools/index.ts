@@ -154,6 +154,43 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       input_schema: { type: "object", properties: {} },
     },
     {
+      name: "xpay_token_find",
+      description:
+        "Find Solana tokens by ticker, name, or mint address (Jupiter registry). Read-only — no " +
+        "wallet, no spending. Returns mint, price, market cap, liquidity, and a `verified` flag. " +
+        "ALWAYS check `verified` before suggesting a swap: unverified tokens can be scams reusing a " +
+        "real token's ticker. Natural flow: xpay_token_find → confirm the exact mint with the user → xpay_swap.",
+      input_schema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Ticker (e.g. BONK), name, or mint address." },
+          limit: { type: "number", description: "Max results. Default 10." },
+        },
+        required: ["query"],
+      },
+    },
+    {
+      name: "xpay_swap",
+      description:
+        "Swap tokens inside the user's own xpay wallet via Jupiter (Solana only — funds never leave " +
+        "the wallet, but the swap is irreversible and puts wallet value at risk). Subject to the " +
+        "user's guardrail caps, enforced before signing. Before calling, show the user: the input " +
+        "amount + USD value, the expected output amount, and the output token's mint + verification " +
+        "status — and get their explicit approval. Never swap unprompted, and never swap into an " +
+        "unverified token without the user confirming the exact mint. Ambiguous tickers return an " +
+        "error listing candidate mints — pass the exact mint to disambiguate.",
+      input_schema: {
+        type: "object",
+        properties: {
+          amount: { type: "number", description: "Amount of the input token, human units (e.g. 0.5)." },
+          from: { type: "string", description: "Input token: symbol (SOL, USDC, BONK, …) or mint address." },
+          to: { type: "string", description: "Output token: symbol or mint address. Prefer the exact mint from xpay_token_find." },
+          slippageBps: { type: "number", description: "Max slippage in bps (50 = 0.5%). Default: Jupiter dynamic slippage (recommended)." },
+        },
+        required: ["amount", "from", "to"],
+      },
+    },
+    {
       name: "xpay_agenc_status",
       description:
         "Check the progress of an AgenC marketplace hire (read-only, no wallet). " +
@@ -253,6 +290,19 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       }),
 
     xpay_guardrail: async () => xpay.guardrail,
+
+    xpay_token_find: async (input) =>
+      xpay.findTokens(input.query as string, {
+        limit: (input.limit as number) ?? 10,
+      }),
+
+    xpay_swap: async (input) =>
+      xpay.swap({
+        amount: input.amount as number,
+        from: input.from as string,
+        to: input.to as string,
+        slippageBps: input.slippageBps as number | undefined,
+      }),
 
     xpay_agenc_status: async (input) => fetchAgencTask(input.taskPda as string),
   };

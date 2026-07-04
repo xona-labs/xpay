@@ -23,14 +23,14 @@ import { magicBlockPrivateTransfer, type MagicBlockConfig } from "../magicblock/
 
 // ─── Solana token registry ────────────────────────────────────────────────────
 
-interface SplTokenInfo {
+export interface SplTokenInfo {
   mint:     string;
   decimals: number;
   symbol:   string;
 }
 
 /** Well-known Solana SPL tokens — symbol (uppercase) → info. */
-const SOLANA_TOKENS: Record<string, SplTokenInfo> = {
+export const SOLANA_TOKENS: Record<string, SplTokenInfo> = {
   USDC:    { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, symbol: "USDC"    },
   USDT:    { mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6, symbol: "USDT"    },
   WSOL:    { mint: "So11111111111111111111111111111111111111112",   decimals: 9, symbol: "wSOL"    },
