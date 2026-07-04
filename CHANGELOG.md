@@ -6,6 +6,17 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.9] – 2026-07-04
+
+### Added
+- **Balance auto-labels every token and shows USD values.** `xpay balance`
+  and `xpay_balance` always scanned all SPL tokens, but anything outside the
+  built-in registry displayed as a truncated mint with no price. Balances are
+  now enriched via one batched Jupiter lookup: real symbol/name for unknown
+  mints, per-token `usdValue`, a portfolio total, and an `⚠ unverified` flag
+  on suspicious tokens. Fails soft — if Jupiter is unreachable, balances
+  render exactly as before. New SDK export: `enrichTokenBalances()`.
+
 ## [0.2.8] – 2026-07-04
 
 ### Added

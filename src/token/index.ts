@@ -138,6 +138,57 @@ export async function resolveTradeToken(input: string, opts: TokenApiOptions = {
   );
 }
 
+/** A wallet token balance enriched with live Jupiter market data. */
+export interface EnrichedTokenBalance {
+  symbol: string;
+  name: string;
+  balance: number;
+  decimals: number;
+  address?: string;
+  isNative?: boolean;
+  usdPrice?: number;
+  usdValue?: number;
+  verified?: boolean;
+}
+
+/**
+ * Label and price wallet balances via one batched Jupiter lookup (comma-
+ * separated mints, max 100). Unknown mints get their real symbol/name; every
+ * priceable token gets `usdPrice`/`usdValue`. Never throws — on any Jupiter
+ * failure the input balances are returned unchanged (a balance display must
+ * not break because a market-data API hiccuped).
+ */
+export async function enrichTokenBalances(
+  balances: Array<{ symbol: string; name: string; balance: number; decimals: number; address?: string; isNative?: boolean }>,
+  opts: TokenApiOptions = {},
+): Promise<EnrichedTokenBalance[]> {
+  try {
+    const mints = [...new Set(
+      balances.map((b) => (b.isNative ? NATIVE_SOL_MINT : b.address)).filter((m): m is string => Boolean(m)),
+    )].slice(0, 100);
+    if (mints.length === 0) return balances;
+
+    const infos = await findTokens(mints.join(","), { ...opts, limit: mints.length });
+    const byMint = new Map(infos.map((t) => [t.mint, t]));
+
+    return balances.map((b) => {
+      const info = byMint.get(b.isNative ? NATIVE_SOL_MINT : (b.address ?? ""));
+      if (!info) return b;
+      const unknown = !b.name || b.name === "Unknown Token";
+      return {
+        ...b,
+        symbol: b.isNative ? b.symbol : unknown ? info.symbol : b.symbol,
+        name: b.isNative ? b.name : unknown ? info.name : b.name,
+        usdPrice: info.usdPrice,
+        usdValue: info.usdPrice !== undefined ? info.usdPrice * b.balance : undefined,
+        verified: info.verified,
+      };
+    });
+  } catch {
+    return balances;
+  }
+}
+
 // ─── Internals ────────────────────────────────────────────────────────────────
 
 interface JupiterTokenItem {

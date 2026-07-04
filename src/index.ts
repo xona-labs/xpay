@@ -59,10 +59,12 @@ export type { AgencHireConfig, AgencHireReceipt } from "./agenc/hire.js";
 export {
   findTokens,
   resolveTradeToken,
+  enrichTokenBalances,
   AmbiguousTokenError,
   NATIVE_SOL_MINT,
   type TokenInfo,
   type TokenApiOptions,
+  type EnrichedTokenBalance,
 } from "./token/index.js";
 export {
   swap as swapTokens,

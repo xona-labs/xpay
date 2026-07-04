@@ -14,6 +14,7 @@
 import type { XPay } from "../index.js";
 import { ResourceSchema } from "../types.js";
 import { fetchAgencTask } from "../agenc/api.js";
+import { enrichTokenBalances } from "../token/index.js";
 import { forSana } from "../sana/tools.js";
 
 /** Base URL for xona's paid X (Twitter) data endpoints (x402-gated). */
@@ -295,8 +296,11 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         const signer = xpay.wallet.signer(n);
 
         if (typeof signer.tokenBalances === "function") {
-          // Full token breakdown — same path as the CLI.
-          const tokens = await signer.tokenBalances().catch(() => []);
+          // Full token breakdown — same path as the CLI. Solana balances are
+          // enriched via Jupiter: unknown mints get real symbols/names, and
+          // priceable tokens carry usdPrice/usdValue.
+          const raw = await signer.tokenBalances().catch(() => []);
+          const tokens = n === "solana" ? await enrichTokenBalances(raw) : raw;
           perNetwork[n] = {
             address: signer.address,
             tokens: tokens.map((t) => ({
@@ -305,6 +309,9 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
               balance: t.balance,
               native: t.isNative ?? false,
               address: t.address,
+              usdPrice: (t as { usdPrice?: number }).usdPrice,
+              usdValue: (t as { usdValue?: number }).usdValue,
+              verified: (t as { verified?: boolean }).verified,
             })),
           };
           for (const t of tokens) {
