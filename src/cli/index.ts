@@ -45,6 +45,7 @@ import { runBentoEnable, runBentoDisable, runBentoStatus } from "./bento.js";
 import { runAgencHire, runAgencStatus } from "./agenc.js";
 import { runTokenFind } from "./token.js";
 import { runSwap } from "./swap.js";
+import { runXUser, runXPosts } from "./x.js";
 import { startMcpServer } from "./mcp-server.js";
 
 const program = new Command();
@@ -138,6 +139,34 @@ token
   .option("--json", "Emit raw JSON")
   .action(async (query: string, opts) => {
     await runTokenFind(query, opts);
+  });
+
+// ---------------------------------------------------------------- x (Twitter)
+const xcmd = program
+  .command("x")
+  .description("Realtime X (Twitter) account data — paid via x402 at cost (no X account needed).");
+
+xcmd
+  .command("user <handle>")
+  .description("Profile lookup: followers, bio, verification (~$0.01 USDC).")
+  .option("--profile <name>", "Profile to pay from (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--json", "Emit raw JSON")
+  .option("-y, --yes", "Skip the confirmation prompt")
+  .action(async (handle: string, opts) => {
+    await runXUser(handle, opts);
+  });
+
+xcmd
+  .command("posts <handle>")
+  .description("Recent original posts with engagement metrics (~$0.06 USDC for 10).")
+  .option("--profile <name>", "Profile to pay from (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--limit <n>", "Posts to return, 1-10 (default 10)")
+  .option("--json", "Emit raw JSON")
+  .option("-y, --yes", "Skip the confirmation prompt")
+  .action(async (handle: string, opts) => {
+    await runXPosts(handle, opts);
   });
 
 // ---------------------------------------------------------------- swap

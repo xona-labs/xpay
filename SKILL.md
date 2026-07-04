@@ -44,6 +44,8 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_transfer` | Send USDC (or any Solana SPL token) directly to an address. Executes immediately, gated by the user's guardrail — confirm amount + destination with the user before calling. |
 | `xpay_token_find` | Find Solana tokens by ticker, name, or mint (price, mcap, liquidity, `verified` flag). Read-only. |
 | `xpay_swap` | Swap tokens inside the wallet via Jupiter (Solana only). Irreversible; guardrail-gated. Confirm with the user first. |
+| `xpay_x_user` | Realtime X (Twitter) profile — followers, bio, verification. Paid (~$0.01 at cost via x402). |
+| `xpay_x_posts` | Recent posts from an X account with engagement metrics. Paid (~$0.06 at cost via x402). |
 | `xpay_balance` | The wallet's balance per network, plus its addresses (use this to tell the user where to send funds). |
 | `xpay_report` | Spending/income report (daily / weekly / monthly). |
 | `xpay_guardrail` | Read the active spending caps (per-tx, per-day, allowed hosts, approval threshold). |
@@ -138,6 +140,11 @@ signing), and hires never auto-release funds without the buyer's acceptance.
 1. `xpay_token_find { query: "BONK" }` → pick the intended token, check `verified`
 2. Show the user: amount, USD value, output token name + mint + verification — get approval
 3. `xpay_swap { amount: 0.5, from: "SOL", to: "<mint from step 1>" }`
+
+**Token due diligence with X (Twitter)**
+1. `xpay_token_find { query: "..." }` → note the token + its project
+2. `xpay_x_posts { handle: "<project's X handle>" }` → what are they actually posting? (paid: ~$0.06)
+3. Report findings; swap only if the user approves.
 
 ## CLI / SDK
 

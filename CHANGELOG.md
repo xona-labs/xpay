@@ -6,6 +6,18 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.8] – 2026-07-04
+
+### Added
+- **Realtime X (Twitter) data, zero setup.** `xpay x user <handle>` /
+  `xpay x posts <handle>` CLI and `xpay_x_user` / `xpay_x_posts` MCP tools —
+  live profile (followers, bio, verification) and recent posts with
+  engagement metrics. Calls xona's x402-paywalled proxy of the X API v2 and
+  pays per call from the wallet at **cost price** (~$0.01 profile, ~$0.06 for
+  10 posts — passthrough of X's pay-per-use billing, no markup). No X
+  developer account or API key needed; guardrail caps apply like any paid
+  call. Endpoint override: `XPAY_XDATA_ENDPOINT`.
+
 ## [0.2.7] – 2026-07-04
 
 ### Changed

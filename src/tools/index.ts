@@ -16,6 +16,9 @@ import { ResourceSchema } from "../types.js";
 import { fetchAgencTask } from "../agenc/api.js";
 import { forSana } from "../sana/tools.js";
 
+/** Base URL for xona's paid X (Twitter) data endpoints (x402-gated). */
+const XDATA_BASE = process.env.XPAY_XDATA_ENDPOINT ?? "https://api.xona-agent.com";
+
 export interface ToolBundle<TDef> {
   tools: TDef[];
   handlers: Record<string, (input: Record<string, unknown>) => Promise<unknown>>;
@@ -197,6 +200,37 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       },
     },
     {
+      name: "xpay_x_user",
+      description:
+        "Realtime X (Twitter) profile lookup — followers, bio, verification status. This is a PAID " +
+        "call (~$0.01 USDC from the wallet via x402, at cost — no markup); guardrail caps apply. " +
+        "Great for due diligence on a token's or project's X account before a swap. Don't spam it: " +
+        "results barely change minute to minute, so one call per account per conversation is enough.",
+      input_schema: {
+        type: "object",
+        properties: {
+          handle: { type: "string", description: "X username, with or without the leading @." },
+        },
+        required: ["handle"],
+      },
+    },
+    {
+      name: "xpay_x_posts",
+      description:
+        "Recent posts from an X (Twitter) account (up to 10, excludes retweets/replies) with " +
+        "engagement metrics. PAID call (~$0.06 USDC from the wallet via x402, at cost — no markup); " +
+        "guardrail caps apply. Use for checking what a project/account is actually saying right now " +
+        "(e.g. before swapping into their token). One call per account per conversation is enough.",
+      input_schema: {
+        type: "object",
+        properties: {
+          handle: { type: "string", description: "X username, with or without the leading @." },
+          limit: { type: "number", description: "Posts to return, 1-10. Default 10." },
+        },
+        required: ["handle"],
+      },
+    },
+    {
       name: "xpay_agenc_status",
       description:
         "Check the progress of an AgenC marketplace hire (read-only, no wallet). " +
@@ -308,6 +342,18 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         from: input.from as string,
         to: input.to as string,
         slippageBps: input.slippageBps as number | undefined,
+      }),
+
+    xpay_x_user: async (input) =>
+      xpay.useByUrl(`${XDATA_BASE}/x/user`, {
+        method: "POST",
+        body: { handle: input.handle as string },
+      }),
+
+    xpay_x_posts: async (input) =>
+      xpay.useByUrl(`${XDATA_BASE}/x/posts`, {
+        method: "POST",
+        body: { handle: input.handle as string, limit: input.limit as number | undefined },
       }),
 
     xpay_agenc_status: async (input) => fetchAgencTask(input.taskPda as string),
