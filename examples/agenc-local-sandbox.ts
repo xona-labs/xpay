@@ -79,6 +79,7 @@ async function main() {
     expectedVersion: 1n,
     reviewWindowSecs: 86_400n,
     listingSpecHash,
+    moderator: market.moderator.address,
   });
   const [task] = await findTaskPda({ creator: buyer.address, taskId });
   const [hireRecord] = await findHireRecordPda({ task });
@@ -96,6 +97,7 @@ async function main() {
       creator: buyer,
       jobSpecHash,
       jobSpecUri: "agenc://job-spec/sha256/demo",
+      moderator: market.moderator.address,
     }),
   ]);
   await providerClient.claimTaskWithJobSpec({ task, worker: providerAgent, authority: provider });

@@ -103,8 +103,40 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
     );
   }
 
-  const { createMarketplaceClient, findTaskPda, findHireRecordPda } = await import(
-    "@tetsuo-ai/marketplace-sdk"
+  const {
+    createMarketplaceClient,
+    findTaskPda,
+    findHireRecordPda,
+    getListingModerationDecoder,
+    AGENC_COORDINATION_PROGRAM_ADDRESS,
+  } = await import("@tetsuo-ai/marketplace-sdk");
+
+  // Resolve the listing's moderation attestation. The deployed mainnet
+  // program seeds it as ["listing_moderation", listing, specHash] (no
+  // moderator in the seeds), and the record itself names the moderator the
+  // hire gate expects — so both are discoverable without extra config. The
+  // SDK facade would derive the newer v2 seeds by default, which the deployed
+  // program rejects (InvalidModerationRecord), so pass both explicitly.
+  const { getProgramDerivedAddress, getAddressEncoder, getUtf8Encoder } = await import(
+    "@solana/kit"
+  );
+  const [listingModeration] = await getProgramDerivedAddress({
+    programAddress: AGENC_COORDINATION_PROGRAM_ADDRESS,
+    seeds: [
+      getUtf8Encoder().encode("listing_moderation"),
+      getAddressEncoder().encode(address(extra.listingPda)),
+      hexToBytes(extra.specHash),
+    ],
+  });
+  const modInfo = await rpc.getAccountInfo(listingModeration, { encoding: "base64" }).send();
+  if (!modInfo.value) {
+    throw new Error(
+      `xpay.agenc: listing ${extra.listingPda} has no on-chain moderation attestation — ` +
+        `the hire gate is fail-closed, so it cannot be hired yet. Re-run discover later.`,
+    );
+  }
+  const modRecord = getListingModerationDecoder().decode(
+    Uint8Array.from(Buffer.from(String(modInfo.value.data[0]), "base64")),
   );
 
   const client = createMarketplaceClient({ rpcUrl, signer: kitSigner });
@@ -118,6 +150,8 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
     expectedVersion: BigInt(extra.version),
     reviewWindowSecs: BigInt(cfg.reviewWindowSecs ?? 86_400),
     listingSpecHash: hexToBytes(extra.specHash),
+    moderator: modRecord.moderator,
+    listingModeration,
   });
 
   const [taskPda] = await findTaskPda({ creator: kitSigner.address, taskId });

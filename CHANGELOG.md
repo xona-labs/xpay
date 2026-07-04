@@ -6,6 +6,23 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.5] – 2026-07-04
+
+### Fixed
+- **AgenC hires failed on mainnet with program error 102
+  (`InstructionDidNotDeserialize`).** The deployed mainnet program requires a
+  `moderator` argument in the hire instruction (P1.2 moderation gate) that
+  SDK 0.7.1 predates. Bumped `@tetsuo-ai/marketplace-sdk` to `^0.8.0` and
+  made the hire path resolve the listing's on-chain moderation record
+  (`["listing_moderation", listing, specHash]` PDA — derivable without
+  knowing the moderator; the record itself names the moderator), passing
+  `moderator` + the explicit `listingModeration` account. Verified against
+  mainnet by transaction simulation (executes cleanly end-to-end) and against
+  the SDK's bundled program via the litesvm sandbox example.
+- Hiring a listing with no on-chain moderation attestation now fails fast
+  with a clear message instead of an opaque on-chain error (the gate is
+  fail-closed).
+
 ## [0.2.4] – 2026-07-03
 
 Re-release of 0.2.3 with no code changes (registry hygiene).
