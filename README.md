@@ -401,7 +401,7 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 
 ## Project status
 
-**v0.2.6 (current):**
+**v0.2.7 (current):**
 - ✅ CLI: init, accounts, balance, discover, pay, agenc, token, swap, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
 - ✅ MCP server on stdio with 13 tools (incl. the Bento intent firewall)
