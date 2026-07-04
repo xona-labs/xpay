@@ -159,8 +159,9 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         "Find Solana tokens by ticker, name, or mint address (Jupiter registry). Read-only — no " +
         "wallet, no spending. Returns mint, price, market cap, liquidity, and a `verified` flag. " +
         "ALWAYS check `verified` before suggesting a swap: unverified tokens can be scams reusing a " +
-        "real token's ticker. To then swap, call the xpay_swap tool with the chosen mint — do NOT " +
-        "write code or call DEX APIs yourself; xpay_swap handles quoting, signing, and execution.",
+        "real token's ticker. This tool alone answers price/info questions — only proceed to a swap " +
+        "if the user explicitly asked to trade, and then use the xpay_swap tool with the chosen mint " +
+        "(do NOT write code or call DEX APIs yourself).",
       input_schema: {
         type: "object",
         properties: {
@@ -176,9 +177,10 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         "THE ONLY way to swap tokens — a single tool call that quotes, signs, and executes inside the " +
         "user's own xpay wallet via Jupiter (Solana only). NEVER write code or scripts (Python/JS/curl) " +
         "to swap, and never call Jupiter or DEX APIs directly: custom code bypasses the user's guardrail " +
-        "caps and token-verification safety, and has no access to the wallet key anyway. After " +
-        "xpay_token_find, call this tool directly with the chosen mint — no other steps are needed. " +
-        "Swaps are irreversible and guardrail caps are enforced before signing. Before calling, show the " +
+        "caps and token-verification safety, and has no access to the wallet key anyway. When the user " +
+        "actually wants to swap, this one tool call does everything (quote + sign + execute) — but " +
+        "xpay_token_find alone answers informational questions; do NOT follow it with a swap unless the " +
+        "user asked to trade. Swaps are irreversible and guardrail caps are enforced before signing. Before calling, show the " +
         "user: the input amount + USD value, the expected output amount, and the output token's mint + " +
         "verification status — and get their explicit approval. Never swap unprompted, and never swap " +
         "into an unverified token without the user confirming the exact mint. Ambiguous tickers return " +

@@ -13,7 +13,9 @@ versioning follows [Semantic Versioning](https://semver.org/).
   a code-execution tool sometimes hand-rolled swap scripts (bypassing the
   guardrail and token-verification safety) instead of calling the tool. The
   descriptions now explicitly forbid custom swap code and state that
-  `xpay_swap` is the single quote+sign+execute step after `xpay_token_find`.
+  `xpay_swap` is the single quote+sign+execute step — while also making clear
+  that `xpay_token_find` alone answers informational questions and a swap
+  must never follow automatically unless the user asked to trade.
 
 ## [0.2.6] – 2026-07-04
 
