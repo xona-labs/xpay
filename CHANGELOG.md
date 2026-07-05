@@ -6,6 +6,15 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.10] – 2026-07-05
+
+### Fixed
+- **Token-2022 balances were invisible.** `tokenBalances()` only scanned the
+  classic SPL token program, so tokens on the Token-2022 program — including
+  most pump.fun mints — never appeared in `xpay balance` / `xpay_balance`,
+  even right after swapping into them. Both token programs are scanned now,
+  and the 0.2.9 Jupiter enrichment labels and prices them.
+
 ## [0.2.9] – 2026-07-04
 
 ### Added

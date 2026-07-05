@@ -18,6 +18,7 @@ import {
   getAccount,
   getOrCreateAssociatedTokenAccount,
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import type { TokenBalance } from "../types.js";
 
@@ -102,29 +103,33 @@ export function rawSolanaSigner(opts: RawSolanaSignerOptions): Signer {
         }
       } catch { /* skip */ }
 
-      // All SPL token accounts
-      try {
-        const { value: accounts } = await connection.getParsedTokenAccountsByOwner(
-          keypair.publicKey,
-          { programId: TOKEN_PROGRAM_ID },
-        );
-        for (const { account } of accounts) {
-          const parsed = account.data.parsed?.info;
-          if (!parsed) continue;
-          const mint: string = parsed.mint;
-          const uiAmount: number = parsed.tokenAmount?.uiAmount ?? 0;
-          const decimals: number = parsed.tokenAmount?.decimals ?? 0;
-          if (uiAmount === 0) continue;
-          const known = KNOWN_MINTS[mint];
-          results.push({
-            symbol: known?.symbol ?? mint.slice(0, 4) + "…",
-            name: known?.name ?? "Unknown Token",
-            balance: uiAmount,
-            decimals,
-            address: mint,
-          });
-        }
-      } catch { /* skip */ }
+      // All SPL token accounts — both the classic token program AND
+      // Token-2022 (newer mints, e.g. pump.fun tokens, live there and were
+      // previously invisible to balance).
+      for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+        try {
+          const { value: accounts } = await connection.getParsedTokenAccountsByOwner(
+            keypair.publicKey,
+            { programId },
+          );
+          for (const { account } of accounts) {
+            const parsed = account.data.parsed?.info;
+            if (!parsed) continue;
+            const mint: string = parsed.mint;
+            const uiAmount: number = parsed.tokenAmount?.uiAmount ?? 0;
+            const decimals: number = parsed.tokenAmount?.decimals ?? 0;
+            if (uiAmount === 0) continue;
+            const known = KNOWN_MINTS[mint];
+            results.push({
+              symbol: known?.symbol ?? mint.slice(0, 4) + "…",
+              name: known?.name ?? "Unknown Token",
+              balance: uiAmount,
+              decimals,
+              address: mint,
+            });
+          }
+        } catch { /* skip */ }
+      }
 
       return results;
     },
