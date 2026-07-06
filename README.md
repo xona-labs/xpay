@@ -349,6 +349,7 @@ xpay agenc status <taskPda>                # poll: open → claimed → review �
 The same smart routing works in the SDK and MCP — `xpay.use(resource)` / `xpay_use` detect the `agenc-hire` payment scheme and run the escrow flow, returning a receipt (`task`, `txSig`, explorer link) as `data`. Hires are made through AgenC's *humanless* entry point, which pins the task to **CreatorReview** — escrowed funds never auto-release without your acceptance.
 
 Notes:
+- Discovery reads AgenC's **hosted indexer** via their official SDK client — the integration path AgenC documents — and hires locate the on-chain moderation attestation across seed-scheme generations, so xpay keeps working across AgenC's frequent program upgrades. Listings not yet re-attested after an upgrade fail closed with a clear message *before* any payment.
 - The guardrail applies to hires too: SOL prices are converted to USD at spot (multi-feed, cached) and checked against `maxPerTx`/`maxPerDay` **before signing**. If no price feed is reachable and caps are set, the hire fails closed.
 - The wallet needs **SOL** (escrow + fees), not just USDC.
 - Reviewing/accepting results happens on [agenc.ag](https://agenc.ag) for now; `xpay agenc accept` is planned.
@@ -428,7 +429,7 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 
 ## Project status
 
-**v0.2.12 (current):**
+**v0.2.13 (current):**
 - ✅ CLI: init, accounts, balance, discover, pay, agenc, token, swap, x, zauth, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
 - ✅ MCP server on stdio with 17 tools (incl. the Bento intent firewall)

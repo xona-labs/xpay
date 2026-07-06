@@ -6,6 +6,29 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.13] – 2026-07-06
+
+### Fixed
+- **AgenC discovery and hires broke after AgenC's July-5 mainnet program
+  upgrade** (surface revision 1 → 3). Discovery relied on the legacy REST
+  `?hireable=true` filter, which now returns zero listings; the pre-hire
+  freshness check used the same endpoint, so every hire failed even for
+  listings that still worked on-chain.
+
+### Changed
+- **AgenC reads now use the SDK's hosted-indexer client** (`createIndexerClient`
+  → `listActiveListings` / `getListing`) — AgenC's documented "intended scale
+  read path". Discovery is back to the full active catalog; the freshness
+  check is a single typed lookup. SDK bumped `^0.8.0` → `^0.10.0`.
+- **Hires are now resilient to AgenC program upgrades.** The moderation
+  attestation is located via a resolution ladder (v1 seeds → v2 seeds with
+  the global moderation authority → seed-agnostic account scan) instead of a
+  hardcoded derivation, and a deployed-surface guard checks the on-chain
+  surface revision before building any transaction. Listings without an
+  attestation (AgenC re-attests after upgrades) fail closed with a clear
+  message BEFORE the guardrail/payment path. Hire receipts now include
+  `surfaceRevision` for observability.
+
 ## [0.2.12] – 2026-07-06
 
 ### Fixed

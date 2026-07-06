@@ -41,6 +41,8 @@ export interface AgencHireReceipt {
   status: "escrowed";
   statusHint: string;
   explorer: string;
+  /** On-chain program surface revision at hire time (observability for AgenC upgrades). */
+  surfaceRevision?: number;
 }
 
 interface AgencExtra {
@@ -103,41 +105,36 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
     );
   }
 
-  const {
-    createMarketplaceClient,
-    findTaskPda,
-    findHireRecordPda,
-    getListingModerationDecoder,
-    AGENC_COORDINATION_PROGRAM_ADDRESS,
-  } = await import("@tetsuo-ai/marketplace-sdk");
+  const sdk = await import("@tetsuo-ai/marketplace-sdk");
+  const { createMarketplaceClient, findTaskPda, findHireRecordPda } = sdk;
 
-  // Resolve the listing's moderation attestation. The deployed mainnet
-  // program seeds it as ["listing_moderation", listing, specHash] (no
-  // moderator in the seeds), and the record itself names the moderator the
-  // hire gate expects — so both are discoverable without extra config. The
-  // SDK facade would derive the newer v2 seeds by default, which the deployed
-  // program rejects (InvalidModerationRecord), so pass both explicitly.
-  const { getProgramDerivedAddress, getAddressEncoder, getUtf8Encoder } = await import(
-    "@solana/kit"
-  );
-  const [listingModeration] = await getProgramDerivedAddress({
-    programAddress: AGENC_COORDINATION_PROGRAM_ADDRESS,
-    seeds: [
-      getUtf8Encoder().encode("listing_moderation"),
-      getAddressEncoder().encode(address(extra.listingPda)),
-      hexToBytes(extra.specHash),
-    ],
-  });
-  const modInfo = await rpc.getAccountInfo(listingModeration, { encoding: "base64" }).send();
-  if (!modInfo.value) {
+  // Surface guard: AgenC upgrades its on-chain program frequently (surface
+  // revisions are stamped in ProtocolConfig). Refuse clearly when the
+  // deployed program doesn't expose the listings/hire family, instead of
+  // failing deep inside a transaction.
+  const surface = await deployedSurface(sdk, rpc);
+  if (!surface.listings) {
     throw new Error(
-      `xpay.agenc: listing ${extra.listingPda} has no on-chain moderation attestation — ` +
-        `the hire gate is fail-closed, so it cannot be hired yet. Re-run discover later.`,
+      `xpay.agenc: the deployed AgenC program (surface revision ${surface.surfaceRevision}) ` +
+        `does not expose listings/hires on this cluster. xpay may need an update — check ` +
+        `for a newer @xona-labs/xpay release.`,
     );
   }
-  const modRecord = getListingModerationDecoder().decode(
-    Uint8Array.from(Buffer.from(String(modInfo.value.data[0]), "base64")),
-  );
+
+  // Resolve the listing's moderation attestation. The record's on-chain
+  // ADDRESS has changed seed schemes across program upgrades, but its CONTENT
+  // always names the moderator the hire gate expects — so we locate the
+  // record (trying each known derivation, newest data wins) and pass both
+  // the moderator and the explicit record address to the facade. Fail-closed
+  // BEFORE the guardrail/payment path if no attestation exists.
+  const moderation = await resolveListingModeration(sdk, rpc, extra.listingPda, extra.specHash);
+  if (!moderation) {
+    throw new Error(
+      `xpay.agenc: listing ${extra.listingPda} has no on-chain moderation attestation yet ` +
+        `(AgenC re-attests listings after program upgrades). The hire gate is fail-closed — ` +
+        `pick another listing or retry later.`,
+    );
+  }
 
   const client = createMarketplaceClient({ rpcUrl, signer: kitSigner });
 
@@ -150,8 +147,8 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
     expectedVersion: BigInt(extra.version),
     reviewWindowSecs: BigInt(cfg.reviewWindowSecs ?? 86_400),
     listingSpecHash: hexToBytes(extra.specHash),
-    moderator: modRecord.moderator,
-    listingModeration,
+    moderator: address(moderation.moderator),
+    listingModeration: address(moderation.address),
   });
 
   const [taskPda] = await findTaskPda({ creator: kitSigner.address, taskId });
@@ -170,6 +167,7 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
       "SOL is escrowed on-chain; the provider works asynchronously. Poll progress with " +
       `\`xpay agenc status ${taskPda}\` — funds settle to the provider after your review window.`,
     explorer: `https://solscan.io/tx/${signature}`,
+    surfaceRevision: surface.surfaceRevision,
   };
 
   const result: UseResult = {
@@ -201,6 +199,141 @@ function parseExtra(req: PaymentRequirement): AgencExtra {
     );
   }
   return { listingPda, specHash, version };
+}
+
+// ─── Program-upgrade resilience helpers ──────────────────────────────────────
+
+type AgencSdk = typeof import("@tetsuo-ai/marketplace-sdk");
+
+/* Minimal structural view of the kit RPC — keeps these helpers decoupled from
+ * kit's branded generics while accepting the client hire() already builds. */
+interface MinimalRpc {
+  getAccountInfo(
+    addr: unknown,
+    opts: unknown,
+  ): { send(): Promise<{ value: { data: unknown[] } | null }> };
+  getProgramAccounts(
+    program: unknown,
+    opts: unknown,
+  ): { send(): Promise<ReadonlyArray<{ pubkey: string; account: { data: unknown[] } }>> };
+}
+
+let surfaceCache: { value: { surfaceRevision: number; listings: boolean }; at: number } | undefined;
+
+/** Deployed instruction surface, cached 10 min — one account fetch. */
+async function deployedSurface(sdk: AgencSdk, rpc: unknown) {
+  if (surfaceCache && Date.now() - surfaceCache.at < 600_000) return surfaceCache.value;
+  const value = await sdk.getDeployedSurface(rpc as Parameters<AgencSdk["getDeployedSurface"]>[0]);
+  surfaceCache = { value, at: Date.now() };
+  return value;
+}
+
+interface ResolvedModeration {
+  address: string;
+  moderator: string;
+}
+
+/**
+ * Locate the listing's moderation attestation record. The seed scheme has
+ * changed across AgenC program upgrades, so try each known derivation, then a
+ * seed-agnostic scan:
+ *   1. v1 seeds ["listing_moderation", listing, specHash]
+ *   2. v2 seeds ["listing_moderation_v2", listing, specHash, globalAuthority]
+ *   3. getProgramAccounts scan (discriminator + listing memcmp)
+ * Whatever record is found, its CONTENT names the moderator the hire gate
+ * expects — return both so the facade can skip its own derivation.
+ */
+export async function resolveListingModeration(
+  sdk: AgencSdk,
+  rpc: unknown,
+  listingPda: string,
+  specHashHex: string,
+): Promise<ResolvedModeration | null> {
+  const { getProgramDerivedAddress, getAddressEncoder, getUtf8Encoder, getBase58Decoder, address } =
+    await import("@solana/kit");
+  const specHash = hexToBytes(specHashHex);
+
+  const candidates: string[] = [];
+
+  // 1) v1 seeds — pre-upgrade attestations (still honored by the program).
+  const [v1] = await getProgramDerivedAddress({
+    programAddress: sdk.AGENC_COORDINATION_PROGRAM_ADDRESS,
+    seeds: [
+      getUtf8Encoder().encode("listing_moderation"),
+      getAddressEncoder().encode(address(listingPda)),
+      specHash,
+    ],
+  });
+  candidates.push(v1);
+
+  // 2) v2 seeds authored by the platform's global moderation authority.
+  try {
+    const [mcPda] = await sdk.findModerationConfigPda();
+    const mc = await sdk.fetchMaybeModerationConfig(
+      rpc as Parameters<AgencSdk["fetchMaybeModerationConfig"]>[0],
+      mcPda,
+    );
+    if (mc.exists) {
+      const [v2] = await sdk.findListingModerationPda({
+        listing: address(listingPda),
+        jobSpecHash: specHash,
+        moderator: address(mc.data.moderationAuthority),
+      });
+      candidates.push(v2);
+    }
+  } catch {
+    /* moderation config unreadable — continue with what we have */
+  }
+
+  for (const candidate of candidates) {
+    const found = await tryDecodeModeration(sdk, rpc as MinimalRpc, candidate);
+    if (found) return found;
+  }
+
+  // 3) Seed-agnostic: scan the program's moderation records for this listing.
+  //    Best effort — some RPCs rate-limit or forbid getProgramAccounts.
+  try {
+    const disc = getBase58Decoder().decode(sdk.LISTING_MODERATION_DISCRIMINATOR);
+    const rows = await (rpc as MinimalRpc)
+      .getProgramAccounts(sdk.AGENC_COORDINATION_PROGRAM_ADDRESS, {
+        encoding: "base64",
+        filters: [
+          { memcmp: { offset: 0n, bytes: disc, encoding: "base58" } },
+          { memcmp: { offset: 8n, bytes: listingPda, encoding: "base58" } },
+        ],
+      })
+      .send();
+    for (const row of rows) {
+      const rec = decodeModeration(sdk, row.account.data);
+      if (rec) return { address: row.pubkey, moderator: rec };
+    }
+  } catch {
+    /* scan unavailable — fall through to fail-closed */
+  }
+
+  return null;
+}
+
+async function tryDecodeModeration(
+  sdk: AgencSdk,
+  rpc: MinimalRpc,
+  pda: string,
+): Promise<ResolvedModeration | null> {
+  const info = await rpc.getAccountInfo(pda, { encoding: "base64" }).send();
+  if (!info.value) return null;
+  const moderator = decodeModeration(sdk, info.value.data);
+  return moderator ? { address: pda, moderator } : null;
+}
+
+function decodeModeration(sdk: AgencSdk, data: unknown[]): string | null {
+  try {
+    const record = sdk
+      .getListingModerationDecoder()
+      .decode(Uint8Array.from(Buffer.from(String(data[0]), "base64")));
+    return String(record.moderator);
+  } catch {
+    return null;
+  }
 }
 
 function hexToBytes(hex: string): Uint8Array {

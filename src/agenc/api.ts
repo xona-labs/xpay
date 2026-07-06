@@ -2,16 +2,17 @@
  * AgenC marketplace client — keyless reads of Solana-mainnet marketplace state.
  *
  * AgenC (https://agenc.ag) lists standing service offers from registered
- * on-chain agents. Discovery is a public REST API (cached snapshot of chain
- * state, rebuilt ~every 45s); execution is NOT x402 — hiring escrows native
- * SOL on-chain via `@tetsuo-ai/marketplace-sdk` (see ./hire.ts).
+ * on-chain agents. Discovery goes through AgenC's hosted indexer via the SDK's
+ * `createIndexerClient` — their documented "intended scale read path" (the
+ * legacy REST `?hireable=true` filter went dark after a program upgrade).
+ * Execution is NOT x402 — hiring escrows native SOL on-chain via
+ * `@tetsuo-ai/marketplace-sdk` (see ./hire.ts).
  */
 
 import { z } from "zod";
 import type { Resource } from "../types.js";
 
 const DEFAULT_ENDPOINT = "https://api.agenc.ag";
-const PAGE_SIZE = 100; // API max
 
 /** Payment scheme marking a resource as an AgenC escrow hire. `use()` dispatches on this. */
 export const AGENC_SCHEME = "agenc-hire";
@@ -65,51 +66,28 @@ export interface AgencClientOptions {
   fetch?: typeof fetch;
 }
 
-interface AgencListingsResponse {
-  items?: unknown[];
-  page?: number;
-  pageSize?: number;
-  total?: number;
-}
-
 /**
- * Fetch all hireable listings (Active, SOL-priced, moderation-passed) and map
- * them into xpay's Resource shape. The API pre-filters via `hireable=true`;
- * we re-check state/mint per item as belt-and-suspenders.
+ * Fetch all active, SOL-priced listings via AgenC's hosted indexer and map
+ * them into xpay's Resource shape. Discovery is deliberately permissive:
+ * listings without a fresh moderation attestation are still shown (matching
+ * agenc.ag's own browse page) — the hire path is the fail-closed gate.
  */
 export async function fetchAgencResources(opts: AgencClientOptions = {}): Promise<Resource[]> {
   const endpoint = opts.endpoint ?? process.env.XPAY_AGENC_ENDPOINT ?? DEFAULT_ENDPOINT;
   const maxItems = opts.maxItems ?? Infinity;
-  const fetchImpl = opts.fetch ?? fetch;
+
+  const { createIndexerClient } = await import("@tetsuo-ai/marketplace-sdk");
+  const indexer = createIndexerClient({ baseUrl: endpoint });
+
+  const active = await indexer.listActiveListings({});
 
   const all: Resource[] = [];
-  let total = Infinity;
-
-  for (let page = 1; page <= 100 && all.length < Math.min(total, maxItems); page++) {
-    const url = new URL("/api/listings", endpoint);
-    url.searchParams.set("hireable", "true");
-    url.searchParams.set("page", String(page));
-    url.searchParams.set("pageSize", String(PAGE_SIZE));
-
-    const res = await fetchImpl(url.toString(), { headers: { accept: "application/json" } });
-    if (!res.ok) throw new Error(await apiError("AgenC discovery", res));
-
-    const body = (await res.json()) as AgencListingsResponse;
-    const rawItems = body.items ?? [];
-
-    for (const raw of rawItems) {
-      const parsed = AgencListingSchema.safeParse(raw);
-      if (!parsed.success) continue;
-      const l = parsed.data;
-      if (l.state !== 0 || (l.priceMint !== null && l.priceMint !== undefined)) continue;
-      all.push(listingToResource(l));
-      if (all.length >= maxItems) return all;
-    }
-
-    total = body.total ?? all.length;
-    if (rawItems.length < PAGE_SIZE) break;
+  for (const { address, account } of active) {
+    const l = normalizeAccount(address, account as unknown as RawListingAccount);
+    if (!l || l.state !== 0 || l.priceMint != null) continue;
+    all.push(listingToResource(l));
+    if (all.length >= maxItems) break;
   }
-
   return all;
 }
 
@@ -159,35 +137,109 @@ export function isAgencResource(r: Resource): boolean {
 }
 
 /**
- * Fetch a single listing by PDA — used as a pre-hire freshness check. The API
- * has no listing-by-pda route, so scan the hireable pages for a match.
- * Returns undefined when the listing is gone or no longer hireable.
+ * Fetch a single listing by PDA via the indexer — used as the pre-hire
+ * freshness check. Decodes the raw on-chain account bytes for byte-true
+ * parity with what the program will see. Returns undefined when the listing
+ * doesn't exist.
  */
 export async function fetchAgencListing(
   pda: string,
   opts: AgencClientOptions = {},
 ): Promise<AgencListing | undefined> {
   const endpoint = opts.endpoint ?? process.env.XPAY_AGENC_ENDPOINT ?? DEFAULT_ENDPOINT;
-  const fetchImpl = opts.fetch ?? fetch;
 
-  for (let page = 1; page <= 100; page++) {
-    const url = new URL("/api/listings", endpoint);
-    url.searchParams.set("hireable", "true");
-    url.searchParams.set("page", String(page));
-    url.searchParams.set("pageSize", String(PAGE_SIZE));
+  const { createIndexerClient, getServiceListingDecoder, IndexerError } = await import(
+    "@tetsuo-ai/marketplace-sdk"
+  );
+  const indexer = createIndexerClient({ baseUrl: endpoint });
 
-    const res = await fetchImpl(url.toString(), { headers: { accept: "application/json" } });
-    if (!res.ok) throw new Error(await apiError("AgenC listing lookup", res));
-
-    const body = (await res.json()) as AgencListingsResponse;
-    const rawItems = body.items ?? [];
-    for (const raw of rawItems) {
-      const parsed = AgencListingSchema.safeParse(raw);
-      if (parsed.success && parsed.data.pda === pda) return parsed.data;
-    }
-    if (rawItems.length < PAGE_SIZE) break;
+  let row;
+  try {
+    row = await indexer.getListing(pda);
+  } catch (err) {
+    if (err instanceof IndexerError && err.status === 404) return undefined;
+    throw err;
   }
-  return undefined;
+
+  const account = getServiceListingDecoder().decode(
+    Uint8Array.from(Buffer.from(row.accountData, "base64")),
+  ) as unknown as RawListingAccount;
+  return normalizeAccount(pda, account) ?? undefined;
+}
+
+// ─── On-chain account normalization ──────────────────────────────────────────
+
+/** Decoded ServiceListing account, tolerating JSON-serialized byte arrays / options. */
+type ByteLike = Uint8Array | Readonly<Uint8Array> | readonly number[] | number[] | Record<string, number>;
+
+interface RawListingAccount {
+  providerAgent: string;
+  authority: string;
+  name: ByteLike;
+  specHash: ByteLike;
+  specUri: string;
+  price: bigint | string | number;
+  priceMint: unknown;
+  defaultDeadlineSecs?: bigint | string | number;
+  operator?: unknown;
+  operatorFeeBps?: number;
+  state: number | string;
+  maxOpenJobs?: number;
+  openJobs?: number;
+  totalHires?: bigint | string | number;
+  ratingCount?: number;
+  version: bigint | string | number;
+  createdAt?: bigint | string | number;
+}
+
+function toBytes(v: ByteLike): Uint8Array {
+  if (v instanceof Uint8Array) return v;
+  if (Array.isArray(v)) return Uint8Array.from(v);
+  return Uint8Array.from(Object.values(v));
+}
+
+/** kit codecs serialize Option<T> as `{__option: "Some"|"None", value?}` over JSON. */
+function unwrapOption(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === "object" && "__option" in (v as Record<string, unknown>)) {
+    const o = v as { __option: string; value?: unknown };
+    return o.__option === "Some" && o.value != null ? String(o.value) : null;
+  }
+  return String(v);
+}
+
+/** Listing lifecycle state → numeric (indexer may serialize the enum name). */
+function toStateNumber(v: number | string): number {
+  if (typeof v === "number") return v;
+  const byName: Record<string, number> = { active: 0, paused: 1, retired: 2 };
+  return byName[v.toLowerCase()] ?? -1;
+}
+
+function normalizeAccount(pda: string, a: RawListingAccount): AgencListing | null {
+  try {
+    return {
+      pda,
+      providerAgent: String(a.providerAgent),
+      authority: String(a.authority),
+      name: Buffer.from(toBytes(a.name)).toString("utf8").replace(/\0+$/, ""),
+      specHash: Buffer.from(toBytes(a.specHash)).toString("hex"),
+      specUri: a.specUri || null,
+      priceLamports: BigInt(a.price).toString(),
+      priceMint: unwrapOption(a.priceMint),
+      defaultDeadlineSecs: a.defaultDeadlineSecs != null ? Number(a.defaultDeadlineSecs) : undefined,
+      operator: unwrapOption(a.operator),
+      operatorFeeBps: a.operatorFeeBps ?? 0,
+      state: toStateNumber(a.state),
+      maxOpenJobs: a.maxOpenJobs ?? 0,
+      openJobs: a.openJobs ?? 0,
+      totalHires: a.totalHires != null ? BigInt(a.totalHires).toString() : "0",
+      ratingCount: a.ratingCount ?? 0,
+      version: BigInt(a.version).toString(),
+      createdAtUnix: a.createdAt != null ? Number(a.createdAt) : undefined,
+    };
+  } catch {
+    return null; // malformed row — skip rather than kill discovery
+  }
 }
 
 /** Fetch a task by PDA (GET /api/tasks/:pda) — the status of a hire. */
