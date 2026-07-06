@@ -72,6 +72,8 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay token find <query>` | Find a Solana token by ticker, name, or mint address (Jupiter) — price, mcap, liquidity, verification. Read-only. `--limit`, `--json`. |
 | `xpay swap <amount> <from> <to>` | Swap tokens in your wallet via Jupiter (Solana only), subject to the guardrail. `--slippage-bps`, `-y`. |
 | `xpay x user \| posts <handle>` | Realtime X (Twitter) account data — profile (~$0.01) or recent posts (~$0.06), paid via x402 at cost. No X account needed. |
+| `xpay zauth reposcan <repoUrl>` | Repository security scan via partner [zauth](#zauth-repo-security-scans), paid via x402 (price set by the 402 challenge). `--json`, `-y`. |
+| `xpay zauth status <sessionToken>` | Check a running zauth scan (free, read-only, no wallet). `--json`. |
 | `xpay transfer <amount> USDC <to>` | Direct USDC transfer, subject to the guardrail. `--network`, `-y`. |
 | `xpay report` | Comprehensive USDC activity report — totals, net flow, timeline, top counterparties, biggest txs. `--period daily\|weekly\|monthly`, `--network`, `--json`. |
 | `xpay guardrail show \| set \| clear` | Inspect or edit spending caps and allowed hosts. |
@@ -168,7 +170,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** — fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_x_user`, `xpay_x_posts`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** — the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -386,6 +388,19 @@ xpay x posts jup_ag         # 10 recent posts + engagement metrics    (~$0.06)
 
 MCP: `xpay_x_user` / `xpay_x_posts` — the classic flow is token due diligence: `xpay_token_find` → check the project's X account → swap only if it holds up. Payments go through the normal x402 flow, so the guardrail caps apply. Endpoint override: `XPAY_XDATA_ENDPOINT`.
 
+## zauth repo security scans
+
+Scan any git repository for security issues via [zauth](https://zauth.inc)'s x402-paywalled scanner (partner integration). Only the scan kickoff is paid — the price comes from zauth's 402 challenge and the guardrail caps apply (if your profile restricts `allowedHosts`, add `api.zauth.inc`). Status checks are free and need no wallet:
+
+```bash
+xpay zauth reposcan https://github.com/owner/repo   # paid: starts the scan (or returns a cached report)
+xpay zauth status <sessionToken>                    # free: poll a still-running scan
+```
+
+A scan either returns a cached report immediately or `{ status: "scanning", sessionToken }`; xpay polls the free status endpoint automatically and hands you the sessionToken if the scan outlives the wait window.
+
+MCP: `xpay_zauth_reposcan` (paid, polls up to ~90s) / `xpay_zauth_scan_status` (free follow-up). Endpoint override: `XPAY_ZAUTH_ENDPOINT`.
+
 ## Multi-network
 
 `init` configures Solana and Base by default. Add or change via `~/.xpay/<name>/config.json`:
@@ -413,12 +428,13 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 
 ## Project status
 
-**v0.2.10 (current):**
-- ✅ CLI: init, accounts, balance, discover, pay, agenc, token, swap, x, transfer, report, guardrail, mcp
+**v0.2.11 (current):**
+- ✅ CLI: init, accounts, balance, discover, pay, agenc, token, swap, x, zauth, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
-- ✅ MCP server on stdio with 15 tools (incl. the Bento intent firewall)
+- ✅ MCP server on stdio with 17 tools (incl. the Bento intent firewall)
 - ✅ Solana token discovery + native Jupiter swaps (`xpay token find`, `xpay swap`)
 - ✅ Realtime X (Twitter) data at cost via x402 (`xpay x user|posts`)
+- ✅ zauth repo security scans via x402 (`xpay zauth reposcan`)
 - ✅ Solana + Base mainnet with disk caching
 - ✅ Optional Sana agent card integration (`xpay sana link`) — 8 additional `sana_*` tools
 - ✅ AgenC marketplace as a discovery source + smart-routed SOL escrow hires (`xpay agenc hire|status`)

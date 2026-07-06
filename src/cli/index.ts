@@ -46,6 +46,7 @@ import { runAgencHire, runAgencStatus } from "./agenc.js";
 import { runTokenFind } from "./token.js";
 import { runSwap } from "./swap.js";
 import { runXUser, runXPosts } from "./x.js";
+import { runZauthScan, runZauthStatus } from "./zauth.js";
 import { startMcpServer } from "./mcp-server.js";
 
 const program = new Command();
@@ -167,6 +168,30 @@ xcmd
   .option("-y, --yes", "Skip the confirmation prompt")
   .action(async (handle: string, opts) => {
     await runXPosts(handle, opts);
+  });
+
+// ---------------------------------------------------------------- zauth
+const zauth = program
+  .command("zauth")
+  .description("zauth partner — repository security scans, paid via x402.");
+
+zauth
+  .command("reposcan <repoUrl>")
+  .description("Scan a repository via zauth (paid via x402; price set by the 402 challenge).")
+  .option("--profile <name>", "Profile to pay from (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--json", "Emit raw JSON")
+  .option("-y, --yes", "Skip the confirmation prompt")
+  .action(async (repoUrl: string, opts) => {
+    await runZauthScan(repoUrl, opts);
+  });
+
+zauth
+  .command("status <sessionToken>")
+  .description("Check a running scan (free, read-only, no wallet needed).")
+  .option("--json", "Emit raw JSON")
+  .action(async (sessionToken: string, opts) => {
+    await runZauthStatus(sessionToken, opts);
   });
 
 // ---------------------------------------------------------------- swap

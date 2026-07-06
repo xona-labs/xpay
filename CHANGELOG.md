@@ -6,6 +6,18 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.11] – 2026-07-06
+
+### Added
+- **zauth repo security scans (partner integration).** `xpay zauth reposcan
+  <repoUrl>` CLI and `xpay_zauth_reposcan` MCP tool — scans a git repository
+  via zauth's x402-paywalled endpoint through the normal payment flow
+  (guardrail caps apply; price set by zauth's 402 challenge). Only the scan
+  kickoff is paid: results are polled from a free status endpoint, with
+  `xpay zauth status <sessionToken>` / `xpay_zauth_scan_status` for scans
+  that outlive the built-in wait window (~3 min CLI, ~90 s MCP). Endpoint
+  override: `XPAY_ZAUTH_ENDPOINT`.
+
 ## [0.2.10] – 2026-07-05
 
 ### Fixed
