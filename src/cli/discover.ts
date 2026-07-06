@@ -13,15 +13,17 @@ import type { Resource } from "../types.js";
 export interface DiscoverCmdOptions {
   limit?: string;
   network?: string;
+  sources?: string;
   json?: boolean;
 }
 
 export async function runDiscover(query: string | undefined, opts: DiscoverCmdOptions): Promise<void> {
-  const limit = opts.limit ? Number(opts.limit) : 10;
+  const sources = opts.sources?.split(",").map((s) => s.trim()).filter(Boolean);
+  const limit = opts.limit ? Number(opts.limit) : sources?.length === 1 ? 50 : 10;
   const networks = opts.network ? [opts.network] : undefined;
 
   const t0 = Date.now();
-  const results = await discover({ query, limit, networks });
+  const results = await discover({ query, limit, networks, sources });
   const elapsed = Date.now() - t0;
 
   if (opts.json) {

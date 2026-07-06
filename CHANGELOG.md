@@ -6,6 +6,17 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.14] – 2026-07-06
+
+### Added
+- **Browse a single catalog in full.** `xpay_discover` gains a `sources`
+  parameter (`['agenc']` / `['orbitx402']`) and the CLI gains
+  `xpay discover --sources agenc`. Mixed results reserve only ~1/3 of the
+  result slots for AgenC (2 of the default 5), which made "show me AgenC
+  listings" look like the marketplace had two items — a single-source browse
+  now returns everything (default limit 50), and the tool description tells
+  agents to use it when the user asks about AgenC specifically.
+
 ## [0.2.13] – 2026-07-06
 
 ### Fixed

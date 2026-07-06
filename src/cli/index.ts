@@ -94,8 +94,9 @@ accounts
 program
   .command("discover [query]")
   .description("Search the agentic-commerce catalog (PayAI + OrbitX402 + AgenC hireable agents).")
-  .option("--limit <n>", "Max results (default 10)")
+  .option("--limit <n>", "Max results (default 10; 50 when a single --sources is given)")
   .option("--network <net>", "Filter by network (solana, base, ...)")
+  .option("--sources <csv>", "Restrict catalogs: orbitx402, agenc (e.g. --sources agenc)")
   .option("--json", "Emit raw JSON instead of the table view")
   .action(async (query: string | undefined, opts) => {
     await runDiscover(query, opts);

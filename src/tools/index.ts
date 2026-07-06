@@ -53,15 +53,22 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         "Find paid HTTP services across the agentic-commerce catalog (PayAI + others). " +
         "Returns ranked candidates with price, network, and payment recipient. " +
         "Results may include AgenC marketplace agent listings (metadata.source === 'agenc') — " +
-        "those are priced in SOL lamports and execute as on-chain escrow hires, not HTTP calls.",
+        "those are priced in SOL lamports and execute as on-chain escrow hires, not HTTP calls. " +
+        "When the user asks specifically about the AgenC marketplace, pass sources: ['agenc'] " +
+        "(optionally with no query) to list ALL its listings instead of the few slots it gets " +
+        "in mixed results.",
       input_schema: {
         type: "object",
         properties: {
-          query: { type: "string", description: "What you want to find, in natural language." },
+          query: { type: "string", description: "What you want to find, in natural language. Omit to browse a whole source." },
           limit: { type: "number", description: "Max results. Default 5." },
           network: { type: "string", description: "Restrict to one network (solana, base, ...)." },
+          sources: {
+            type: "array",
+            items: { type: "string", enum: ["orbitx402", "agenc"] },
+            description: "Restrict to specific catalogs, e.g. ['agenc'] for AgenC marketplace only. Default: all.",
+          },
         },
-        required: ["query"],
       },
     },
     {
@@ -295,12 +302,17 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
   ];
 
   const handlers: ToolBundle<ClaudeToolDef>["handlers"] = {
-    xpay_discover: async (input) =>
-      xpay.discover({
-        query: input.query as string,
-        limit: (input.limit as number) ?? 5,
+    xpay_discover: async (input) => {
+      const sources = input.sources as string[] | undefined;
+      return xpay.discover({
+        query: input.query as string | undefined,
+        // Browsing a single catalog implies "show me what's there" — don't
+        // truncate to the mixed-results default.
+        limit: (input.limit as number) ?? (sources?.length === 1 ? 50 : 5),
         networks: input.network ? [input.network as string] : undefined,
-      }),
+        sources,
+      });
+    },
 
     xpay_use: async (input) => {
       // Prefer the full resource object from xpay_discover — it carries
