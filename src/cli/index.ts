@@ -177,7 +177,7 @@ const zauth = program
 
 zauth
   .command("reposcan <repoUrl>")
-  .description("Scan a repository via zauth (paid via x402; price set by the 402 challenge).")
+  .description("Scan a repository via zauth (~$0.05 USDC, paid via x402).")
   .option("--profile <name>", "Profile to pay from (defaults to active)")
   .option("--passphrase <value>", "Non-interactive passphrase")
   .option("--json", "Emit raw JSON")

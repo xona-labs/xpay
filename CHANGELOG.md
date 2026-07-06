@@ -6,6 +6,27 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.12] – 2026-07-06
+
+### Fixed
+- **zauth reposcan polling broke after the first check.** zauth's poll
+  responses echo only `{ status, scanId, progress }` — no `sessionToken` —
+  so the scanning check never matched: the poll loop exited immediately and
+  the MCP result dropped the sessionToken, leaving agents with just the
+  scanId. Agents then passed the scanId to `xpay_zauth_scan_status` and got
+  `401 Invalid or expired session token` (after already paying). The loop
+  now keys on `status === "scanning"` alone, the kickoff's sessionToken is
+  re-attached to still-pending results, and passing a scanId fails fast with
+  a clear message instead of an opaque 401.
+
+### Changed
+- zauth scan pricing confirmed live and backfilled everywhere: **$0.05 USDC**
+  per scan (Solana or Base); session tokens are JWTs valid ~1 hour.
+- Completed zauth reports are compacted for MCP/CLI display: the bulky
+  `matches` array (full file contents, tens of KB) is replaced by a
+  `matchCount` — `analysisMarkdown` + `zauthScore` carry the summary.
+  `xpay zauth reposcan --json` still emits the full raw report.
+
 ## [0.2.11] – 2026-07-06
 
 ### Added

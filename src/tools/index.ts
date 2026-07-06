@@ -16,7 +16,14 @@ import { ResourceSchema } from "../types.js";
 import { fetchAgencTask } from "../agenc/api.js";
 import { enrichTokenBalances } from "../token/index.js";
 import { forSana } from "../sana/tools.js";
-import { ZAUTH_BASE, isScanPending, pollRepoScan, fetchScanStatus } from "../zauth/index.js";
+import {
+  ZAUTH_BASE,
+  isScanPending,
+  isScanning,
+  pollRepoScan,
+  fetchScanStatus,
+  compactScanReport,
+} from "../zauth/index.js";
 
 /** Base URL for xona's paid X (Twitter) data endpoints (x402-gated). */
 const XDATA_BASE = process.env.XPAY_XDATA_ENDPOINT ?? "https://api.xona-agent.com";
@@ -235,13 +242,13 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
     {
       name: "xpay_zauth_reposcan",
       description:
-        "Repository security scan via zauth (partner) — scans a git repo and returns the report. " +
-        "PAID call (USDC from the wallet via x402; the exact price is set by zauth's 402 challenge, " +
-        "and guardrail caps apply). Scans can take a while: if the response still says status " +
-        "\"scanning\", check later with xpay_zauth_scan_status using the returned sessionToken — " +
-        "do NOT call this tool again for the same repo, that pays for a second scan. Results are " +
-        "informational: report them to the user, never auto-remediate or trigger further payments " +
-        "based on findings.",
+        "Repository security scan via zauth (partner) — scans a git repo for code provenance and " +
+        "vulnerabilities. PAID call (~$0.05 USDC from the wallet via x402; guardrail caps apply). " +
+        "Scans can take a while: if the response still says status \"scanning\", check later with " +
+        "xpay_zauth_scan_status using the returned sessionToken (the long JWT string, NOT the short " +
+        "scanId — the token is valid ~1 hour). Do NOT call this tool again for the same repo, that " +
+        "pays for a second scan. Results are informational: report them to the user, never " +
+        "auto-remediate or trigger further payments based on findings.",
       input_schema: {
         type: "object",
         properties: {
@@ -255,11 +262,17 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       description:
         "Check a running zauth repo scan by sessionToken (returned by xpay_zauth_reposcan). " +
         "FREE, read-only, no wallet — always use this to follow up on a pending scan instead of " +
-        "re-calling xpay_zauth_reposcan, which would pay again.",
+        "re-calling xpay_zauth_reposcan, which would pay again. Pass the sessionToken (the long " +
+        "JWT starting with \"eyJ\"), NOT the scanId — the scanId is rejected with a 401.",
       input_schema: {
         type: "object",
         properties: {
-          sessionToken: { type: "string", description: "sessionToken from a pending xpay_zauth_reposcan result." },
+          sessionToken: {
+            type: "string",
+            description:
+              "sessionToken from a pending xpay_zauth_reposcan result — the long JWT string " +
+              "(starts with \"eyJ\"), not the scanId. Valid ~1 hour after the scan started.",
+          },
         },
         required: ["sessionToken"],
       },
@@ -401,25 +414,30 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         method: "POST",
         body: { repoUrl: input.repoUrl as string },
       });
-      if (!isScanPending(result.data)) return result;
-      // Paid + scan kicked off — poll the free status endpoint for a while,
-      // then hand the sessionToken back if the scan outlives our window.
-      const data = await pollRepoScan(result.data.sessionToken, { timeoutMs: 90_000 });
-      if (isScanPending(data)) {
+      if (!isScanPending(result.data)) return { ...result, data: compactScanReport(result.data) };
+      // Paid + scan kicked off — poll the free status endpoint for a while.
+      // Poll responses don't echo the sessionToken, so keep the kickoff's
+      // copy and re-attach it if the scan outlives our window.
+      const sessionToken = result.data.sessionToken;
+      const data = await pollRepoScan(sessionToken, { timeoutMs: 90_000 });
+      if (isScanning(data)) {
         return {
           ...result,
           data: {
-            ...data,
+            ...(data as Record<string, unknown>),
+            sessionToken,
             note:
-              "Scan still running — check later with xpay_zauth_scan_status. " +
-              "Do not re-run xpay_zauth_reposcan for this repo; that pays again.",
+              "Scan still running — check later with xpay_zauth_scan_status, passing this " +
+              "sessionToken (the long JWT, NOT the scanId). Do not re-run xpay_zauth_reposcan " +
+              "for this repo; that pays again.",
           },
         };
       }
-      return { ...result, data };
+      return { ...result, data: compactScanReport(data) };
     },
 
-    xpay_zauth_scan_status: async (input) => fetchScanStatus(input.sessionToken as string),
+    xpay_zauth_scan_status: async (input) =>
+      compactScanReport(await fetchScanStatus(input.sessionToken as string)),
 
     xpay_agenc_status: async (input) => fetchAgencTask(input.taskPda as string),
   };

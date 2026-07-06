@@ -72,7 +72,7 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay token find <query>` | Find a Solana token by ticker, name, or mint address (Jupiter) — price, mcap, liquidity, verification. Read-only. `--limit`, `--json`. |
 | `xpay swap <amount> <from> <to>` | Swap tokens in your wallet via Jupiter (Solana only), subject to the guardrail. `--slippage-bps`, `-y`. |
 | `xpay x user \| posts <handle>` | Realtime X (Twitter) account data — profile (~$0.01) or recent posts (~$0.06), paid via x402 at cost. No X account needed. |
-| `xpay zauth reposcan <repoUrl>` | Repository security scan via partner [zauth](#zauth-repo-security-scans), paid via x402 (price set by the 402 challenge). `--json`, `-y`. |
+| `xpay zauth reposcan <repoUrl>` | Repository security scan via partner [zauth](#zauth-repo-security-scans) — zauth score + provenance/vulnerability report (~$0.05 USDC via x402). `--json`, `-y`. |
 | `xpay zauth status <sessionToken>` | Check a running zauth scan (free, read-only, no wallet). `--json`. |
 | `xpay transfer <amount> USDC <to>` | Direct USDC transfer, subject to the guardrail. `--network`, `-y`. |
 | `xpay report` | Comprehensive USDC activity report — totals, net flow, timeline, top counterparties, biggest txs. `--period daily\|weekly\|monthly`, `--network`, `--json`. |
@@ -390,14 +390,14 @@ MCP: `xpay_x_user` / `xpay_x_posts` — the classic flow is token due diligence:
 
 ## zauth repo security scans
 
-Scan any git repository for security issues via [zauth](https://zauth.inc)'s x402-paywalled scanner (partner integration). Only the scan kickoff is paid — the price comes from zauth's 402 challenge and the guardrail caps apply (if your profile restricts `allowedHosts`, add `api.zauth.inc`). Status checks are free and need no wallet:
+Scan any git repository for code provenance and vulnerabilities via [zauth](https://zauth.inc)'s x402-paywalled scanner (partner integration) — returns a zauth score (0–100) plus a markdown analysis. Only the scan kickoff is paid (~$0.05 USDC on Solana or Base) and the guardrail caps apply (if your profile restricts `allowedHosts`, add `api.zauth.inc`). Status checks are free and need no wallet:
 
 ```bash
 xpay zauth reposcan https://github.com/owner/repo   # paid: starts the scan (or returns a cached report)
 xpay zauth status <sessionToken>                    # free: poll a still-running scan
 ```
 
-A scan either returns a cached report immediately or `{ status: "scanning", sessionToken }`; xpay polls the free status endpoint automatically and hands you the sessionToken if the scan outlives the wait window.
+A scan either returns a cached report immediately or `{ status: "scanning", scanId, sessionToken }`; xpay polls the free status endpoint automatically and hands you the sessionToken if the scan outlives the wait window. Follow up with the **sessionToken** (the JWT, valid ~1 hour) — not the scanId.
 
 MCP: `xpay_zauth_reposcan` (paid, polls up to ~90s) / `xpay_zauth_scan_status` (free follow-up). Endpoint override: `XPAY_ZAUTH_ENDPOINT`.
 
@@ -428,7 +428,7 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 
 ## Project status
 
-**v0.2.11 (current):**
+**v0.2.12 (current):**
 - ✅ CLI: init, accounts, balance, discover, pay, agenc, token, swap, x, zauth, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
 - ✅ MCP server on stdio with 17 tools (incl. the Bento intent firewall)

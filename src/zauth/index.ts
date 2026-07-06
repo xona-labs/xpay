@@ -14,17 +14,36 @@ export interface ScanPending {
   [key: string]: unknown;
 }
 
+/**
+ * Kickoff response from the paid POST: `{ status, scanId, sessionToken }`.
+ * Only this response carries the sessionToken (a ~1h JWT) — poll responses
+ * echo just `{ status, scanId, progress }`, so callers must hold on to the
+ * token themselves.
+ */
 export function isScanPending(data: unknown): data is ScanPending {
+  return (
+    isScanning(data) && typeof (data as { sessionToken?: unknown }).sessionToken === "string"
+  );
+}
+
+/** Any payload (kickoff or poll) that says the scan hasn't finished. */
+export function isScanning(data: unknown): boolean {
   return (
     typeof data === "object" &&
     data !== null &&
-    (data as { status?: unknown }).status === "scanning" &&
-    typeof (data as { sessionToken?: unknown }).sessionToken === "string"
+    (data as { status?: unknown }).status === "scanning"
   );
 }
 
 /** One unpaid GET against the scan-status endpoint. */
 export async function fetchScanStatus(sessionToken: string): Promise<unknown> {
+  // The kickoff response carries both a short scanId and a JWT sessionToken;
+  // only the JWT works here. Catch the mixup before it becomes an opaque 401.
+  if (!sessionToken.includes(".")) {
+    throw new Error(
+      `zauth: "${sessionToken}" looks like a scanId — pass the sessionToken (the long JWT from the scan kickoff) instead`,
+    );
+  }
   const res = await fetch(`${ZAUTH_BASE}/x402/reposcan/${encodeURIComponent(sessionToken)}`);
   const text = await res.text();
   let data: unknown;
@@ -41,6 +60,19 @@ export async function fetchScanStatus(sessionToken: string): Promise<unknown> {
     throw new Error(`zauth scan status ${res.status}${detail ? `: ${detail}` : ""}`);
   }
   return data;
+}
+
+/**
+ * Completed reports embed every provenance match with full file contents —
+ * tens of KB the caller rarely needs (analysisMarkdown already summarizes
+ * them). Swap the array for a count; use the raw payload when full detail
+ * matters (CLI --json).
+ */
+export function compactScanReport(data: unknown): unknown {
+  if (typeof data !== "object" || data === null) return data;
+  const { matches, ...rest } = data as Record<string, unknown>;
+  if (!Array.isArray(matches)) return data;
+  return { ...rest, matchCount: matches.length };
 }
 
 export interface PollOptions {
@@ -61,7 +93,7 @@ export async function pollRepoScan(sessionToken: string, opts: PollOptions = {})
   const deadline = Date.now() + timeoutMs;
 
   let last = await fetchScanStatus(sessionToken);
-  while (isScanPending(last) && Date.now() < deadline) {
+  while (isScanning(last) && Date.now() < deadline) {
     const wait = Math.min(intervalMs, Math.max(0, deadline - Date.now()));
     await new Promise((r) => setTimeout(r, wait));
     last = await fetchScanStatus(sessionToken);
