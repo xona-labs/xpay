@@ -185,4 +185,16 @@ export interface Signer {
    * signing service.
    */
   getKitSigner?(): Promise<unknown>;
+  /**
+   * Optional (EVM signers): sign an EIP-712 typed-data payload and return the
+   * hex signature. When present, `use()` pays eip155 endpoints gaslessly via
+   * a signed EIP-3009 `transferWithAuthorization` (the facilitator broadcasts
+   * and covers gas — no native ETH needed); when absent, it falls back to the
+   * legacy `pay()` (broadcasts an ERC-20 transfer, wallet pays its own gas).
+   */
+  signEvmTypedData?(typedData: {
+    domain: Record<string, unknown>;
+    types: Record<string, Array<{ name: string; type: string }>>;
+    message: Record<string, unknown>;
+  }): Promise<string>;
 }

@@ -22,6 +22,7 @@ import type { Wallet } from "../wallet/index.js";
 import type { Guardrail } from "../guardrail/index.js";
 import { extractRequirements, extractSettleEnvelope } from "../x402/extract.js";
 import { buildSvmPaymentHeader, isSvmNetwork } from "../x402/svm-payment.js";
+import { buildEvmPaymentHeader, hasEvmDomainParams, isEvmNetwork } from "../x402/evm-payment.js";
 import { isAgencResource } from "../agenc/api.js";
 import type { AgencHireConfig } from "../agenc/hire.js";
 
@@ -62,16 +63,22 @@ export async function use(args: UseArgs): Promise<UseResult> {
 
 /**
  * Catalog entries are snapshots — they carry payTo/asset/amount but not the
- * per-facilitator settlement fields. SVM v2 settlement needs
- * `extra.feePayer` (the facilitator's fee-payer pubkey), which only a fresh
- * 402 challenge provides. When it's missing, pay via the live flow instead
- * of failing with "feePayer is required in paymentRequirements.extra".
+ * per-facilitator settlement fields that only a fresh 402 challenge provides.
+ * SVM v2 settlement needs `extra.feePayer` (the facilitator's fee-payer
+ * pubkey); gasless EVM settlement needs the asset's EIP-712 domain params
+ * (`extra.name`/`extra.version`). When the wallet can do the v2 flow but the
+ * snapshot lacks those fields, pay via the live flow instead of failing (or,
+ * worse for EVM, silently falling back to a gas-burning broadcast).
  */
 function reqNeedsLiveChallenge(args: UseArgs, req: PaymentRequirement): boolean {
-  if (!isSvmNetwork(req.network)) return false;
   const signer = args.wallet.signer(normalizeNetwork(req.network));
-  const usesSvmV2 = typeof signer?.getKitSigner === "function";
-  return usesSvmV2 && !req.extra?.feePayer;
+  if (isSvmNetwork(req.network)) {
+    return typeof signer?.getKitSigner === "function" && !req.extra?.feePayer;
+  }
+  if (isEvmNetwork(req.network)) {
+    return typeof signer?.signEvmTypedData === "function" && !hasEvmDomainParams(req);
+  }
+  return false;
 }
 
 /**
@@ -164,8 +171,14 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
  *     signed tx, facilitator settles. Returns header only (no txSig until
  *     the upstream call comes back).
  *
- *   Anything else (EVM facilitators, legacy v1 SVM) →
- *     legacy path: signer.pay() broadcasts, header carries the txSig.
+ *   EVM (eip155:* / base / ethereum / …) + signer has signEvmTypedData +
+ *   requirement carries EIP-712 domain params →
+ *     canonical x402 v2 — gasless EIP-3009 transferWithAuthorization
+ *     signature in the header, facilitator broadcasts and pays gas.
+ *
+ *   Anything else (legacy v1) →
+ *     legacy path: signer.pay() broadcasts, header carries the txSig
+ *     (EVM wallets need native gas here).
  */
 async function settle(
   args: UseArgs,
@@ -179,6 +192,24 @@ async function settle(
     const kitSigner = await signer.getKitSigner();
     const header = await buildSvmPaymentHeader({
       kitSigner,
+      requirement: req,
+      x402Version,
+    });
+    return { header, network };
+  }
+
+  // Gasless EVM v2 — sign an EIP-3009 transferWithAuthorization, facilitator
+  // broadcasts and pays gas. Needs the EIP-712 domain params from the 402
+  // challenge; catalog snapshots without them were already routed through the
+  // live flow by reqNeedsLiveChallenge().
+  if (
+    isEvmNetwork(req.network) &&
+    typeof signer.signEvmTypedData === "function" &&
+    hasEvmDomainParams(req)
+  ) {
+    const header = await buildEvmPaymentHeader({
+      address: signer.address,
+      signTypedData: signer.signEvmTypedData.bind(signer),
       requirement: req,
       x402Version,
     });

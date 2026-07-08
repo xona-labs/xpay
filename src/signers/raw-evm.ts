@@ -87,6 +87,11 @@ export function rawEvmSigner(opts: RawEvmSignerOptions): Signer {
       return getBytes(sig);
     },
 
+    // EIP-712 signing for gasless x402 v2 (EIP-3009 transferWithAuthorization).
+    async signEvmTypedData({ domain, types, message }) {
+      return wallet.signTypedData(domain, types, message);
+    },
+
     async balance(): Promise<number> {
       const usdc = USDC_CONTRACTS[opts.network];
       if (!usdc) return 0;

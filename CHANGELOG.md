@@ -6,6 +6,32 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.15] – 2026-07-08
+
+### Fixed
+- **EVM x402 payments demanded native ETH gas despite the scheme being
+  gasless.** Paying an `eip155:*` endpoint (e.g. xona's Base video routes)
+  went through the legacy v1 path — a literal `erc20.transfer()` broadcast
+  from the wallet — so gasless agent wallets died with "insufficient funds
+  for intrinsic transaction cost". EVM now gets the same canonical v2
+  treatment Solana has had since 0.1.4: the client signs an off-chain
+  EIP-3009 `transferWithAuthorization` (EIP-712), sends it in `X-Payment`,
+  and the facilitator broadcasts and pays the gas. Zero ETH required.
+
+### Added
+- `Signer.signEvmTypedData` (optional capability, implemented by
+  `rawEvmSigner`) — EIP-712 typed-data signing; custom KMS/MPC signers can
+  implement it to opt into gasless EVM payments.
+- `buildEvmPaymentHeader` / `isEvmNetwork` / `hasEvmDomainParams` in
+  `src/x402/evm-payment.ts`, mirroring the SVM v2 header builder.
+
+### Changed
+- Catalog-mode `use()` now falls back to the live 402 challenge for EVM
+  requirements missing EIP-712 domain params (`extra.name`/`version`) —
+  catalog snapshots strip `extra`, and without the domain the gasless
+  signature can't be built (previously this silently took the gas-burning
+  legacy path). Same pattern as the existing SVM `feePayer` fallback.
+
 ## [0.2.14] – 2026-07-06
 
 ### Added
