@@ -22,7 +22,15 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
   const name = profile.name;
 
   const signers = signersFromProfile(profile);
-  const networks = opts.network ? [opts.network] : profile.config.networks;
+  // Robinhood Chain always has a signer (see signersFromProfile) even when it's
+  // not in the profile's `networks`, so surface it in the default view too —
+  // handy as the deposit address for funding trades.
+  const configured = profile.config.networks;
+  const networks = opts.network
+    ? [opts.network]
+    : configured.includes("robinhood")
+      ? configured
+      : [...configured, "robinhood"];
 
   console.log("");
   console.log(chalk.bold(`Profile "${name}"`));
