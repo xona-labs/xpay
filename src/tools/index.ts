@@ -15,6 +15,7 @@ import type { XPay } from "../index.js";
 import { ResourceSchema } from "../types.js";
 import { fetchAgencTask } from "../agenc/api.js";
 import { enrichTokenBalances } from "../token/index.js";
+import { robinhoodHoldings } from "../trading/discovery.js";
 import { forSana } from "../sana/tools.js";
 import {
   ZAUTH_BASE,
@@ -403,9 +404,14 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       }),
 
     xpay_balance: async (input) => {
+      // Robinhood Chain always has a signer (see signersFromProfile) even when
+      // it's not in the profile's `networks`, so include it in the default view.
+      const configured = xpay.wallet.networks;
       const networks = input.network
         ? [input.network as string]
-        : xpay.wallet.networks;
+        : configured.includes("robinhood")
+          ? configured
+          : [...configured, "robinhood"];
 
       const perNetwork: Record<string, unknown> = {};
       let stablecoinTotal = 0;
@@ -419,7 +425,16 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
           // enriched via Jupiter: unknown mints get real symbols/names, and
           // priceable tokens carry usdPrice/usdValue.
           const raw = await signer.tokenBalances().catch(() => []);
-          const tokens = n === "solana" ? await enrichTokenBalances(raw) : raw;
+          let tokens = n === "solana" ? await enrichTokenBalances(raw) : raw;
+          // Robinhood Chain: the signer only knows a hardcoded token list, so
+          // pull the wallet's full ERC-20 holdings from the chain explorer —
+          // this is how memecoins bought via xpay_trade show up. Native ETH
+          // still comes from the signer.
+          if (n === "robinhood") {
+            const native = (raw as Array<{ isNative?: boolean }>).filter((t) => t.isNative);
+            const holdings = await robinhoodHoldings(signer.address);
+            tokens = [...native, ...holdings] as typeof tokens;
+          }
           perNetwork[n] = {
             address: signer.address,
             tokens: tokens.map((t) => ({
