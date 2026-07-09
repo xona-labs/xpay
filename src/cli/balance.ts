@@ -9,6 +9,7 @@
 import chalk from "chalk";
 import { signersFromProfile } from "../profile/index.js";
 import { enrichTokenBalances } from "../token/index.js";
+import { robinhoodHoldings } from "../trading/discovery.js";
 import { unlockActive } from "./common.js";
 
 export interface BalanceCmdOptions {
@@ -53,7 +54,16 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
       const raw = await (signer as any).tokenBalances().catch(() => []);
       // Label unknown mints + attach USD values via one batched Jupiter
       // lookup (Solana only; EVM balances pass through unchanged).
-      const tokens = net === "solana" ? await enrichTokenBalances(raw) : raw;
+      let tokens = net === "solana" ? await enrichTokenBalances(raw) : raw;
+      // Robinhood Chain: the signer only knows a hardcoded token list (WETH),
+      // so pull the wallet's full ERC-20 holdings from the chain explorer —
+      // this is how memecoins bought via `xpay trade` show up. Keep the
+      // signer's native ETH entry and take every ERC-20 from the explorer.
+      if (net === "robinhood") {
+        const native = (raw as any[]).filter((t) => t.isNative);
+        const holdings = await robinhoodHoldings(signer.address);
+        tokens = [...native, ...holdings.map((h) => ({ ...h }))];
+      }
       if (tokens.length === 0) {
         console.log(`    ${chalk.dim("(no balances)")}`);
       }

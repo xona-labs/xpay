@@ -9,6 +9,7 @@
 
 const DEFAULT_ENDPOINT = "https://api.geckoterminal.com/api/v2";
 const GT_NETWORK = "robinhood";
+const BLOCKSCOUT = "https://robinhoodchain.blockscout.com";
 
 export interface DiscoveredToken {
   symbol: string;
@@ -101,6 +102,61 @@ export async function tokenPriceUsd(address: string): Promise<number | undefined
   } catch {
     return undefined;
   }
+}
+
+export interface TokenHolding {
+  symbol: string;
+  name: string;
+  address: string;
+  decimals: number;
+  /** Human-unit balance. */
+  balance: number;
+}
+
+/**
+ * All ERC-20 balances a wallet holds on Robinhood Chain, via the chain's
+ * Blockscout explorer API (keyless). This is what surfaces memecoins bought
+ * through `xpay trade` — the on-chain signer only knows a hardcoded token list.
+ * Best-effort: returns [] if the explorer is unreachable.
+ */
+export async function robinhoodHoldings(address: string): Promise<TokenHolding[]> {
+  const base = process.env.XPAY_ROBINHOOD_EXPLORER ?? BLOCKSCOUT;
+  try {
+    const res = await fetch(`${base}/api/v2/addresses/${address}/token-balances`, {
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) return [];
+    const rows = (await res.json()) as Array<Record<string, any>>;
+    if (!Array.isArray(rows)) return [];
+    const out: TokenHolding[] = [];
+    for (const row of rows) {
+      const t = row.token ?? {};
+      // Only fungible ERC-20s (skip NFTs / ERC-1155).
+      if (t.type && t.type !== "ERC-20") continue;
+      const addr: string = t.address ?? t.address_hash ?? "";
+      const decimals = Number(t.decimals ?? 18);
+      const raw = String(row.value ?? "0");
+      if (!addr || raw === "0") continue;
+      out.push({
+        symbol: t.symbol ?? addr.slice(0, 6) + "…",
+        name: t.name ?? "",
+        address: addr,
+        decimals,
+        balance: atomsToHuman(raw, decimals),
+      });
+    }
+    // Biggest holdings first.
+    return out.sort((a, b) => b.balance - a.balance);
+  } catch {
+    return [];
+  }
+}
+
+function atomsToHuman(atoms: string, decimals: number): number {
+  const s = atoms.padStart(decimals + 1, "0");
+  const whole = s.slice(0, s.length - decimals);
+  const frac = s.slice(s.length - decimals);
+  return Number(`${whole}.${frac}`);
 }
 
 /**

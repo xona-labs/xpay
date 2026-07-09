@@ -90,7 +90,9 @@ export {
   trendingTokens,
   newTokens,
   tokenPriceUsd,
+  robinhoodHoldings,
   type DiscoveredToken,
+  type TokenHolding,
 } from "./trading/discovery.js";
 
 /** Options for {@link createXPay}. */

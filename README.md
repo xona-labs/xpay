@@ -404,6 +404,7 @@ Notes:
 - **Verification.** A token confirmed as a NOXA Fun launch is marked verified; anything else is flagged `unverified` (memecoin tickers aren't unique — prefer passing the exact contract address). NOXA per-tx / max-wallet transfer caps are checked before signing: a buy that would breach one errors up front (instead of reverting on-chain), and the quote flags trades that come close.
 - **Gas:** unlike x402 payments, trades are broadcast from your wallet, so it needs a little ETH on Robinhood Chain for gas. Bridge via [Across](https://across.to) or the Uniswap bridge. RPC override: profile `rpcs.robinhood`.
 - **Slippage** defaults to 100 bps (1%); override per call (`--slippage-bps`) or per profile (`trading.slippageBps`).
+- **Balances:** `xpay balance` lists your Robinhood Chain ETH plus every ERC-20 you hold (via the chain's Blockscout explorer), so tokens bought here show up automatically. Override the explorer with `XPAY_ROBINHOOD_EXPLORER`.
 - This is distinct from `xpay swap` (Solana / Jupiter). GMGN was evaluated and skipped — it doesn't support Robinhood Chain.
 
 ## Realtime X (Twitter) data
