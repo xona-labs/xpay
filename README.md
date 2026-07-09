@@ -71,6 +71,8 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay agenc status <taskPda>` | Check a hire's progress (read-only, no wallet). `--json`. |
 | `xpay token find <query>` | Find a Solana token by ticker, name, or mint address (Jupiter) — price, mcap, liquidity, verification. Read-only. `--limit`, `--json`. |
 | `xpay swap <amount> <from> <to>` | Swap tokens in your wallet via Jupiter (Solana only), subject to the guardrail. `--slippage-bps`, `-y`. |
+| `xpay trade <amount> <from> <to>` | Trade tokens on [Robinhood Chain](#robinhood-chain-trading) via Uniswap V3 / NOXA Fun (ETH↔token), subject to the guardrail. `--slippage-bps`, `--quote-only`, `-y`. |
+| `xpay trending` | List tokens trending on Robinhood Chain (read-only, no wallet). `--new`, `--limit`. |
 | `xpay x user \| posts <handle>` | Realtime X (Twitter) account data — profile (~$0.01) or recent posts (~$0.06), paid via x402 at cost. No X account needed. |
 | `xpay zauth reposcan <repoUrl>` | Repository security scan via partner [zauth](#zauth-repo-security-scans) — zauth score + provenance/vulnerability report (~$0.05 USDC via x402). `--json`, `-y`. |
 | `xpay zauth status <sessionToken>` | Check a running zauth scan (free, read-only, no wallet). `--json`. |
@@ -170,7 +172,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** — fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** — the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -377,6 +379,32 @@ Notes:
 - **Slippage** defaults to Jupiter's dynamic slippage; override per call (`--slippage-bps`) or per profile (`swap.slippageBps`).
 - Keyless by default (~20 req/s shared bucket). Set `JUPITER_API_KEY` (or profile `swap.apiKey`) for higher limits; `XPAY_JUPITER_ENDPOINT` overrides the API base.
 - This is the **native** swap in your own xpay wallet. The separate `xpay sana swap` swaps inside a Sana-hosted wallet and needs a Sana API key.
+
+## Robinhood Chain trading
+
+Trade the [NOXA Fun](https://fun.noxa.fi/robinhood) memecoin scene on **Robinhood Chain** (Robinhood's Arbitrum L2, chain `4663`) straight from your own wallet — no API key. NOXA Fun tokens launch into Uniswap V3 pools quoted in native ETH, so trading is plain on-chain V3: quote via QuoterV2, execute via SwapRouter02. Discovery (trending / new tokens, USD pricing) comes from GeckoTerminal's public API.
+
+```bash
+xpay trending                              # what's hot on Robinhood Chain (free, no wallet)
+xpay trending --new                        # freshest launches (higher risk)
+xpay trade 0.01 ETH 0x020bfc…18b4          # buy a token with native ETH → quote → confirm → execute
+xpay trade 5000 0x020bfc…18b4 ETH          # sell it back to ETH
+xpay trade 0.01 ETH CASHCAT --quote-only   # preview without trading (symbol resolved via trending)
+```
+
+```ts
+const hot    = await xpay.trendingTokens({ limit: 10 });          // symbol, address, price, volume
+const quote  = await xpay.tradeQuote({ amount: 0.01, from: "ETH", to: hot[0].address });
+const result = await xpay.trade({ amount: 0.01, from: "ETH", to: hot[0].address }); // → { txHash, ... }
+```
+
+Notes:
+- **Scope:** ETH ⇄ token only (buy with native ETH, sell back to ETH). Buys auto-wrap ETH; sells unwrap WETH → ETH in one transaction.
+- **The guardrail applies.** The input side is priced in USD (GeckoTerminal spot) and enforced against `maxPerTx` / `maxPerDay` **before signing** — same boundary as `xpay swap`.
+- **Verification.** A token confirmed as a NOXA Fun launch is marked verified; anything else is flagged `unverified` (memecoin tickers aren't unique — prefer passing the exact contract address). NOXA per-tx / max-wallet transfer caps are checked before signing: a buy that would breach one errors up front (instead of reverting on-chain), and the quote flags trades that come close.
+- **Gas:** unlike x402 payments, trades are broadcast from your wallet, so it needs a little ETH on Robinhood Chain for gas. Bridge via [Across](https://across.to) or the Uniswap bridge. RPC override: profile `rpcs.robinhood`.
+- **Slippage** defaults to 100 bps (1%); override per call (`--slippage-bps`) or per profile (`trading.slippageBps`).
+- This is distinct from `xpay swap` (Solana / Jupiter). GMGN was evaluated and skipped — it doesn't support Robinhood Chain.
 
 ## Realtime X (Twitter) data
 

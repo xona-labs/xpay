@@ -62,6 +62,7 @@ export function createWallet(opts: WalletOptions): Wallet {
     if (raw === "eip155:1" && signers["ethereum"]) return "ethereum";
     if (raw === "eip155:42161" && signers["arbitrum"]) return "arbitrum";
     if (raw === "eip155:10" && signers["optimism"]) return "optimism";
+    if (raw === "eip155:4663" && signers["robinhood"]) return "robinhood";
     return undefined;
   }
 

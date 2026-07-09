@@ -216,6 +216,67 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       },
     },
     {
+      name: "xpay_trending_tokens",
+      description:
+        "List tokens trending on Robinhood Chain (Robinhood's Arbitrum L2, home of the NOXA Fun / " +
+        "fun.noxa.fi memecoin scene) right now, with price, market cap, 24h volume, and the token's " +
+        "contract address. FREE, read-only, no wallet. Use this to answer 'what's hot on Robinhood " +
+        "Chain' and to get the exact contract address to pass to xpay_trade. Pass newOnly:true for " +
+        "the freshest launches (higher risk). This is Robinhood *Chain* on-chain data — unrelated to " +
+        "the Robinhood brokerage app or stock trading.",
+      input_schema: {
+        type: "object",
+        properties: {
+          newOnly: { type: "boolean", description: "Show newest pools instead of trending. Default false." },
+          limit: { type: "number", description: "Max results. Default 10." },
+        },
+      },
+    },
+    {
+      name: "xpay_trade_quote",
+      description:
+        "Quote a Robinhood Chain trade WITHOUT executing — no signing, no funds moved, no guardrail. " +
+        "Buy a token with native ETH or sell it back to ETH, routed through Uniswap V3 (NOXA Fun " +
+        "pools). Returns expected output, min output after slippage, pool fee, USD estimate, and " +
+        "whether the token is a verified NOXA launch. Use this to preview a trade before calling " +
+        "xpay_trade. `from`/`to` are 'ETH' or an ERC-20 contract address (or a trending symbol); " +
+        "exactly one side must be ETH.",
+      input_schema: {
+        type: "object",
+        properties: {
+          amount: { type: "number", description: "Amount of the input token, human units (e.g. 0.01)." },
+          from: { type: "string", description: "Input: 'ETH' or an ERC-20 contract address / trending symbol." },
+          to: { type: "string", description: "Output: 'ETH' or an ERC-20 contract address / trending symbol." },
+          slippageBps: { type: "number", description: "Max slippage in bps (100 = 1%). Default 100." },
+        },
+        required: ["amount", "from", "to"],
+      },
+    },
+    {
+      name: "xpay_trade",
+      description:
+        "Trade tokens on Robinhood Chain (Arbitrum L2) via Uniswap V3 — quotes, signs, and executes " +
+        "in ONE call from the user's own xpay wallet. Buy a memecoin with native ETH, or sell it back " +
+        "to ETH (v1 supports ETH↔token only). This is distinct from xpay_swap, which is Solana/Jupiter. " +
+        "NEVER write code or call DEX/router contracts yourself — custom code bypasses the guardrail and " +
+        "has no wallet key. Trades are IRREVERSIBLE; guardrail caps are enforced before signing. Before " +
+        "calling: show the user the input amount + USD value, expected output, the token's contract " +
+        "address, and whether it's a verified NOXA launch (unverified tokens can be scams reusing a " +
+        "ticker) — and get explicit approval. Prefer passing the exact contract address from " +
+        "xpay_trending_tokens over a symbol (memecoin tickers aren't unique). Fund the wallet with ETH " +
+        "on Robinhood Chain first (bridge via Across or Uniswap) — the wallet pays its own gas here.",
+      input_schema: {
+        type: "object",
+        properties: {
+          amount: { type: "number", description: "Amount of the input token, human units (e.g. 0.01)." },
+          from: { type: "string", description: "Input: 'ETH' or an ERC-20 contract address / trending symbol." },
+          to: { type: "string", description: "Output: 'ETH' or an ERC-20 contract address / trending symbol." },
+          slippageBps: { type: "number", description: "Max slippage in bps (100 = 1%). Default 100." },
+        },
+        required: ["amount", "from", "to"],
+      },
+    },
+    {
       name: "xpay_x_user",
       description:
         "Realtime X (Twitter) profile lookup — followers, bio, verification status. This is a PAID " +
@@ -403,6 +464,27 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
 
     xpay_swap: async (input) =>
       xpay.swap({
+        amount: input.amount as number,
+        from: input.from as string,
+        to: input.to as string,
+        slippageBps: input.slippageBps as number | undefined,
+      }),
+
+    xpay_trending_tokens: async (input) => {
+      const opts = { limit: (input.limit as number) ?? 10 };
+      return input.newOnly ? xpay.newTokens(opts) : xpay.trendingTokens(opts);
+    },
+
+    xpay_trade_quote: async (input) =>
+      xpay.tradeQuote({
+        amount: input.amount as number,
+        from: input.from as string,
+        to: input.to as string,
+        slippageBps: input.slippageBps as number | undefined,
+      }),
+
+    xpay_trade: async (input) =>
+      xpay.trade({
         amount: input.amount as number,
         from: input.from as string,
         to: input.to as string,

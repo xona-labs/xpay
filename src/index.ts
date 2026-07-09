@@ -25,6 +25,8 @@ import { fetchReport, type WalletReport, type ReportOptions } from "./report/ind
 import { transfer, type TransferResult } from "./transfer/index.js";
 import { findTokens, type TokenInfo } from "./token/index.js";
 import { swap, swapQuote, type SwapQuote, type SwapResult } from "./swap/index.js";
+import { trade, tradeQuote, type TradeQuote, type TradeResult } from "./trading/index.js";
+import { trendingTokens, newTokens, type DiscoveredToken } from "./trading/discovery.js";
 import type {
   DiscoverOptions,
   Resource,
@@ -74,6 +76,22 @@ export {
   type SwapQuote,
   type SwapResult,
 } from "./swap/index.js";
+export {
+  trade as tradeTokens,
+  tradeQuote as quoteTrade,
+  RH_CONTRACTS,
+  type TradeArgs,
+  type TradeConfig,
+  type TradeQuote,
+  type TradeResult,
+  type TradeTokenInfo,
+} from "./trading/index.js";
+export {
+  trendingTokens,
+  newTokens,
+  tokenPriceUsd,
+  type DiscoveredToken,
+} from "./trading/discovery.js";
 
 /** Options for {@link createXPay}. */
 export interface XPayOptions {
@@ -123,6 +141,20 @@ export interface XPay {
   swapQuote(args: { amount: number; from: string; to: string; slippageBps?: number }): Promise<SwapQuote>;
   /** Swap tokens inside the wallet (Solana only, Jupiter). Subject to the guardrail. */
   swap(args: { amount: number; from: string; to: string; slippageBps?: number }): Promise<SwapResult>;
+  /**
+   * Quote a Robinhood Chain trade without executing — no guardrail, no signing.
+   * `from`/`to` are "ETH" or an ERC-20 address / trending symbol (one must be ETH).
+   */
+  tradeQuote(args: { amount: number; from: string; to: string; slippageBps?: number }): Promise<TradeQuote>;
+  /**
+   * Trade tokens on Robinhood Chain via Uniswap V3 (NOXA Fun launchpad).
+   * Buy a token with native ETH or sell it back to ETH. Subject to the guardrail.
+   */
+  trade(args: { amount: number; from: string; to: string; slippageBps?: number }): Promise<TradeResult>;
+  /** Tokens from pools trending on Robinhood Chain right now (GeckoTerminal). Read-only. */
+  trendingTokens(opts?: { limit?: number }): Promise<DiscoveredToken[]>;
+  /** Tokens from the newest Robinhood Chain pools (fresh, high-risk launches). Read-only. */
+  newTokens(opts?: { limit?: number }): Promise<DiscoveredToken[]>;
 }
 
 /**
@@ -195,5 +227,9 @@ export function createXPay(options: XPayOptions): XPay {
     }),
     swapQuote: (args) => swapQuote({ ...args, wallet, config: options.profile?.config.swap }),
     swap: (args) => swap({ ...args, wallet, guardrail, config: options.profile?.config.swap }),
+    tradeQuote: (args) => tradeQuote({ ...args, wallet, config: options.profile?.config.trading }),
+    trade: (args) => trade({ ...args, wallet, guardrail, config: options.profile?.config.trading }),
+    trendingTokens: (opts) => trendingTokens(opts),
+    newTokens: (opts) => newTokens(opts),
   };
 }

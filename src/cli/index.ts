@@ -45,6 +45,7 @@ import { runBentoEnable, runBentoDisable, runBentoStatus } from "./bento.js";
 import { runAgencHire, runAgencStatus } from "./agenc.js";
 import { runTokenFind } from "./token.js";
 import { runSwap } from "./swap.js";
+import { runTrade, runTrending } from "./trade.js";
 import { runXUser, runXPosts } from "./x.js";
 import { runZauthScan, runZauthStatus } from "./zauth.js";
 import { startMcpServer } from "./mcp-server.js";
@@ -205,6 +206,29 @@ program
   .option("-y, --yes", "Skip the confirmation prompt")
   .action(async (amount: string, fromToken: string, toToken: string, opts) => {
     await runSwap(amount, fromToken, toToken, opts);
+  });
+
+// ---------------------------------------------------------------- trade
+program
+  .command("trade <amount> <fromToken> <toToken>")
+  .description("Trade tokens on Robinhood Chain via Uniswap V3 / NOXA Fun (ETH↔token). Subject to the guardrail.")
+  .option("--profile <name>", "Profile to trade from (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--slippage-bps <n>", "Max slippage in bps (default 100 = 1%)")
+  .option("--quote-only", "Show the quote and exit without trading")
+  .option("-y, --yes", "Skip the confirmation prompt")
+  .action(async (amount: string, fromToken: string, toToken: string, opts) => {
+    await runTrade(amount, fromToken, toToken, opts);
+  });
+
+// ---------------------------------------------------------------- trending
+program
+  .command("trending")
+  .description("List tokens trending on Robinhood Chain (read-only, no wallet).")
+  .option("--new", "Show the newest pools instead of trending (higher risk)")
+  .option("--limit <n>", "Max results (default 10)")
+  .action(async (opts) => {
+    await runTrending(opts);
   });
 
 // ---------------------------------------------------------------- transfer

@@ -103,6 +103,14 @@ export interface ProfileConfig {
     endpoint?: string;
   };
   /**
+   * Robinhood Chain token-trading settings (NOXA Fun / Uniswap V3). Optional —
+   * trades work with sensible defaults; the RPC override lives in `rpcs.robinhood`.
+   */
+  trading?: {
+    /** Default max slippage in bps (100 = 1%). Memecoin pools move fast. */
+    slippageBps?: number;
+  };
+  /**
    * MagicBlock Private Ephemeral Rollup integration.
    * Platform-level config — set once by the xpay operator via `xpay magicblock configure`.
    * End users never need a MagicBlock account; they just pass private:true.

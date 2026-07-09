@@ -11,6 +11,7 @@ const NATIVE_TOKEN: Record<string, { symbol: string; name: string }> = {
   ethereum: { symbol: "ETH", name: "Ether" },
   arbitrum: { symbol: "ETH", name: "Ether" },
   optimism: { symbol: "ETH", name: "Ether" },
+  robinhood: { symbol: "ETH", name: "Ether" },
 };
 
 const KNOWN_ERC20S: Record<string, Array<{ symbol: string; name: string; contract: string; decimals: number }>> = {
@@ -38,6 +39,11 @@ const KNOWN_ERC20S: Record<string, Array<{ symbol: string; name: string; contrac
     { symbol: "WETH", name: "Wrapped Ether",  contract: "0x4200000000000000000000000000000000000006", decimals: 18 },
     { symbol: "OP",   name: "Optimism",       contract: "0x4200000000000000000000000000000000000042", decimals: 18 },
   ],
+  // Robinhood Chain (Arbitrum Orbit L2, chain 4663) is ETH-native; no canonical
+  // USDC exists there yet, so no USDC entry — `balance()` reports 0 by design.
+  robinhood: [
+    { symbol: "WETH", name: "Wrapped Ether",  contract: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", decimals: 18 },
+  ],
 };
 
 /** Per-network USDC contract addresses. */
@@ -53,6 +59,7 @@ const DEFAULT_RPCS: Record<string, string> = {
   ethereum: "https://eth-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
   arbitrum: "https://arb-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
   optimism: "https://opt-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
+  robinhood: "https://rpc.mainnet.chain.robinhood.com",
 };
 
 const ERC20_ABI = [
@@ -90,6 +97,11 @@ export function rawEvmSigner(opts: RawEvmSignerOptions): Signer {
     // EIP-712 signing for gasless x402 v2 (EIP-3009 transferWithAuthorization).
     async signEvmTypedData({ domain, types, message }) {
       return wallet.signTypedData(domain, types, message);
+    },
+
+    // Underlying ethers Wallet (provider-connected) for on-chain DEX trades.
+    getEvmWallet() {
+      return wallet;
     },
 
     async balance(): Promise<number> {

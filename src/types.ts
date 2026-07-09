@@ -197,4 +197,12 @@ export interface Signer {
     types: Record<string, Array<{ name: string; type: string }>>;
     message: Record<string, unknown>;
   }): Promise<string>;
+  /**
+   * Optional (EVM signers): return the underlying ethers `Wallet` (connected to
+   * a provider) so higher-level flows like on-chain DEX trades can read chain
+   * state and broadcast arbitrary contract calls (swaps, approvals). Typed
+   * `unknown` to keep ethers out of the core type surface — callers cast it.
+   * Mirrors {@link Signer.getKitSigner}. Implemented by `rawEvmSigner`.
+   */
+  getEvmWallet?(): unknown;
 }

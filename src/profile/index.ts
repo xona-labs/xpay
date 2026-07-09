@@ -128,7 +128,7 @@ export function signersFromProfile(profile: LoadedProfile): Partial<Record<strin
         secretKey: keys.solana.keypair.secretKey,
         rpcUrl: profile.config.rpcs?.solana,
       });
-    } else if (["base", "ethereum", "arbitrum", "optimism"].includes(network)) {
+    } else if (["base", "ethereum", "arbitrum", "optimism", "robinhood"].includes(network)) {
       out[network] = rawEvmSigner({
         privateKey: keys.evm.privateKey,
         network,
@@ -136,6 +136,16 @@ export function signersFromProfile(profile: LoadedProfile): Partial<Record<strin
       });
     }
   }
+  // Always register a Robinhood Chain signer (same derived EVM key) so the
+  // trading tools work out of the box on any profile, even one that didn't
+  // opt "robinhood" into its `networks`. It's ETH-native with no USDC/x402
+  // surface, so this doesn't affect balances or payment routing — it only
+  // makes `wallet.has("robinhood")` true so `xpay trade` can sign.
+  out.robinhood ??= rawEvmSigner({
+    privateKey: keys.evm.privateKey,
+    network: "robinhood",
+    rpcUrl: profile.config.rpcs?.robinhood,
+  });
   return out;
 }
 
