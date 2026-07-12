@@ -1,0 +1,80 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.xona-labs/xpay",
+  "description": "Discovery and usage layer for agentic commerce — multi-network wallet, x402 payments, AgenC marketplace hires, 20k+ services via PayAI and other catalogs",
+  "repository": {
+    "url": "https://github.com/xona-labs/xpay",
+    "source": "github"
+  },
+  "websiteUrl": "https://xpay.xona-agent.com",
+  "version": "0.2.19",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@xona-labs/xpay",
+      "version": "0.2.19",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp",
+          "description": "Start the MCP server on stdio"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "XPAY_PROFILE",
+          "description": "Wallet profile to load or create (default: active profile, else \"default\")",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "XPAY_PASSPHRASE",
+          "description": "Encrypts the auto-generated wallet at rest; also unlocks an existing encrypted profile",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "XPAY_HOME",
+          "description": "Override the ~/.xpay/ data directory",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "XPAY_NO_AUTO_WALLET",
+          "description": "Set to error instead of auto-generating a wallet when none is configured",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "XPAY_SOLANA_SECRET",
+          "description": "Use an existing Solana secret key (base58) instead of the generated wallet",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "XPAY_EVM_KEY",
+          "description": "Use an existing EVM private key instead of the generated wallet",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "XPAY_EVM_NETWORK",
+          "description": "EVM network for XPAY_EVM_KEY (e.g. base, base-sepolia)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

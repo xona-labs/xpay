@@ -1,0 +1,54 @@
+name: Publish to MCP Registry
+
+# Publishes server metadata to the official MCP Registry
+# (registry.modelcontextprotocol.io). The npm package itself must already be
+# published — the registry verifies the `mcpName` field in the npm tarball's
+# package.json against the server name.
+#
+# Run automatically on version tags (v0.2.19) or manually from the Actions tab
+# after `npm publish`.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # GitHub OIDC login to the MCP Registry
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync server.json version with package.json
+        run: |
+          VERSION=$(jq -r .version package.json)
+          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.json.tmp
+          mv server.json.tmp server.json
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Wait for version on npm
+        run: |
+          for i in $(seq 1 10); do
+            if npm view "@xona-labs/xpay@$VERSION" version >/dev/null 2>&1; then
+              echo "@xona-labs/xpay@$VERSION found on npm"
+              exit 0
+            fi
+            echo "@xona-labs/xpay@$VERSION not on npm yet, retrying in 30s ($i/10)..."
+            sleep 30
+          done
+          echo "::error::@xona-labs/xpay@$VERSION never appeared on npm — run 'npm publish' first"
+          exit 1
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/
+
+      - name: Publish
+        run: |
+          mcp-publisher login github-oidc
+          mcp-publisher publish

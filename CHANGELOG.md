@@ -6,6 +6,15 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.19] – 2026-07-12
+
+### Added
+- Published to the official MCP Registry as `io.github.xona-labs/xpay`:
+  `mcpName` field in package.json (required for the registry's npm ownership
+  check), `server.json` metadata, and a GitHub Actions workflow
+  (`publish-mcp-registry.yml`) that pushes registry metadata on `v*` tags
+  after the npm version is live.
+
 ## [0.2.15] – 2026-07-08
 
 ### Fixed

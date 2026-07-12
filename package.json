@@ -1,6 +1,7 @@
 {
   "name": "@xona-labs/xpay",
-  "version": "0.2.18",
+  "version": "0.2.19",
+  "mcpName": "io.github.xona-labs/xpay",
   "description": "Discovery and usage layer for agentic commerce — multi-network wallet, x402 payments, AgenC marketplace hires, 20k+ services via PayAI and other catalogs",
   "type": "module",
   "main": "dist/index.js",
