@@ -3,6 +3,7 @@
 [![npm](https://img.shields.io/npm/v/@xona-labs/xpay)](https://www.npmjs.com/package/@xona-labs/xpay)
 [![downloads](https://img.shields.io/npm/dm/@xona-labs/xpay)](https://www.npmjs.com/package/@xona-labs/xpay)
 [![license](https://img.shields.io/npm/l/@xona-labs/xpay)](https://github.com/xona-labs/xpay/blob/main/LICENSE)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.xona--labs%2Fxpay-6e56cf)](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.xona-labs/xpay)
 ![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
 
 > **Agentic-commerce wallet.** Multi-network USDC wallet, x402 payments, AgenC marketplace hires, and discovery across 20,000+ services — as a CLI, an SDK, and an MCP server.
@@ -153,8 +154,11 @@ for (const block of response.content) {
 
 ## MCP server (Claude Desktop / Cursor / Codex)
 
-Drop xPay into any MCP host's config — **no code, no keys, no `xpay init`.** On
-first boot the agent is given its own wallet automatically:
+xPay is listed in the [official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.xona-labs/xpay)
+as **`io.github.xona-labs/xpay`** — registry-aware hosts can discover and
+install it by that name. For everything else, drop xPay into the host's
+config — **no code, no keys, no `xpay init`.** On first boot the agent is
+given its own wallet automatically:
 
 ```jsonc
 // ~/Library/Application Support/Claude/claude_desktop_config.json
