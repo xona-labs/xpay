@@ -46,7 +46,27 @@ import type { Network, Signer } from "../types.js";
 import type { XPay } from "../index.js";
 
 export async function startMcpServer(): Promise<void> {
-  const { xpay, profileName } = await buildXPay();
+  // Boot must not throw: a crash here kills the stdio transport and the host
+  // only shows "Connection closed" with no way to recover. When the wallet
+  // can't be unlocked (encrypted profile, no/wrong passphrase) we start in a
+  // locked state instead — tools are listed, and every call returns the
+  // unlock instructions for the agent to relay to the user.
+  let xpay: XPay;
+  let profileName: string | null = null;
+  let lockedReason: string | null = null;
+  try {
+    ({ xpay, profileName } = await buildXPay());
+  } catch (err) {
+    lockedReason = lockedBootMessage(err as Error);
+    process.stderr.write(`[xpay-mcp] wallet locked — starting in locked mode.\n[xpay-mcp] ${lockedReason}\n`);
+    // Placeholder client: tool construction never touches it (all access is
+    // inside handler closures) and calls short-circuit on lockedReason below.
+    xpay = new Proxy({} as XPay, {
+      get() {
+        throw new Error(lockedReason as string);
+      },
+    });
+  }
   const sanaApiKey = await resolveSanaApiKey();
   const { tools, handlers } = forClaude(xpay, { sanaApiKey });
 
@@ -155,6 +175,12 @@ export async function startMcpServer(): Promise<void> {
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    if (lockedReason) {
+      return {
+        content: [{ type: "text", text: `Error: ${lockedReason}` }],
+        isError: true,
+      };
+    }
     const handler = handlers[req.params.name];
     if (!handler) {
       throw new Error(`Unknown tool: ${req.params.name}`);
@@ -282,6 +308,42 @@ async function resolveSanaApiKey(): Promise<string | undefined> {
     // profile not found — fall through to env
   }
   return process.env.SANABOT_API_KEY || undefined;
+}
+
+/**
+ * Turn a boot failure into the message locked-mode tools return. The agent
+ * relays this to the user, so it has to carry the full remediation — the
+ * user never sees stderr in an MCP host.
+ */
+function lockedBootMessage(err: Error): string {
+  const profileName = process.env.XPAY_PROFILE ?? getActiveProfile();
+  const unlockHint =
+    `To unlock, add the passphrase to this MCP server's env in your host config ` +
+    `(Cursor: ~/.cursor/mcp.json, Claude Desktop: claude_desktop_config.json):\n` +
+    `  "xona": { "command": "npx", "args": ["-y", "@xona-labs/xpay", "mcp"], ` +
+    `"env": { "XPAY_PASSPHRASE": "<your passphrase>" } }\n` +
+    `then reload the MCP server. On macOS you can instead run \`npx @xona-labs/xpay biometric enable\` ` +
+    `in a terminal to unlock with Touch ID at boot, no passphrase in the config.`;
+
+  if (err.message.includes("passphrase required")) {
+    return (
+      `The xpay wallet profile "${profileName}" is encrypted and no passphrase was provided, ` +
+      `so wallet tools are locked. ${unlockHint}\n` +
+      `If the passphrase is lost, the wallet cannot be decrypted — restore from the recovery ` +
+      `phrase with \`npx @xona-labs/xpay init --overwrite\`, or delete the profile directory ` +
+      `to start fresh (funds at the old address are only recoverable with the phrase).`
+    );
+  }
+  if (err.message.includes("Wrong passphrase")) {
+    return (
+      `The passphrase provided for the xpay wallet profile "${profileName}" is incorrect ` +
+      `(or the wallet file is corrupted), so wallet tools are locked. ${unlockHint}`
+    );
+  }
+  return (
+    `The xpay wallet failed to load, so wallet tools are locked. Underlying error: ` +
+    `${err.message}`
+  );
 }
 
 /**

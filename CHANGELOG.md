@@ -6,6 +6,20 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.20] – 2026-07-22
+
+### Fixed
+- **MCP server crashed at boot when the wallet couldn't be unlocked.** An
+  encrypted profile with no (or a wrong) `XPAY_PASSPHRASE` in the host's MCP
+  env made `xpay mcp` exit fatally, so Cursor/Claude Desktop only showed
+  "MCP error -32000: Connection closed" with no remediation. The server now
+  boots in a **locked mode** instead: the connection succeeds, all tools are
+  listed, and every call returns an actionable error telling the user exactly
+  how to unlock (add `XPAY_PASSPHRASE` to the server's `env` in the host
+  config, or `xpay biometric enable` on macOS) — which the agent can relay
+  in-chat. Any other boot failure also falls back to locked mode with the
+  underlying error, instead of killing the connection.
+
 ## [0.2.19] – 2026-07-12
 
 ### Added
