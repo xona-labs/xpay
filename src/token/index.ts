@@ -31,6 +31,8 @@ export interface TokenInfo {
   organicScore?: number;
   tokenProgram?: string;
   icon?: string;
+  /** Jupiter's tag list (e.g. verified, rwa, stocks, xstocks, yield). */
+  tags?: string[];
 }
 
 export interface TokenApiOptions {
@@ -205,14 +207,29 @@ interface JupiterTokenItem {
   organicScore?: number;
   tokenProgram?: string;
   icon?: string;
+  tags?: string[];
 }
 
-async function searchJupiter(query: string, opts: TokenApiOptions): Promise<TokenInfo[]> {
+/**
+ * Raw Jupiter search, exported for callers that need the unranked result set
+ * (e.g. RWA discovery, which filters by tag before ranking). `limit` above the
+ * API's default 20 is passed through; at or below it is left client-side so
+ * findTokens keeps ranking from the full default window.
+ */
+export async function searchTokens(
+  query: string,
+  opts: TokenApiOptions & { limit?: number } = {},
+): Promise<TokenInfo[]> {
+  return searchJupiter(query, opts);
+}
+
+async function searchJupiter(query: string, opts: TokenApiOptions & { limit?: number } = {}): Promise<TokenInfo[]> {
   const endpoint = opts.endpoint ?? process.env.XPAY_JUPITER_ENDPOINT ?? DEFAULT_ENDPOINT;
   const apiKey = opts.apiKey ?? process.env.JUPITER_API_KEY;
 
   const url = new URL("/tokens/v2/search", endpoint);
   url.searchParams.set("query", query);
+  if (opts.limit && opts.limit > 20) url.searchParams.set("limit", String(Math.min(opts.limit, 100)));
 
   const body = (await jupiterFetch(url.toString(), apiKey)) as JupiterTokenItem[];
   if (!Array.isArray(body)) return [];
@@ -233,6 +250,7 @@ async function searchJupiter(query: string, opts: TokenApiOptions): Promise<Toke
       organicScore: numOrUndef(t.organicScore),
       tokenProgram: t.tokenProgram,
       icon: t.icon,
+      tags: Array.isArray(t.tags) ? t.tags : undefined,
     }));
 }
 

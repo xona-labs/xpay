@@ -26,6 +26,7 @@ import {
   compactScanReport,
 } from "../zauth/index.js";
 import { SHOP_BASE, fetchShopQuote, compactShopResult, type ShopSearchParams } from "../shop/index.js";
+import { findRwaTokens, type RwaCategory } from "../token/rwa.js";
 
 /** Base URL for xona's paid X (Twitter) data endpoints (x402-gated). */
 const XDATA_BASE = process.env.XPAY_XDATA_ENDPOINT ?? "https://api.xona-agent.com";
@@ -348,6 +349,33 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       },
     },
     {
+      name: "xpay_rwa_find",
+      description:
+        "List tradable RWA (real-world asset) tokens on Solana: FREE, read-only, no wallet. " +
+        "RWA means any tokenized off-chain asset, not just stocks. What is tradable on Solana " +
+        "DEXes today: tokenized stocks/ETFs (Backed xStocks like TSLAx/SPYx, Ondo Global Markets " +
+        "like TSLAon/GLDon, Remora, Backpack) plus the treasury-backed yieldcoin USDY. Ranked " +
+        "verified-first by liquidity, with live price/mcap from Jupiter. Results are swappable " +
+        "from USDC via xpay_swap (confirm with the user first). Caveats to relay when relevant: " +
+        "these are issuer IOUs tracking the underlying, not brokerage shares; permissioned funds " +
+        "(BUIDL, OUSG) are excluded because they are KYC-gated and not DEX-tradable.",
+      input_schema: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Substring filter on symbol/name, e.g. 'tesla' matches TSLAx and TSLAon. Omit to list all.",
+          },
+          category: {
+            type: "string",
+            enum: ["stocks", "treasuries"],
+            description: "Restrict to tokenized stocks/ETFs or treasury-backed tokens. Default: both.",
+          },
+          limit: { type: "number", description: "Max results. Default 20." },
+        },
+      },
+    },
+    {
       name: "xpay_shop_quote",
       description:
         "FREE preflight for product search via xona shop (partner): parses the query server-side " +
@@ -606,6 +634,13 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
 
     xpay_zauth_scan_status: async (input) =>
       compactScanReport(await fetchScanStatus(input.sessionToken as string)),
+
+    xpay_rwa_find: async (input) =>
+      findRwaTokens({
+        query: input.query as string | undefined,
+        category: input.category as RwaCategory | undefined,
+        limit: (input.limit as number) ?? 20,
+      }),
 
     xpay_shop_quote: async (input) =>
       fetchShopQuote({

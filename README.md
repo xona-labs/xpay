@@ -71,6 +71,7 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay agenc hire <listingPda>` | Hire an [AgenC marketplace](#agenc-marketplace-hire-on-chain-agents) listing — escrows its SOL price on-chain; the provider works asynchronously. `--max-usd`, `--review-window`, `-y`. |
 | `xpay agenc status <taskPda>` | Check a hire's progress (read-only, no wallet). `--json`. |
 | `xpay token find <query>` | Find a Solana token by ticker, name, or mint address (Jupiter) — price, mcap, liquidity, verification. Read-only. `--limit`, `--json`. |
+| `xpay token rwa [query]` | List tradable [RWA tokens](#rwa-discovery-solana) on Solana: tokenized stocks/ETFs (xStocks, Ondo, Remora) + USDY. Read-only. `--category`, `--limit`, `--json`. |
 | `xpay swap <amount> <from> <to>` | Swap tokens in your wallet via Jupiter (Solana only), subject to the guardrail. `--slippage-bps`, `-y`. |
 | `xpay trade <amount> <from> <to>` | Trade tokens on [Robinhood Chain](#robinhood-chain-trading) via Uniswap V3 / NOXA Fun (ETH↔token), subject to the guardrail. `--slippage-bps`, `--quote-only`, `-y`. |
 | `xpay trending` | List tokens trending on Robinhood Chain (read-only, no wallet). `--new`, `--limit`. |
@@ -178,7 +179,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** — fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_rwa_find`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** — the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -386,6 +387,27 @@ Notes:
 - Keyless by default (~20 req/s shared bucket). Set `JUPITER_API_KEY` (or profile `swap.apiKey`) for higher limits; `XPAY_JUPITER_ENDPOINT` overrides the API base.
 - This is the **native** swap in your own xpay wallet. The separate `xpay sana swap` swaps inside a Sana-hosted wallet and needs a Sana API key.
 
+## RWA discovery (Solana)
+
+List tradable real-world-asset tokens: RWA covers any tokenized off-chain asset, and what actually trades on Solana DEXes today is tokenized stocks/ETFs (Backed xStocks like `TSLAx`/`SPYx`, Ondo Global Markets like `TSLAon`/`GLDon`, Remora, Backpack Securities) plus the treasury-backed yieldcoin `USDY`. Free, read-only, no wallet:
+
+```bash
+xpay token rwa                        # full list, verified-first by liquidity
+xpay token rwa tesla                  # matches TSLAx (Backed) and TSLAon (Ondo)
+xpay token rwa --category treasuries  # USDY
+xpay swap 10 USDC TSLAx               # swap into one (guardrail-gated)
+```
+
+```ts
+const rwas = await xpay.findRwaTokens({ query: "nvidia" });   // NVDAx, NVDAon
+```
+
+Notes:
+- Discovery sweeps Jupiter's search API and filters by Jupiter's own `rwa`/`stocks`/`xstocks` token tags (the tag endpoint itself doesn't accept these), so the list is Jupiter-verified and priced live. Results cache in-process for 5 minutes.
+- Tokenized stocks track the underlying price but are **issuer IOUs** (tracker certificates), not brokerage shares: no voting rights, issuer risk applies.
+- Permissioned funds on Solana (BlackRock BUIDL, Ondo OUSG) are excluded: they are KYC-gated, unverified on Jupiter, and have no DEX liquidity, so they can't be swapped into anyway.
+- MCP: `xpay_rwa_find` (free). Everything returned is swappable from USDC via `xpay_swap` / `xpay swap`.
+
 ## Robinhood Chain trading
 
 Trade the [NOXA Fun](https://fun.noxa.fi/robinhood) memecoin scene on **Robinhood Chain** (Robinhood's Arbitrum L2, chain `4663`) straight from your own wallet — no API key. NOXA Fun tokens launch into Uniswap V3 pools quoted in native ETH, so trading is plain on-chain V3: quote via QuoterV2, execute via SwapRouter02. Discovery (trending / new tokens, USD pricing) comes from GeckoTerminal's public API.
@@ -481,11 +503,12 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 **v0.2.14 (current):**
 - ✅ CLI: init, accounts, balance, discover, pay, agenc, token, swap, x, zauth, shop, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
-- ✅ MCP server on stdio with 22 tools (incl. the Bento intent firewall)
+- ✅ MCP server on stdio with 23 tools (incl. the Bento intent firewall)
 - ✅ Solana token discovery + native Jupiter swaps (`xpay token find`, `xpay swap`)
 - ✅ Realtime X (Twitter) data at cost via x402 (`xpay x user|posts`)
 - ✅ zauth repo security scans via x402 (`xpay zauth reposcan`)
 - ✅ xona shop product discovery via x402 (`xpay shop search`), free quote preflight
+- ✅ RWA discovery on Solana (`xpay token rwa`): tokenized stocks/ETFs + USDY, swappable via `xpay swap`
 - ✅ Solana + Base mainnet with disk caching
 - ✅ Optional Sana agent card integration (`xpay sana link`) — 8 additional `sana_*` tools
 - ✅ AgenC marketplace as a discovery source + smart-routed SOL escrow hires (`xpay agenc hire|status`)

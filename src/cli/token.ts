@@ -7,10 +7,69 @@
 import chalk from "chalk";
 import { findTokens } from "../token/index.js";
 import type { TokenInfo } from "../token/index.js";
+import { findRwaTokens, type RwaToken, type RwaCategory } from "../token/rwa.js";
 
 export interface TokenFindCmdOptions {
   limit?: string;
   json?: boolean;
+}
+
+export interface TokenRwaCmdOptions {
+  category?: string;
+  limit?: string;
+  unverified?: boolean;
+  json?: boolean;
+}
+
+export async function runTokenRwa(query: string | undefined, opts: TokenRwaCmdOptions): Promise<void> {
+  if (opts.category && opts.category !== "stocks" && opts.category !== "treasuries") {
+    console.error(chalk.red(`✗ --category must be "stocks" or "treasuries", got "${opts.category}"`));
+    process.exit(1);
+  }
+
+  const t0 = Date.now();
+  let results: RwaToken[];
+  try {
+    results = await findRwaTokens({
+      query,
+      category: opts.category as RwaCategory | undefined,
+      limit: opts.limit ? Number(opts.limit) : 20,
+      includeUnverified: opts.unverified,
+    });
+  } catch (err) {
+    console.error(chalk.red(`✗ ${(err as Error).message}`));
+    process.exit(1);
+  }
+  const elapsed = Date.now() - t0;
+
+  if (opts.json) {
+    process.stdout.write(JSON.stringify(results, null, 2) + "\n");
+    return;
+  }
+
+  if (results.length === 0) {
+    console.log(chalk.yellow(`No tradable RWA tokens found${query ? ` for "${query}"` : ""}.`));
+    return;
+  }
+
+  console.log("");
+  console.log(chalk.dim(`${results.length} RWA token${results.length === 1 ? "" : "s"} on Solana${query ? ` for "${query}"` : ""} (${elapsed}ms)`));
+  console.log("");
+
+  for (let i = 0; i < results.length; i++) {
+    const t = results[i]!;
+    const badge = t.verified ? chalk.green("✓") : chalk.yellow("⚠ unverified");
+    const price = t.usdPrice !== undefined ? formatPrice(t.usdPrice) : chalk.dim("?");
+    const liq = t.liquidity !== undefined ? `liq ${formatCompact(t.liquidity)}` : "";
+    console.log(
+      `  ${chalk.bold(String(i + 1).padStart(2) + ".")} ${chalk.bold(t.symbol.padEnd(10))} ${price.padEnd(14)} ${badge}  ${chalk.dim(`${t.issuer} · ${t.category}${liq ? ` · ${liq}` : ""}`)}`,
+    );
+    console.log(`      ${chalk.white(t.name)}`);
+    console.log(`      ${chalk.dim(t.mint)}`);
+    console.log("");
+  }
+  console.log(chalk.dim("Tokenized stocks track the underlying but are issuer IOUs, not brokerage shares."));
+  console.log(chalk.dim("Use `xpay swap <amount> USDC <symbol-or-mint>` to swap into one."));
 }
 
 export async function runTokenFind(query: string, opts: TokenFindCmdOptions): Promise<void> {

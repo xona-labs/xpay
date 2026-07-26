@@ -24,6 +24,7 @@ import { signersFromProfile, deriveKeysFromMnemonic, type LoadedProfile } from "
 import { fetchReport, type WalletReport, type ReportOptions } from "./report/index.js";
 import { transfer, type TransferResult } from "./transfer/index.js";
 import { findTokens, type TokenInfo } from "./token/index.js";
+import { findRwaTokens, type RwaToken, type RwaFindOptions } from "./token/rwa.js";
 import { swap, swapQuote, type SwapQuote, type SwapResult } from "./swap/index.js";
 import { trade, tradeQuote, type TradeQuote, type TradeResult } from "./trading/index.js";
 import { trendingTokens, newTokens, type DiscoveredToken } from "./trading/discovery.js";
@@ -68,6 +69,12 @@ export {
   type TokenApiOptions,
   type EnrichedTokenBalance,
 } from "./token/index.js";
+export {
+  findRwaTokens,
+  type RwaToken,
+  type RwaCategory,
+  type RwaFindOptions,
+} from "./token/rwa.js";
 export {
   swap as swapTokens,
   swapQuote as quoteSwap,
@@ -139,6 +146,8 @@ export interface XPay {
   transfer(args: { amount: number; to: string; network?: Network; token?: string; private?: boolean }): Promise<TransferResult>;
   /** Search Solana tokens by ticker, name, or mint (Jupiter). Read-only, no signing. */
   findTokens(query: string, opts?: { limit?: number }): Promise<TokenInfo[]>;
+  /** List tradable RWA tokens on Solana (tokenized stocks/ETFs + USDY). Read-only, no signing. */
+  findRwaTokens(opts?: RwaFindOptions): Promise<RwaToken[]>;
   /** Quote a swap without executing — no guardrail, no signing, no funds moved. */
   swapQuote(args: { amount: number; from: string; to: string; slippageBps?: number }): Promise<SwapQuote>;
   /** Swap tokens inside the wallet (Solana only, Jupiter). Subject to the guardrail. */
@@ -223,6 +232,11 @@ export function createXPay(options: XPayOptions): XPay {
       magicBlockConfig: options.profile?.config.magicblock,
     }),
     findTokens: (query, opts) => findTokens(query, {
+      endpoint: options.profile?.config.swap?.endpoint,
+      apiKey: options.profile?.config.swap?.apiKey,
+      ...opts,
+    }),
+    findRwaTokens: (opts) => findRwaTokens({
       endpoint: options.profile?.config.swap?.endpoint,
       apiKey: options.profile?.config.swap?.apiKey,
       ...opts,

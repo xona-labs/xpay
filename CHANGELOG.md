@@ -6,6 +6,23 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **RWA discovery on Solana.** `xpay token rwa [query]` CLI, `xpay_rwa_find`
+  MCP tool, and `xpay.findRwaTokens()` SDK method list the real-world-asset
+  tokens actually tradable on Solana DEXes: tokenized stocks/ETFs (Backed
+  xStocks, Ondo Global Markets, Remora, Backpack Securities) plus the
+  treasury-backed yieldcoin USDY. Free and read-only via Jupiter; ranked
+  verified-first by liquidity with live prices, filterable by substring
+  ("tesla" matches both TSLAx and TSLAon) and `--category stocks|treasuries`.
+  Jupiter's tag endpoint rejects `rwa`/`stocks`/`xstocks` as queries, so
+  discovery sweeps the search endpoint and filters by each token's tag array
+  (5-minute in-process cache). Permissioned KYC-gated funds (BUIDL, OUSG) are
+  deliberately excluded: no DEX liquidity, not swappable. Everything returned
+  can be swapped from USDC with the existing `xpay swap` / `xpay_swap`.
+- `TokenInfo` now carries Jupiter's `tags` array; `searchTokens()` (raw,
+  unranked search) is exported, and search `limit` above the API default 20
+  is passed through to Jupiter (max 100).
+
 ## [0.2.21] – 2026-07-26
 
 ### Added

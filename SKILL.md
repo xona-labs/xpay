@@ -43,6 +43,7 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_do` | One step: discover the best service for an intent **and** call it. Use when you don't need to compare options. |
 | `xpay_transfer` | Send USDC (or any Solana SPL token) directly to an address. Executes immediately, gated by the user's guardrail — confirm amount + destination with the user before calling. |
 | `xpay_token_find` | Find Solana tokens by ticker, name, or mint (price, mcap, liquidity, `verified` flag). Read-only. |
+| `xpay_rwa_find` | List tradable RWA tokens on Solana: tokenized stocks/ETFs (xStocks, Ondo, Remora) + treasury-backed USDY. Free, read-only; results swappable via `xpay_swap`. |
 | `xpay_swap` | Swap tokens inside the wallet via Jupiter (Solana only). Irreversible; guardrail-gated. Confirm with the user first. |
 | `xpay_x_user` | Realtime X (Twitter) profile — followers, bio, verification. Paid (~$0.01 at cost via x402). |
 | `xpay_x_posts` | Recent posts from an X account with engagement metrics. Paid (~$0.06 at cost via x402). |
