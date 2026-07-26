@@ -6,6 +6,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.22] – 2026-07-26
+
 ### Added
 - **RWA discovery on Solana.** `xpay token rwa [query]` CLI, `xpay_rwa_find`
   MCP tool, and `xpay.findRwaTokens()` SDK method list the real-world-asset
