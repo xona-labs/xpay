@@ -46,6 +46,8 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_swap` | Swap tokens inside the wallet via Jupiter (Solana only). Irreversible; guardrail-gated. Confirm with the user first. |
 | `xpay_x_user` | Realtime X (Twitter) profile — followers, bio, verification. Paid (~$0.01 at cost via x402). |
 | `xpay_x_posts` | Recent posts from an X account with engagement metrics. Paid (~$0.06 at cost via x402). |
+| `xpay_shop_quote` | Free preflight for product search: exact price, marketplaces it would hit, and whether the query parses as a product search. Quote first when a query is ambiguous. |
+| `xpay_shop_search` | Product discovery across Google Shopping, Amazon, and eBay from one free-text query: normalized, deduped, ranked. Paid (~$0.02 via x402, less for fewer marketplaces). |
 | `xpay_balance` | The wallet's balance per network, plus its addresses (use this to tell the user where to send funds). |
 | `xpay_report` | Spending/income report (daily / weekly / monthly). |
 | `xpay_guardrail` | Read the active spending caps (per-tx, per-day, allowed hosts, approval threshold). |

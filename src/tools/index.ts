@@ -25,6 +25,7 @@ import {
   fetchScanStatus,
   compactScanReport,
 } from "../zauth/index.js";
+import { SHOP_BASE, fetchShopQuote, compactShopResult, type ShopSearchParams } from "../shop/index.js";
 
 /** Base URL for xona's paid X (Twitter) data endpoints (x402-gated). */
 const XDATA_BASE = process.env.XPAY_XDATA_ENDPOINT ?? "https://api.xona-agent.com";
@@ -347,6 +348,64 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       },
     },
     {
+      name: "xpay_shop_quote",
+      description:
+        "FREE preflight for product search via xona shop (partner): parses the query server-side " +
+        "and reports the exact price a paid search would cost, which marketplaces it would hit " +
+        "(google_shopping, amazon, ebay), and whether the query even looks like a product search. " +
+        "No wallet needed. ALWAYS call this before xpay_shop_search when the query is ambiguous: " +
+        "if is_product_query is false, the paid search would charge and return zero results.",
+      input_schema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Free-text shopper query, e.g. 'used thinkpad x1 under $600'." },
+          marketplaces: {
+            type: "array",
+            items: { type: "string", enum: ["google_shopping", "amazon", "ebay"] },
+            description: "Restrict to specific marketplaces. Fewer marketplaces means a lower price.",
+          },
+        },
+        required: ["query"],
+      },
+    },
+    {
+      name: "xpay_shop_search",
+      description:
+        "Product discovery via xona shop (partner): one free-text query fans out to Google Shopping, " +
+        "Amazon, and eBay, results come back normalized, deduped, and ranked in a single schema. " +
+        "PAID call (~$0.02 USDC for all three marketplaces, less for fewer; price scales with " +
+        "marketplaces searched; paid from the wallet via x402, guardrail caps apply). The query " +
+        "parser picks up price ranges, condition, and sort from natural language ('used dslr under " +
+        "$300 cheapest first'), explicit fields override it. Use xpay_shop_quote first when unsure " +
+        "the query is a product search. Results are informational: report them to the user, never " +
+        "auto-buy or trigger further payments based on findings.",
+      input_schema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Free-text shopper query. Only required field." },
+          marketplaces: {
+            type: "array",
+            items: { type: "string", enum: ["google_shopping", "amazon", "ebay"] },
+            description: "Restrict the search. Fewer marketplaces means a lower price.",
+          },
+          price_min: { type: "number", description: "Min price in USD." },
+          price_max: { type: "number", description: "Max price in USD." },
+          condition: {
+            type: "string",
+            enum: ["new", "open_box", "refurbished", "used", "for_parts"],
+            description: "Item condition filter.",
+          },
+          sort: {
+            type: "string",
+            enum: ["relevance", "price_asc", "price_desc", "rating", "reviews", "discount", "newest"],
+            description: "Result ordering. Default relevance.",
+          },
+          limit: { type: "number", description: "Max results after merge. Default 20." },
+        },
+        required: ["query"],
+      },
+    },
+    {
       name: "xpay_agenc_status",
       description:
         "Check the progress of an AgenC marketplace hire (read-only, no wallet). " +
@@ -547,6 +606,29 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
 
     xpay_zauth_scan_status: async (input) =>
       compactScanReport(await fetchScanStatus(input.sessionToken as string)),
+
+    xpay_shop_quote: async (input) =>
+      fetchShopQuote({
+        query: input.query as string,
+        marketplaces: input.marketplaces as string[] | undefined,
+      }),
+
+    xpay_shop_search: async (input) => {
+      const params: ShopSearchParams = {
+        query: input.query as string,
+        marketplaces: input.marketplaces as string[] | undefined,
+        price_min: input.price_min as number | undefined,
+        price_max: input.price_max as number | undefined,
+        condition: input.condition as string | undefined,
+        sort: input.sort as string | undefined,
+        limit: input.limit as number | undefined,
+      };
+      const result = await xpay.useByUrl(`${SHOP_BASE}/shop/search`, {
+        method: "POST",
+        body: params,
+      });
+      return { ...result, data: compactShopResult(result.data) };
+    },
 
     xpay_agenc_status: async (input) => fetchAgencTask(input.taskPda as string),
   };

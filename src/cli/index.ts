@@ -48,6 +48,7 @@ import { runSwap } from "./swap.js";
 import { runTrade, runTrending } from "./trade.js";
 import { runXUser, runXPosts } from "./x.js";
 import { runZauthScan, runZauthStatus } from "./zauth.js";
+import { runShopSearch, runShopQuote } from "./shop.js";
 import { startMcpServer } from "./mcp-server.js";
 
 const program = new Command();
@@ -194,6 +195,37 @@ zauth
   .option("--json", "Emit raw JSON")
   .action(async (sessionToken: string, opts) => {
     await runZauthStatus(sessionToken, opts);
+  });
+
+// ---------------------------------------------------------------- shop
+const shop = program
+  .command("shop")
+  .description("xona partner: product discovery across Google Shopping, Amazon, and eBay, paid via x402.");
+
+shop
+  .command("search <query>")
+  .description("Search products from one free-text query (~$0.02 USDC for all 3 marketplaces, less for fewer).")
+  .option("--profile <name>", "Profile to pay from (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--marketplaces <list>", "Comma-separated subset of google_shopping,amazon,ebay (fewer = cheaper)")
+  .option("--price-min <usd>", "Min price filter")
+  .option("--price-max <usd>", "Max price filter")
+  .option("--condition <c>", "new | open_box | refurbished | used | for_parts")
+  .option("--sort <s>", "relevance | price_asc | price_desc | rating | reviews | discount | newest")
+  .option("--limit <n>", "Max results after merge (default 20)")
+  .option("--json", "Emit raw JSON")
+  .option("-y, --yes", "Skip the confirmation prompt")
+  .action(async (query: string, opts) => {
+    await runShopSearch(query, opts);
+  });
+
+shop
+  .command("quote <query>")
+  .description("Free preflight: exact price + how the query would be interpreted (no wallet needed).")
+  .option("--marketplaces <list>", "Comma-separated subset of google_shopping,amazon,ebay")
+  .option("--json", "Emit raw JSON")
+  .action(async (query: string, opts) => {
+    await runShopQuote(query, opts);
   });
 
 // ---------------------------------------------------------------- swap

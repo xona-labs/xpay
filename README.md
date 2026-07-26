@@ -77,6 +77,8 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay x user \| posts <handle>` | Realtime X (Twitter) account data — profile (~$0.01) or recent posts (~$0.06), paid via x402 at cost. No X account needed. |
 | `xpay zauth reposcan <repoUrl>` | Repository security scan via partner [zauth](#zauth-repo-security-scans) — zauth score + provenance/vulnerability report (~$0.05 USDC via x402). `--json`, `-y`. |
 | `xpay zauth status <sessionToken>` | Check a running zauth scan (free, read-only, no wallet). `--json`. |
+| `xpay shop search "<query>"` | [Product discovery](#xona-shop-product-discovery) across Google Shopping, Amazon, and eBay from one query (~$0.02 USDC via x402, less for fewer marketplaces). `--marketplaces`, `--price-min/max`, `--condition`, `--sort`, `--json`, `-y`. |
+| `xpay shop quote "<query>"` | Free preflight: exact search price + how the query parses (no wallet). `--json`. |
 | `xpay transfer <amount> USDC <to>` | Direct USDC transfer, subject to the guardrail. `--network`, `-y`. |
 | `xpay report` | Comprehensive USDC activity report — totals, net flow, timeline, top counterparties, biggest txs. `--period daily\|weekly\|monthly`, `--network`, `--json`. |
 | `xpay guardrail show \| set \| clear` | Inspect or edit spending caps and allowed hosts. |
@@ -176,7 +178,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** — fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** — the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -435,6 +437,20 @@ A scan either returns a cached report immediately or `{ status: "scanning", scan
 
 MCP: `xpay_zauth_reposcan` (paid, polls up to ~90s) / `xpay_zauth_scan_status` (free follow-up). Endpoint override: `XPAY_ZAUTH_ENDPOINT`.
 
+## xona shop product discovery
+
+Search products across Google Shopping, Amazon, and eBay from a single free-text query via xona's x402-paywalled `/shop/search` endpoint (partner integration). The query parser picks up price ranges, condition, and sort straight from natural language; results come back normalized, deduped, and ranked in one schema. Price scales with the marketplaces searched: ~$0.02 USDC for all three, less for a subset (floor $0.005). Paid through the normal x402 flow, so guardrail caps apply (if your profile restricts `allowedHosts`, `api.xona-agent.com` must be on the list):
+
+```bash
+xpay shop quote "used thinkpad x1 under $600"    # free: exact price + parsed intent, no wallet
+xpay shop search "used thinkpad x1 under $600"   # paid: quotes first, confirms, then searches
+xpay shop search "sony wh-1000xm5" --marketplaces amazon,ebay --sort price_asc
+```
+
+`shop search` runs the free quote automatically before asking for confirmation, and refuses to pay when the parser says the query is not a product search (a paid search for such a query charges but returns zero results).
+
+MCP: `xpay_shop_search` (paid) / `xpay_shop_quote` (free preflight: agents should quote first when a query is ambiguous). MCP results are compacted for context (image/position/scoring fields dropped); `xpay shop search --json` keeps the full payload. Endpoint override: `XPAY_SHOP_ENDPOINT`.
+
 ## Multi-network
 
 `init` configures Solana and Base by default. Add or change via `~/.xpay/<name>/config.json`:
@@ -463,12 +479,13 @@ Public RPCs work for development but rate-limit hard. Production deployments sho
 ## Project status
 
 **v0.2.14 (current):**
-- ✅ CLI: init, accounts, balance, discover, pay, agenc, token, swap, x, zauth, transfer, report, guardrail, mcp
+- ✅ CLI: init, accounts, balance, discover, pay, agenc, token, swap, x, zauth, shop, transfer, report, guardrail, mcp
 - ✅ SDK: full parity with CLI; tool exporters for Claude / OpenAI / Gemini
-- ✅ MCP server on stdio with 17 tools (incl. the Bento intent firewall)
+- ✅ MCP server on stdio with 22 tools (incl. the Bento intent firewall)
 - ✅ Solana token discovery + native Jupiter swaps (`xpay token find`, `xpay swap`)
 - ✅ Realtime X (Twitter) data at cost via x402 (`xpay x user|posts`)
 - ✅ zauth repo security scans via x402 (`xpay zauth reposcan`)
+- ✅ xona shop product discovery via x402 (`xpay shop search`), free quote preflight
 - ✅ Solana + Base mainnet with disk caching
 - ✅ Optional Sana agent card integration (`xpay sana link`) — 8 additional `sana_*` tools
 - ✅ AgenC marketplace as a discovery source + smart-routed SOL escrow hires (`xpay agenc hire|status`)

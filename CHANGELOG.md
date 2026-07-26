@@ -6,6 +6,22 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **xona shop product discovery (partner integration).** `xpay shop search
+  "<query>"` CLI plus `xpay_shop_search` / `xpay_shop_quote` MCP tools: one
+  free-text query fans out to Google Shopping, Amazon, and eBay via xona's
+  x402-paywalled `/shop/search` endpoint, results come back normalized,
+  deduped, and ranked in a single schema. Same partner pattern as zauth
+  reposcan, with one twist: there is a FREE quote preflight
+  (`xpay shop quote`, `xpay_shop_quote`) that reports the exact price and
+  whether the query even parses as a product search, so agents never pay for
+  a query that would return nothing. `shop search` quotes automatically
+  before confirming, and refuses to pay for non-product queries. Price scales
+  with marketplaces searched (~$0.02 USDC for all three, floor $0.005); paid
+  through the normal x402 flow, guardrail caps apply. MCP results are
+  compacted (image/position/scoring fields dropped); `--json` keeps the full
+  payload. Endpoint override: `XPAY_SHOP_ENDPOINT`.
+
 ## [0.2.20] – 2026-07-22
 
 ### Fixed
