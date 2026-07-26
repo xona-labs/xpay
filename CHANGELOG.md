@@ -6,6 +6,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.21] – 2026-07-26
+
 ### Added
 - **xona shop product discovery (partner integration).** `xpay shop search
   "<query>"` CLI plus `xpay_shop_search` / `xpay_shop_quote` MCP tools: one
