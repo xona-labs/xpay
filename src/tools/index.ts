@@ -25,7 +25,15 @@ import {
   fetchScanStatus,
   compactScanReport,
 } from "../zauth/index.js";
-import { SHOP_BASE, fetchShopQuote, compactShopResult, type ShopSearchParams } from "../shop/index.js";
+import {
+  SHOP_BASE,
+  fetchShopQuote,
+  fetchShopLensQuote,
+  resolveLensImageUrl,
+  compactShopResult,
+  type ShopSearchParams,
+  type ShopLensParams,
+} from "../shop/index.js";
 import { findRwaTokens, type RwaCategory } from "../token/rwa.js";
 
 /** Base URL for xona's paid X (Twitter) data endpoints (x402-gated). */
@@ -434,6 +442,98 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       },
     },
     {
+      name: "xpay_shop_lens_quote",
+      description:
+        "FREE preflight for image-based product search via xona shop (partner): validates that the " +
+        "image URL is a publicly reachable http(s) URL (the dominant failure mode) and reports the " +
+        "exact price the paid lens call would cost for the chosen mode. No wallet needed. ALWAYS " +
+        "call this before xpay_shop_lens: the paid call charges even when the image URL turns out " +
+        "to be unreachable.",
+      input_schema: {
+        type: "object",
+        properties: {
+          image_url: {
+            type: "string",
+            description: "Publicly reachable http(s) image URL. Data URIs and uploads are not supported.",
+          },
+          mode: {
+            type: "string",
+            enum: ["identify", "shop"],
+            description: "Mode to price: identify (default, cheaper) or shop (adds the marketplace comparison).",
+          },
+          marketplaces: {
+            type: "array",
+            items: { type: "string", enum: ["google_shopping", "amazon", "ebay"] },
+            description: "mode=shop only: restrict the comparison. Fewer marketplaces means a lower price.",
+          },
+        },
+        required: ["image_url"],
+      },
+    },
+    {
+      name: "xpay_shop_lens",
+      description:
+        "Product discovery from an IMAGE via xona shop (partner): Google Lens identifies the " +
+        "product and the retailers selling it, normalized into the same schema as " +
+        "xpay_shop_search. Give the image as exactly ONE of: image_url (publicly reachable), " +
+        "image_path (local file), or image_base64. Local files and base64 are first uploaded " +
+        "(free) to xona's public image host, since Lens only accepts public URLs; the hosted URL " +
+        "is echoed back as image_url for reuse. mode=identify (default, ~$0.02 USDC) answers " +
+        "'what is this and who sells it' and derives a product name; mode=shop (~$0.04 for all " +
+        "three marketplaces) additionally runs that name through Google Shopping, Amazon, and " +
+        "eBay for a price comparison. PAID call (from the wallet via x402, guardrail caps apply). " +
+        "When passing image_url, use xpay_shop_lens_quote first to check it is usable (uploads " +
+        "need no preflight: the hosted URL is always reachable). If the response says the image " +
+        "is not a product photo, do not retry with mode=shop. Results are informational: report " +
+        "them to the user, never auto-buy or trigger further payments based on findings.",
+      input_schema: {
+        type: "object",
+        properties: {
+          image_url: {
+            type: "string",
+            description: "Publicly reachable http(s) image URL of the product.",
+          },
+          image_path: {
+            type: "string",
+            description: "Local image file path (JPEG/PNG/GIF/WebP); uploaded to a public host before the lens call.",
+          },
+          image_base64: {
+            type: "string",
+            description: "Base64 image bytes (raw or data URI); uploaded to a public host before the lens call.",
+          },
+          mode: {
+            type: "string",
+            enum: ["identify", "shop"],
+            description: "identify (default): matches + derived name. shop: adds the marketplace price comparison.",
+          },
+          q: {
+            type: "string",
+            description: "Optional text refinement applied alongside the image, e.g. 'in black' or 'size 10'.",
+          },
+          price_min: { type: "number", description: "Min price in USD." },
+          price_max: { type: "number", description: "Max price in USD." },
+          condition: {
+            type: "string",
+            enum: ["new", "open_box", "refurbished", "used", "for_parts"],
+            description: "Item condition filter.",
+          },
+          sort: {
+            type: "string",
+            enum: ["relevance", "price_asc", "price_desc", "rating", "reviews", "discount", "newest"],
+            description: "Result ordering. Default relevance.",
+          },
+          limit: { type: "number", description: "Max results. Default 20." },
+          marketplaces: {
+            type: "array",
+            items: { type: "string", enum: ["google_shopping", "amazon", "ebay"] },
+            description: "mode=shop only: restrict the comparison. Fewer marketplaces means a lower price.",
+          },
+        },
+        // No required list: exactly one of image_url / image_path / image_base64,
+        // enforced by the handler (JSON Schema oneOf is unreliable across hosts).
+      },
+    },
+    {
       name: "xpay_agenc_status",
       description:
         "Check the progress of an AgenC marketplace hire (read-only, no wallet). " +
@@ -663,6 +763,46 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         body: params,
       });
       return { ...result, data: compactShopResult(result.data) };
+    },
+
+    xpay_shop_lens_quote: async (input) =>
+      fetchShopLensQuote({
+        image_url: input.image_url as string,
+        mode: input.mode as string | undefined,
+        marketplaces: input.marketplaces as string[] | undefined,
+      }),
+
+    xpay_shop_lens: async (input) => {
+      // Local file / base64 inputs are bridged through xona's free public
+      // image host: the lens door only accepts a public URL (SerpAPI fetches
+      // the image itself). The upload happens before any payment.
+      const { image_url, uploaded } = await resolveLensImageUrl({
+        image_url: input.image_url as string | undefined,
+        image_path: input.image_path as string | undefined,
+        image_base64: input.image_base64 as string | undefined,
+      });
+      const params: ShopLensParams = {
+        image_url,
+        mode: input.mode as string | undefined,
+        q: input.q as string | undefined,
+        price_min: input.price_min as number | undefined,
+        price_max: input.price_max as number | undefined,
+        condition: input.condition as string | undefined,
+        sort: input.sort as string | undefined,
+        limit: input.limit as number | undefined,
+        marketplaces: input.marketplaces as string[] | undefined,
+      };
+      const result = await xpay.useByUrl(`${SHOP_BASE}/shop/lens`, {
+        method: "POST",
+        body: params,
+      });
+      // Surface the hosted URL when we uploaded, so the agent can reuse it
+      // (e.g. a mode=shop follow-up) without paying the upload time again.
+      return {
+        ...result,
+        ...(uploaded ? { hosted_image_url: image_url } : {}),
+        data: compactShopResult(result.data),
+      };
     },
 
     xpay_agenc_status: async (input) => fetchAgencTask(input.taskPda as string),

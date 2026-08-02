@@ -6,7 +6,29 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.2.22] – 2026-07-26
+## [0.2.23] – 2026-08-02
+
+### Added
+- **Shop lens: image-based product discovery** (xona shop partner
+  integration). `xpay_shop_lens` MCP tool answers "what is this, and where
+  do I buy it" from a photo via xona's x402-paywalled `/shop/lens`:
+  `mode=identify` (default, ~$0.02 USDC) returns Google Lens visual matches
+  plus a derived product name, `mode=shop` (~$0.04 for all three
+  marketplaces) additionally runs that name through the Google
+  Shopping/Amazon/eBay comparison, nested as `marketplace_comparison`.
+  `xpay_shop_lens_quote` is the free preflight: validates the image URL is
+  publicly reachable and reports the exact price, no wallet.
+- The image can be given as exactly one of `image_url`, `image_path`
+  (local file), or `image_base64` (raw or data URI). The lens engine only
+  accepts public http(s) URLs, so local/base64 inputs are first uploaded,
+  free, to xona's public image host (JPEG/PNG/GIF/WebP, type sniffed from
+  magic bytes, 25MB cap) and the hosted URL is echoed back as
+  `hosted_image_url` for reuse. This makes images from chat clients that
+  upload attachments (Hermes and friends) work without a manual hosting
+  step.
+- `compactShopResult` now also compacts the nested
+  `marketplace_comparison` result list, so lens `mode=shop` responses stay
+  context-friendly over MCP.
 
 ### Added
 - **RWA discovery on Solana.** `xpay token rwa [query]` CLI, `xpay_rwa_find`

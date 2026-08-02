@@ -179,7 +179,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** — fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_rwa_find`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_shop_lens`, `xpay_shop_lens_quote`, `xpay_rwa_find`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** — the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -472,6 +472,14 @@ xpay shop search "sony wh-1000xm5" --marketplaces amazon,ebay --sort price_asc
 `shop search` runs the free quote automatically before asking for confirmation, and refuses to pay when the parser says the query is not a product search (a paid search for such a query charges but returns zero results).
 
 MCP: `xpay_shop_search` (paid) / `xpay_shop_quote` (free preflight: agents should quote first when a query is ambiguous). MCP results are compacted for context (image/position/scoring fields dropped); `xpay shop search --json` keeps the full payload. Endpoint override: `XPAY_SHOP_ENDPOINT`.
+
+### Shop lens: image-based discovery
+
+The same partner also answers "what is this, and where do I buy it" from a photo. Give `/shop/lens` an image and Google Lens identifies the product and the retailers selling it, normalized into the same schema as `/shop/search`. Two modes: `identify` (default, ~$0.02 USDC) returns the visual matches plus a derived product name; `shop` (~$0.04 for all three marketplaces) additionally runs that name through Google Shopping, Amazon, and eBay for a price comparison.
+
+The lens engine itself only accepts a publicly reachable http(s) URL (SerpAPI fetches the image; data URIs are rejected), so the MCP tool takes the image as exactly one of three inputs: `image_url` (used as-is), `image_path` (local file), or `image_base64` (raw or data URI). Local files and base64 are first uploaded, free, to xona's public image host (JPEG/PNG/GIF/WebP, type sniffed from magic bytes, 25MB cap) and the hosted URL is echoed back as `hosted_image_url` for reuse. This is what makes images from chat clients that upload attachments (Hermes and friends) work: bytes in, public URL bridged automatically.
+
+MCP: `xpay_shop_lens` (paid) / `xpay_shop_lens_quote` (free preflight: validates an image URL is publicly reachable and reports the exact price, no wallet). Agents should quote first when passing `image_url`, since the paid door charges even when the URL turns out to be unusable; uploads need no preflight because the hosted URL is always reachable. If the response flags the image as not a product photo, a `mode=shop` retry will not help.
 
 ## Multi-network
 
