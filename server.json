@@ -7,13 +7,13 @@
     "source": "github"
   },
   "websiteUrl": "https://xpay.xona-agent.com",
-  "version": "0.2.23",
+  "version": "0.2.24",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@xona-labs/xpay",
-      "version": "0.2.23",
+      "version": "0.2.24",
       "transport": {
         "type": "stdio"
       },
@@ -69,7 +69,7 @@
         },
         {
           "name": "XPAY_EVM_NETWORK",
-          "description": "EVM network for XPAY_EVM_KEY (e.g. base, base-sepolia)",
+          "description": "EVM network for XPAY_EVM_KEY (e.g. base, stable, base-sepolia)",
           "isRequired": false,
           "format": "string",
           "isSecret": false
