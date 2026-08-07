@@ -1,5 +1,5 @@
 /**
- * `xpay balance` — show USDC balance per network for the active profile.
+ * `xpay balance` - show USDC balance per network for the active profile.
  *
  * Unlocks the active profile (prompts for passphrase if encrypted, unless
  * $XPAY_PASSPHRASE is set for non-interactive use), then queries each
@@ -25,7 +25,7 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
   const signers = signersFromProfile(profile);
   // Robinhood Chain and Stable always have a signer (see signersFromProfile)
   // even when they're not in the profile's `networks`, so surface them in the
-  // default view too — handy as the deposit address for funding trades and
+  // default view too - handy as the deposit address for funding trades and
   // for /stable/* x402 calls.
   const configured = profile.config.networks;
   const networks = opts.network
@@ -55,7 +55,7 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
       // lookup (Solana only; EVM balances pass through unchanged).
       let tokens = net === "solana" ? await enrichTokenBalances(raw) : raw;
       // Robinhood Chain: the signer only knows a hardcoded token list (WETH),
-      // so pull the wallet's full ERC-20 holdings from the chain explorer —
+      // so pull the wallet's full ERC-20 holdings from the chain explorer -
       // this is how memecoins bought via `xpay trade` show up. Keep the
       // signer's native ETH entry and take every ERC-20 from the explorer.
       if (net === "robinhood") {
@@ -73,7 +73,7 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
         const flag = t.verified === false && !t.isNative ? chalk.yellow(" ⚠ unverified") : "";
         console.log(`    ${label.padEnd(18)}  ${chalk.white(val.padEnd(14))} ${usd}${flag}`);
         // USDT0 is Stable's USDT (an ERC-20 OFT), and its native gas coin
-        // reports as USDT — both are dollars, so both count.
+        // reports as USDT - both are dollars, so both count.
         if (t.symbol === "USDC" || t.symbol === "USDT" || t.symbol === "USDT0") usdcTotal += t.balance;
         if (t.usdValue !== undefined) portfolioUsd += t.usdValue;
         else portfolioComplete = false;

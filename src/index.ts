@@ -1,5 +1,5 @@
 /**
- * @xona-labs/xpay — discovery + usage layer for agentic commerce.
+ * @xona-labs/xpay - discovery + usage layer for agentic commerce.
  *
  * Quick start:
  * ```ts
@@ -105,7 +105,7 @@ export {
 /** Options for {@link createXPay}. */
 export interface XPayOptions {
   /**
-   * A loaded profile — derives `networks`, `signers`, and `guardrail` from
+   * A loaded profile - derives `networks`, `signers`, and `guardrail` from
    * the profile's keyfile and config. Mutually exclusive with the manual
    * `networks` + `signers` shape below.
    */
@@ -126,10 +126,10 @@ export interface XPay {
   guardrail: Guardrail;
   /** Find paid services across configured catalogs. */
   discover(opts?: DiscoverOptions): Promise<Resource[]>;
-  /** Call a specific resource — handles payment + retry. */
+  /** Call a specific resource - handles payment + retry. */
   use(resource: Resource, opts?: { body?: unknown; headers?: Record<string, string> }): Promise<UseResult>;
   /**
-   * Call any URL that supports x402 — even one not in the catalog. Probes the
+   * Call any URL that supports x402 - even one not in the catalog. Probes the
    * URL, follows the 402 challenge, settles, retries.
    */
   useByUrl(url: string, opts?: { method?: string; body?: unknown; headers?: Record<string, string> }): Promise<UseResult>;
@@ -140,7 +140,7 @@ export interface XPay {
   /**
    * Direct token transfer (no x402). Subject to the same guardrail.
    * Solana: USDC, USDT, wSOL, BONK, JUP, PYTH, or any mint address.
-   * EVM: the network's stablecoin only — USDC, or USDT0 on Stable.
+   * EVM: the network's stablecoin only - USDC, or USDT0 on Stable.
    * Pass private:true for MagicBlock PER privacy (Solana only).
    */
   transfer(args: { amount: number; to: string; network?: Network; token?: string; private?: boolean }): Promise<TransferResult>;
@@ -148,12 +148,12 @@ export interface XPay {
   findTokens(query: string, opts?: { limit?: number }): Promise<TokenInfo[]>;
   /** List tradable RWA tokens on Solana (tokenized stocks/ETFs + USDY). Read-only, no signing. */
   findRwaTokens(opts?: RwaFindOptions): Promise<RwaToken[]>;
-  /** Quote a swap without executing — no guardrail, no signing, no funds moved. */
+  /** Quote a swap without executing - no guardrail, no signing, no funds moved. */
   swapQuote(args: { amount: number; from: string; to: string; slippageBps?: number }): Promise<SwapQuote>;
   /** Swap tokens inside the wallet (Solana only, Jupiter). Subject to the guardrail. */
   swap(args: { amount: number; from: string; to: string; slippageBps?: number }): Promise<SwapResult>;
   /**
-   * Quote a Robinhood Chain trade without executing — no guardrail, no signing.
+   * Quote a Robinhood Chain trade without executing - no guardrail, no signing.
    * `from`/`to` are "ETH" or an ERC-20 address / trending symbol (one must be ETH).
    */
   tradeQuote(args: { amount: number; from: string; to: string; slippageBps?: number }): Promise<TradeQuote>;
@@ -188,7 +188,7 @@ export function createXPay(options: XPayOptions): XPay {
     // Bento intent firewall: thread the enable flag into the guardrail and
     // expose the wallet key to @bentoguard/sdk, which reads it from
     // AGENT_WALLET_PRIVATE_KEY. Bento authenticates by signing a challenge
-    // with this key — there is no separate API key.
+    // with this key - there is no separate API key.
     if (options.profile.config.bento?.enabled) {
       guardrailConfig = { ...guardrailConfig, bento: { enabled: true } };
       if (!process.env.AGENT_WALLET_PRIVATE_KEY) {

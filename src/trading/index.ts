@@ -1,15 +1,15 @@
 /**
- * Robinhood Chain token trading — direct Uniswap V3 (NOXA Fun launchpad).
+ * Robinhood Chain token trading - direct Uniswap V3 (NOXA Fun launchpad).
  *
  * NOXA Fun tokens (fun.noxa.fi) launch straight into Uniswap V3 pools quoted
  * in WETH, so trading them is plain V3: quote via QuoterV2, execute via
- * SwapRouter02. No third-party API or key — everything is on-chain against the
+ * SwapRouter02. No third-party API or key - everything is on-chain against the
  * chain's own RPC. GMGN was ruled out (no chain-4663 support, gated API).
  *
  * Scope v1: ETH ⇄ token only (buy with native ETH, sell back to native ETH).
  * The router auto-wraps ETH on buys; sells unwrap WETH → ETH via multicall.
  *
- * A trade is irreversible and risks wallet value, so — exactly like `swap` —
+ * A trade is irreversible and risks wallet value, so, exactly like `swap`, 
  * it runs through the guardrail *before* signing.
  */
 
@@ -33,7 +33,7 @@ export const RH_CONTRACTS = {
 /** Fee tiers probed (in bps*100) when the pool fee isn't known up front. NOXA uses 10000 (1%). */
 const FEE_TIERS = [10000, 3000, 500, 100];
 
-const DEFAULT_SLIPPAGE_BPS = 100; // 1% — memecoin pools with a 1% fee move fast.
+const DEFAULT_SLIPPAGE_BPS = 100; // 1% - memecoin pools with a 1% fee move fast.
 const MAX_SLIPPAGE_BPS = 5000; // 50% hard ceiling.
 
 const QUOTER_ABI = [
@@ -51,7 +51,7 @@ const ERC20_ABI = [
   "function allowance(address owner,address spender) view returns (uint256)",
   "function approve(address spender,uint256 amount) returns (bool)",
 ];
-// NOXA Fun token surface — non-standard getters a plain ERC-20 lacks.
+// NOXA Fun token surface - non-standard getters a plain ERC-20 lacks.
 const NOXA_TOKEN_ABI = [
   "function liquidityPool() view returns (address)",
   "function pairToken() view returns (address)",
@@ -64,7 +64,7 @@ const NOXA_TOKEN_ABI = [
 const ROUTER_ADDRESS_THIS = "0x0000000000000000000000000000000000000002";
 const NATIVE_ETH = { symbol: "ETH", decimals: 18 } as const;
 
-/** Trading settings — profile `config.trading`, overridable per call. */
+/** Trading settings - profile `config.trading`, overridable per call. */
 export interface TradeConfig {
   /** Default max slippage in bps (100 = 1%). */
   slippageBps?: number;
@@ -119,7 +119,7 @@ export interface TradeQuote {
   /** Input-side USD estimate (GeckoTerminal spot). Best-effort. */
   usdValue?: number;
   /**
-   * True when the counterparty token was NOT confirmed as a NOXA Fun launch —
+   * True when the counterparty token was NOT confirmed as a NOXA Fun launch -
    * it may still be tradeable, but treat the pool/price with more suspicion.
    */
   unverified: boolean;
@@ -132,7 +132,7 @@ export interface TradeResult extends TradeQuote {
   txHash: string;
 }
 
-/** Quote a trade without executing — no guardrail, no signing, no funds moved. */
+/** Quote a trade without executing - no guardrail, no signing, no funds moved. */
 export async function tradeQuote(args: Omit<TradeArgs, "guardrail">): Promise<TradeQuote> {
   return (await prepare(args)).quote;
 }
@@ -141,7 +141,7 @@ export async function tradeQuote(args: Omit<TradeArgs, "guardrail">): Promise<Tr
 export async function trade(args: TradeArgs): Promise<TradeResult> {
   const { quote, ethersWallet, side, token } = await prepare(args);
 
-  // Guardrail *before* signing — same security boundary as swap/pay/transfer.
+  // Guardrail *before* signing - same security boundary as swap/pay/transfer.
   // Reuse the "swap" scheme so host-whitelist is skipped and the USD estimate
   // is priced from `extra.usdEstimate` (see Guardrail.estimateUsd).
   await args.guardrail.check({
@@ -233,7 +233,7 @@ async function prepare(args: Omit<TradeArgs, "guardrail">): Promise<Prepared> {
     throw new Error(`xpay.trade: only Robinhood Chain ("robinhood") is supported (got "${network}")`);
   }
   if (!args.wallet.has(ROBINHOOD_NETWORK)) {
-    throw new Error('xpay.trade: no "robinhood" signer configured — add it to your profile networks');
+    throw new Error('xpay.trade: no "robinhood" signer configured - add it to your profile networks');
   }
   if (!Number.isFinite(args.amount) || args.amount <= 0) {
     throw new Error("xpay.trade: amount must be a positive number");
@@ -284,7 +284,7 @@ async function prepare(args: Omit<TradeArgs, "guardrail">): Promise<Prepared> {
   // A buy that would breach a cap is failed up front with a clear message
   // rather than reverting opaquely on-chain. The cap info is surfaced on the
   // quote only when this trade is actually within striking distance of a cap
-  // (>25% of it) — established tokens leave a far-future endBlock set with wide
+  // (>25% of it) - established tokens leave a far-future endBlock set with wide
   // caps, so reporting it unconditionally would be misleading noise.
   let boundRestriction: TradeRestriction | undefined;
   if (restriction && side === "buy") {
@@ -344,7 +344,7 @@ function isEth(ref: string): boolean {
 async function resolveToken(wallet: Wallet, ref: string): Promise<TradeTokenInfo> {
   let address = ref.trim();
   if (!isAddress(address)) {
-    // Treat as a symbol — resolve via GeckoTerminal trending/new pools.
+    // Treat as a symbol - resolve via GeckoTerminal trending/new pools.
     const found = await resolveTokenBySymbol(address);
     address = found.address;
   }
@@ -364,7 +364,7 @@ interface TokenMeta {
   restriction?: TradeRestriction;
 }
 
-/** Probe a token's NOXA Fun surface — pool, fee tier, launch restrictions. */
+/** Probe a token's NOXA Fun surface - pool, fee tier, launch restrictions. */
 async function inspectToken(wallet: Wallet, address: string): Promise<TokenMeta> {
   const t = new Contract(address, NOXA_TOKEN_ABI, wallet);
   try {
@@ -396,7 +396,7 @@ async function inspectToken(wallet: Wallet, address: string): Promise<TokenMeta>
     }
     return meta;
   } catch {
-    // Not a NOXA token (getters reverted) — still tradeable if a V3 pool exists.
+    // Not a NOXA token (getters reverted) - still tradeable if a V3 pool exists.
     return { isNoxa: false };
   }
 }
@@ -413,7 +413,7 @@ async function quoteBestFee(
   let lastErr: unknown;
   for (const fee of fees) {
     try {
-      // QuoterV2 quote fns are non-view (revert-to-return) — must use staticCall.
+      // QuoterV2 quote fns are non-view (revert-to-return) - must use staticCall.
       const res = await quoter.quoteExactInputSingle!.staticCall({
         tokenIn,
         tokenOut,

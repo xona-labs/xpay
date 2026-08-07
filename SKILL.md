@@ -8,9 +8,9 @@ description: >-
   or SDK.
 ---
 
-# xPay — a wallet and payment rail for agents
+# Xona Wallet: a wallet and payment rail for agents
 
-xPay lets an agent **find a service, pay for it, and get the result** without
+Xona Wallet lets an agent **find a service, pay for it, and get the result** without
 writing any payment plumbing. It hides x402, USDC, RPC, and multi-network
 routing behind a flat set of tools.
 
@@ -20,14 +20,14 @@ an intent and call it in one step).
 
 ## Setup (zero-config)
 
-Add xPay as an MCP server — no keys, no init:
+Add Xona Wallet as an MCP server - no keys, no init:
 
 ```jsonc
 { "mcpServers": { "xpay": { "command": "npx", "args": ["-y", "@xona-labs/xpay", "mcp"] } } }
 ```
 
 On first run the agent is given its **own wallet**. Its Solana address is
-printed to the server's stderr — **fund that address with USDC** and the agent
+printed to the server's stderr - **fund that address with USDC** and the agent
 can pay. The wallet persists and is reused across restarts.
 
 To use a wallet you already hold instead, set `XPAY_SOLANA_SECRET` (base58) in
@@ -41,11 +41,11 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_discover` | Find paid services by natural-language query. Returns ranked candidates with price, network, and payee. |
 | `xpay_use` | Pay for and call a specific service. Pass the full `resource` object from `xpay_discover` (preferred), or a `resourceUrl`. Handles the x402 402-challenge → pay → retry flow. |
 | `xpay_do` | One step: discover the best service for an intent **and** call it. Use when you don't need to compare options. |
-| `xpay_transfer` | Send USDC (or any Solana SPL token, or USDT0 on Stable) directly to an address. Executes immediately, gated by the user's guardrail — confirm amount + destination with the user before calling. |
+| `xpay_transfer` | Send USDC (or any Solana SPL token, or USDT0 on Stable) directly to an address. Executes immediately, gated by the user's guardrail - confirm amount + destination with the user before calling. |
 | `xpay_token_find` | Find Solana tokens by ticker, name, or mint (price, mcap, liquidity, `verified` flag). Read-only. |
 | `xpay_rwa_find` | List tradable RWA tokens on Solana: tokenized stocks/ETFs (xStocks, Ondo, Remora) + treasury-backed USDY. Free, read-only; results swappable via `xpay_swap`. |
 | `xpay_swap` | Swap tokens inside the wallet via Jupiter (Solana only). Irreversible; guardrail-gated. Confirm with the user first. |
-| `xpay_x_user` | Realtime X (Twitter) profile — followers, bio, verification. Paid (~$0.01 at cost via x402). |
+| `xpay_x_user` | Realtime X (Twitter) profile - followers, bio, verification. Paid (~$0.01 at cost via x402). |
 | `xpay_x_posts` | Recent posts from an X account with engagement metrics. Paid (~$0.06 at cost via x402). |
 | `xpay_shop_quote` | Free preflight for product search: exact price, marketplaces it would hit, and whether the query parses as a product search. Quote first when a query is ambiguous. |
 | `xpay_shop_search` | Product discovery across Google Shopping, Amazon, and eBay from one free-text query: normalized, deduped, ranked. Paid (~$0.02 via x402, less for fewer marketplaces). |
@@ -55,73 +55,73 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_agenc_status` | Check the progress of an AgenC marketplace hire (see below). Read-only. |
 | `xpay_bento_status` | Check whether the Bento intent firewall is on (read-only). |
 | `xpay_bento_enable` | Turn the Bento intent firewall on. Returns the agent wallet address to register at app.bentoguard.xyz. |
-| `xpay_bento_disable` | Turn the Bento firewall off — use if the wallet isn't registered and payments are rejected. |
+| `xpay_bento_disable` | Turn the Bento firewall off - use if the wallet isn't registered and payments are rejected. |
 
 ## How payment works
 
 Services price calls in **USDC** over the **x402** protocol (typically fractions
 of a cent to a few cents per call). `xpay_use` / `xpay_do` settle the payment
-and call the service in one round-trip — the agent just receives the result. A
+and call the service in one round-trip - the agent just receives the result. A
 small platform fee ($0.01 USDC) applies per paid call.
 
-When a service accepts more than one network (e.g. Base **and** Solana), xPay
-**routes automatically to a funded network** — it pays from the first one whose
+When a service accepts more than one network (e.g. Base **and** Solana), Xona Wallet
+**routes automatically to a funded network** - it pays from the first one whose
 balance covers the cost, so a $0 Base wallet falls through to a funded Solana
 one. If no network has the funds, the call fails fast with a clear
 "insufficient balance" message naming each network's balance.
 
 Networks the wallet can pay from: Solana, Base and the other EVM chains,
 Robinhood Chain, and **Stable** (chain 988, Tether's payments L1). Stable
-settles in **USDT0**, not USDC — one derived EVM key covers it, so it is
+settles in **USDT0**, not USDC - one derived EVM key covers it, so it is
 always available and needs no setup. Fund it with USDT0; payments there are
 gasless, so no native gas token is needed to pay.
 
 The agent pays from its own wallet, so **it must be funded first**. If a call
 fails for lack of funds, ask the user to send the right stablecoin to the
-matching address from `xpay_balance` — USDC on Solana mainnet or Base, USDT0
+matching address from `xpay_balance` - USDC on Solana mainnet or Base, USDT0
 on Stable.
 
-## AgenC marketplace listings — a different execution rail
+## AgenC marketplace listings - a different execution rail
 
 `xpay_discover` results may include **AgenC marketplace** listings
-(`metadata.source === "agenc"`) — on-chain agent services priced in **SOL**,
+(`metadata.source === "agenc"`) - on-chain agent services priced in **SOL**,
 not USDC. Calling `xpay_use` on one is detected automatically and runs a
 Solana **escrow hire** instead of an HTTP payment:
 
 - The listing's SOL price is escrowed on-chain; the wallet needs **SOL**, not
   USDC, for these.
 - The result is a **hire receipt** (`data.kind === "agenc-hire-receipt"` with
-  `task`, `txSig`, `explorer`), **not** the service's output — the provider
+  `task`, `txSig`, `explorer`), **not** the service's output - the provider
   works asynchronously.
 - Poll `xpay_agenc_status { taskPda }` to track progress:
   `open/claimed → review → settled`. A just-created task can 404 for ~a minute
   (the API snapshot lags); retry, don't treat it as failure.
 - Tell the user the work is in progress and how to review it
-  (https://agenc.ag/tasks/<taskPda>) — escrow only settles after their review
+  (https://agenc.ag/tasks/<taskPda>) - escrow only settles after their review
   window.
 
 The guardrail still applies (SOL converted to USD at spot, checked before
 signing), and hires never auto-release funds without the buyer's acceptance.
 
-## Safety — built in, respect it
+## Safety - built in, respect it
 
 - **Spending guardrail.** Per-tx and per-day USD caps and an allowed-host list
   are enforced *before* signing. A blocked call throws; don't try to route
-  around it — surface the limit to the user.
+  around it - surface the limit to the user.
 - **Transfers and swaps move real funds immediately.** Show the user the
   amount + destination (or the swap pair, USD value, and output-token mint)
   and get their explicit approval *before* calling `xpay_transfer` or
   `xpay_swap`. Never move funds unprompted. The guardrail enforces the user's
   caps before signing either way.
 - **Check token verification.** Before any swap, confirm the output token's
-  `verified` flag from `xpay_token_find` — unverified tokens can be scams
+  `verified` flag from `xpay_token_find` - unverified tokens can be scams
   reusing a real ticker. Never swap into an unverified token unless the user
   explicitly confirms the exact mint address.
 - **Bento intent firewall (optional security layer).** When enabled, every
   payment is screened for malicious intent (prompt-injection, wallet-drain)
   before signing. A `BLOCKED` result means stop. Toggle with
   `xpay_bento_enable` / `xpay_bento_disable`; it needs a one-time wallet
-  registration at app.bentoguard.xyz, and until then payments are rejected —
+  registration at app.bentoguard.xyz, and until then payments are rejected -
   disable it to fall back to local caps if you don't want to register.
 
 ## Recipes
@@ -144,11 +144,11 @@ signing), and hires never auto-release funds without the buyer's acceptance.
 
 **Send funds (with approval)**
 1. Confirm the amount + destination with the user
-2. `xpay_transfer { amount: 5, to: "<address>", token: "USDC" }` — executes directly, guardrail-gated
+2. `xpay_transfer { amount: 5, to: "<address>", token: "USDC" }` - executes directly, guardrail-gated
 
 **Find and swap into a token (with approval)**
 1. `xpay_token_find { query: "BONK" }` → pick the intended token, check `verified`
-2. Show the user: amount, USD value, output token name + mint + verification — get approval
+2. Show the user: amount, USD value, output token name + mint + verification - get approval
 3. `xpay_swap { amount: 0.5, from: "SOL", to: "<mint from step 1>" }`
 
 **Token due diligence with X (Twitter)**

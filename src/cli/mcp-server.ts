@@ -1,7 +1,7 @@
 /**
  * xPay MCP server.
  *
- * Exposes every CLI capability as an MCP tool over stdio. Zero-config — drop
+ * Exposes every CLI capability as an MCP tool over stdio. Zero-config - drop
  * this into any Claude Desktop / Cursor / Codex / agent-framework config and
  * on first boot the agent is given its own persistent wallet:
  *
@@ -14,7 +14,7 @@
  *     }
  *   }
  *
- * The generated wallet's address is printed to stderr on first run — fund the
+ * The generated wallet's address is printed to stderr on first run - fund the
  * Solana address with USDC to let the agent pay. It persists under ~/.xpay and
  * is reused on every later boot.
  *
@@ -49,7 +49,7 @@ export async function startMcpServer(): Promise<void> {
   // Boot must not throw: a crash here kills the stdio transport and the host
   // only shows "Connection closed" with no way to recover. When the wallet
   // can't be unlocked (encrypted profile, no/wrong passphrase) we start in a
-  // locked state instead — tools are listed, and every call returns the
+  // locked state instead - tools are listed, and every call returns the
   // unlock instructions for the agent to relay to the user.
   let xpay: XPay;
   let profileName: string | null = null;
@@ -58,7 +58,7 @@ export async function startMcpServer(): Promise<void> {
     ({ xpay, profileName } = await buildXPay());
   } catch (err) {
     lockedReason = lockedBootMessage(err as Error);
-    process.stderr.write(`[xpay-mcp] wallet locked — starting in locked mode.\n[xpay-mcp] ${lockedReason}\n`);
+    process.stderr.write(`[xpay-mcp] wallet locked - starting in locked mode.\n[xpay-mcp] ${lockedReason}\n`);
     // Placeholder client: tool construction never touches it (all access is
     // inside handler closures) and calls short-circuit on lockedReason below.
     xpay = new Proxy({} as XPay, {
@@ -70,12 +70,12 @@ export async function startMcpServer(): Promise<void> {
   const sanaApiKey = await resolveSanaApiKey();
   const { tools, handlers } = forClaude(xpay, { sanaApiKey });
 
-  // Note: xpay_transfer executes directly (via the forClaude handler) — the same
+  // Note: xpay_transfer executes directly (via the forClaude handler) - the same
   // path as the CLI. We deliberately do NOT stage transfers behind a second
   // "confirm" tool call: that relied on the agent faithfully making a follow-up
   // call, which weaker models skip while hallucinating a success + fake tx hash.
   // The real spending gate is the guardrail (caps + requireApprovalAbove), which
-  // surfaces as a Touch ID prompt on MCP when biometric unlock is enabled — a
+  // surfaces as a Touch ID prompt on MCP when biometric unlock is enabled - a
   // gate the model can't fake or skip.
 
   const mcpTools = [
@@ -92,7 +92,7 @@ export async function startMcpServer(): Promise<void> {
       description:
         "Turn ON the Bento intent firewall for this agent's wallet. Returns the agent wallet " +
         "address, which must be registered once at app.bentoguard.xyz (logging in with the " +
-        "owner wallet) before protection takes effect — until then payments are rejected.",
+        "owner wallet) before protection takes effect - until then payments are rejected.",
       inputSchema: { type: "object", properties: {} },
     },
     {
@@ -145,7 +145,7 @@ export async function startMcpServer(): Promise<void> {
       agentWallet: agentSolanaAddress(),
       action_required:
         `Register this agent wallet at ${BENTO_DASHBOARD} (log in with your owner wallet). ` +
-        `Until it's registered, payments are rejected with "Agent not found" — call ` +
+        `Until it's registered, payments are rejected with "Agent not found" - call ` +
         `xpay_bento_disable to fall back to local caps if you don't want to register.`,
     };
   };
@@ -219,7 +219,7 @@ async function buildXPay(): Promise<{ xpay: XPay; profileName: string | null }> 
     // Expose the agent's own key so a runtime `xpay_bento_enable` can activate
     // protect() without a restart. In-process only; it's the wallet's own key.
     process.env.AGENT_WALLET_PRIVATE_KEY ??= deriveKeysFromMnemonic(profile.mnemonic).solana.secretKeyBase58;
-    // No TTY here — approvals above the guardrail threshold surface as a
+    // No TTY here - approvals above the guardrail threshold surface as a
     // system Touch ID dialog when the profile has biometric unlock enabled.
     const xpay = createXPay({ profile, guardrail: guardrailWithApproval(profile, { interactive: false }) });
     return { xpay, profileName };
@@ -236,7 +236,7 @@ async function buildXPay(): Promise<{ xpay: XPay; profileName: string | null }> 
     signers[evmNet] = rawEvmSigner({ privateKey: process.env.XPAY_EVM_KEY, network: evmNet });
   }
   if (Object.keys(signers).length === 0) {
-    // Nothing configured — give the agent its own wallet (zero-config
+    // Nothing configured - give the agent its own wallet (zero-config
     // onboarding). Opt out with XPAY_NO_AUTO_WALLET for the strict behaviour.
     if (!process.env.XPAY_NO_AUTO_WALLET) {
       return autoProvisionXPay(profileName);
@@ -248,7 +248,7 @@ async function buildXPay(): Promise<{ xpay: XPay; profileName: string | null }> 
     );
   }
   // Raw-key mode: no profile on disk, so bento's profile-gated flag can't be
-  // toggled — profileName is null and the bento tools report that.
+  // toggled - profileName is null and the bento tools report that.
   const xpay = createXPay({
     networks,
     signers,
@@ -265,25 +265,25 @@ async function buildXPay(): Promise<{ xpay: XPay; profileName: string | null }> 
  * Zero-config onboarding: no profile and no key configured, so generate a
  * fresh wallet for the agent, persist it under ~/.xpay (or XPAY_HOME), and
  * surface the address. Encrypted when XPAY_PASSPHRASE is set, otherwise
- * plaintext (file-permission protected) — fine for a low-balance agent wallet.
+ * plaintext (file-permission protected) - fine for a low-balance agent wallet.
  *
  * Runs once: the next boot finds the profile and loads it via the normal path,
  * so the agent keeps the same address across restarts. All notices go to
- * stderr — stdout is the MCP JSON-RPC channel and must stay clean.
+ * stderr - stdout is the MCP JSON-RPC channel and must stay clean.
  */
 async function autoProvisionXPay(profileName: string): Promise<{ xpay: XPay; profileName: string }> {
   const passphrase = process.env.XPAY_PASSPHRASE || undefined;
   const created = await initProfile({ name: profileName, passphrase });
 
   process.stderr.write(
-    `\n[xpay-mcp] No wallet found — generated one for this agent.\n` +
+    `\n[xpay-mcp] No wallet found - generated one for this agent.\n` +
       `[xpay-mcp]   profile:  ${profileName}\n` +
       `[xpay-mcp]   Solana:   ${created.addresses.solana}\n` +
       `[xpay-mcp]   Base/EVM: ${created.addresses.evm}\n` +
       `[xpay-mcp]   stored:   ${created.path}` +
-      (passphrase ? " (encrypted)\n" : " (UNENCRYPTED — set XPAY_PASSPHRASE to encrypt at rest)\n") +
+      (passphrase ? " (encrypted)\n" : " (UNENCRYPTED - set XPAY_PASSPHRASE to encrypt at rest)\n") +
       `[xpay-mcp] Fund the Solana address with USDC so the agent can pay.\n` +
-      `[xpay-mcp] The recovery phrase lives in ${created.path} — back it up.\n\n`,
+      `[xpay-mcp] The recovery phrase lives in ${created.path} - back it up.\n\n`,
   );
 
   const profile = await loadProfile({ name: profileName, passphrase });
@@ -300,19 +300,19 @@ async function autoProvisionXPay(profileName: string): Promise<{ xpay: XPay; pro
 async function resolveSanaApiKey(): Promise<string | undefined> {
   try {
     const profileName = process.env.XPAY_PROFILE ?? getActiveProfile();
-    // config.json is plaintext — no need to unlock the wallet to read it.
+    // config.json is plaintext - no need to unlock the wallet to read it.
     const { readProfileConfig } = await import("../profile/index.js");
     const key = readProfileConfig(profileName).sana?.apiKey;
     if (key) return key;
   } catch {
-    // profile not found — fall through to env
+    // profile not found - fall through to env
   }
   return process.env.SANABOT_API_KEY || undefined;
 }
 
 /**
  * Turn a boot failure into the message locked-mode tools return. The agent
- * relays this to the user, so it has to carry the full remediation — the
+ * relays this to the user, so it has to carry the full remediation - the
  * user never sees stderr in an MCP host.
  */
 function lockedBootMessage(err: Error): string {
@@ -329,7 +329,7 @@ function lockedBootMessage(err: Error): string {
     return (
       `The xpay wallet profile "${profileName}" is encrypted and no passphrase was provided, ` +
       `so wallet tools are locked. ${unlockHint}\n` +
-      `If the passphrase is lost, the wallet cannot be decrypted — restore from the recovery ` +
+      `If the passphrase is lost, the wallet cannot be decrypted - restore from the recovery ` +
       `phrase with \`npx @xona-labs/xpay init --overwrite\`, or delete the profile directory ` +
       `to start fresh (funds at the old address are only recoverable with the phrase).`
     );
@@ -347,7 +347,7 @@ function lockedBootMessage(err: Error): string {
 }
 
 /**
- * Touch ID unlock at MCP startup — lets hosts omit XPAY_PASSPHRASE from
+ * Touch ID unlock at MCP startup - lets hosts omit XPAY_PASSPHRASE from
  * their config when the profile has `xpay biometric enable` set. Shows one
  * system dialog as the server boots; resolves undefined on any failure so
  * loadProfile produces its normal "passphrase required" error.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * xpay CLI — agentic-commerce wallet.
+ * xpay CLI - agentic-commerce wallet.
  *
  * Top-level commands:
  *   xpay init [--import] [--no-encrypt] [--workspace]
@@ -11,7 +11,7 @@
  * More to come: discover, pay, transfer, history, bridge, guardrail, link.
  *
  * Designed to also run as the MCP server entry point (the `bin` field points
- * here) — invoking `xpay-mcp` directly defaults to the `mcp` subcommand.
+ * here) - invoking `xpay-mcp` directly defaults to the `mcp` subcommand.
  */
 
 import "dotenv/config";
@@ -55,7 +55,7 @@ const program = new Command();
 
 program
   .name("xpay")
-  .description("xPay — discovery, payments, and wallet for agentic commerce.")
+  .description("xPay - discovery, payments, and wallet for agentic commerce.")
   .version(pkgVersion);
 
 // ---------------------------------------------------------------- init
@@ -110,7 +110,7 @@ program
   .description("Pay an x402 endpoint (catalog URL or any URL that returns 402).")
   .option("--profile <name>", "Profile to pay from (defaults to active)")
   .option("--passphrase <value>", "Non-interactive passphrase")
-  .option("--method <m>", "HTTP method (default GET — use POST for most x402 services)")
+  .option("--method <m>", "HTTP method (default GET - use POST for most x402 services)")
   .option("--max-usd <n>", "Override per-tx guardrail cap for this call")
   .option("--body <json>", "Request body for POST endpoints (JSON)")
   .option("-y, --yes", "Skip the confirmation prompt")
@@ -159,7 +159,7 @@ token
 // ---------------------------------------------------------------- x (Twitter)
 const xcmd = program
   .command("x")
-  .description("Realtime X (Twitter) account data — paid via x402 at cost (no X account needed).");
+  .description("Realtime X (Twitter) account data - paid via x402 at cost (no X account needed).");
 
 xcmd
   .command("user <handle>")
@@ -187,7 +187,7 @@ xcmd
 // ---------------------------------------------------------------- zauth
 const zauth = program
   .command("zauth")
-  .description("zauth partner — repository security scans, paid via x402.");
+  .description("zauth partner - repository security scans, paid via x402.");
 
 zauth
   .command("reposcan <repoUrl>")
@@ -353,7 +353,7 @@ const sana = program
 
 sana
   .command("link <apiKey>")
-  .description("Link a Sana API key — enables sana_* tools in the MCP server.")
+  .description("Link a Sana API key - enables sana_* tools in the MCP server.")
   .option("--profile <name>", "Profile to link to (defaults to active)")
   .action((apiKey: string, opts) => runSanaLink(apiKey, opts));
 
@@ -371,7 +371,7 @@ sana
 
 sana
   .command("card")
-  .description("Card metadata — status, type, last 4, expiry.")
+  .description("Card metadata - status, type, last 4, expiry.")
   .option("--profile <name>")
   .action((opts) => runSanaCard(opts));
 
@@ -421,7 +421,7 @@ sana
 // ---------------------------------------------------------------- bento
 const bento = program
   .command("bento")
-  .description("Bento Guard intent firewall — screen payments for malicious intent (optional).");
+  .description("Bento Guard intent firewall - screen payments for malicious intent (optional).");
 
 bento
   .command("status", { isDefault: true })
@@ -437,14 +437,14 @@ bento
 
 bento
   .command("disable")
-  .description("Disable Bento intent screening — payments rely on local caps only.")
+  .description("Disable Bento intent screening - payments rely on local caps only.")
   .option("--profile <name>", "Profile to disable (defaults to active)")
   .action((opts) => runBentoDisable(opts));
 
 // ---------------------------------------------------------------- magicblock
 const magicblock = program
   .command("magicblock")
-  .description("MagicBlock Private Ephemeral Rollup — platform-level privacy setup (operator commands).");
+  .description("MagicBlock Private Ephemeral Rollup - platform-level privacy setup (operator commands).");
 
 magicblock
   .command("status", { isDefault: true })
@@ -473,7 +473,7 @@ magicblock
 // ---------------------------------------------------------------- agenc
 const agenc = program
   .command("agenc")
-  .description("AgenC marketplace (agenc.ag) — hire on-chain agent services with SOL escrow.");
+  .description("AgenC marketplace (agenc.ag) - hire on-chain agent services with SOL escrow.");
 
 agenc
   .command("hire <listingPda>")

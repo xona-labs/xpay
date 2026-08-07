@@ -1,5 +1,5 @@
 /**
- * `xpay zauth <reposcan|status>` — repository security scans via partner
+ * `xpay zauth <reposcan|status>` - repository security scans via partner
  * zauth's x402-paywalled endpoint. The scan POST is paid from the active
  * profile's wallet through the normal x402 flow (guardrail included);
  * status polling is free and needs no wallet.
@@ -57,9 +57,9 @@ export async function runZauthScan(repoUrl: string, opts: ZauthCmdOptions): Prom
   }
 
   if (isScanPending(data)) {
-    // Poll responses don't echo the sessionToken — keep the kickoff's copy.
+    // Poll responses don't echo the sessionToken - keep the kickoff's copy.
     const sessionToken = data.sessionToken;
-    console.log(chalk.dim(`  Scan started — session ${sessionToken}`));
+    console.log(chalk.dim(`  Scan started - session ${sessionToken}`));
     console.log(chalk.dim("  Waiting for results (status checks are free)…"));
     try {
       data = await pollRepoScan(sessionToken, { timeoutMs: 180_000 });
@@ -87,7 +87,7 @@ export async function runZauthStatus(sessionToken: string, opts: ZauthCmdOptions
   }
 
   if (isScanning(data)) {
-    console.log(chalk.yellow(`Still scanning (session ${sessionToken}) — try again in a bit.`));
+    console.log(chalk.yellow(`Still scanning (session ${sessionToken}) - try again in a bit.`));
     return;
   }
 
@@ -95,7 +95,7 @@ export async function runZauthStatus(sessionToken: string, opts: ZauthCmdOptions
 }
 
 // Completed reports carry `zauthScore` + `analysisMarkdown` (the human
-// summary) plus a bulky `matches` array with full file contents — show the
+// summary) plus a bulky `matches` array with full file contents - show the
 // summary, keep the bulk behind --json.
 function render(data: unknown, opts: ZauthCmdOptions): void {
   if (opts.json) {

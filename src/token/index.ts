@@ -1,8 +1,8 @@
 /**
- * Solana token discovery — Jupiter Token API v2.
+ * Solana token discovery - Jupiter Token API v2.
  *
  * Keyless read-only search by ticker, name, or mint address. Returns live
- * market data (price, mcap, liquidity) plus Jupiter's verification flag —
+ * market data (price, mcap, liquidity) plus Jupiter's verification flag -
  * the main scam signal agents must check before swapping (anyone can mint a
  * token reusing a real project's ticker).
  */
@@ -13,7 +13,7 @@ import { SOLANA_TOKENS } from "../transfer/index.js";
 
 const DEFAULT_ENDPOINT = "https://api.jup.ag";
 
-/** Wrapped-SOL mint — Jupiter's sentinel for native SOL (wraps/unwraps automatically). */
+/** Wrapped-SOL mint - Jupiter's sentinel for native SOL (wraps/unwraps automatically). */
 export const NATIVE_SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export interface TokenInfo {
@@ -21,7 +21,7 @@ export interface TokenInfo {
   symbol: string;
   name: string;
   decimals: number;
-  /** Jupiter verification — unverified tokens can be scams reusing a real ticker. */
+  /** Jupiter verification - unverified tokens can be scams reusing a real ticker. */
   verified: boolean;
   usdPrice?: number;
   mcap?: number;
@@ -42,7 +42,7 @@ export interface TokenApiOptions {
   apiKey?: string;
 }
 
-/** Thrown when a bare ticker matches several plausible tokens — retry with the exact mint. */
+/** Thrown when a bare ticker matches several plausible tokens - retry with the exact mint. */
 export class AmbiguousTokenError extends Error {
   readonly candidates: TokenInfo[];
   constructor(input: string, candidates: TokenInfo[]) {
@@ -50,7 +50,7 @@ export class AmbiguousTokenError extends Error {
       .map((c) => `  ${c.symbol} (${c.name}) mint ${c.mint}${c.verified ? " [verified]" : " [UNVERIFIED]"} liquidity $${Math.round(c.liquidity ?? 0).toLocaleString()}`)
       .join("\n");
     super(
-      `Token "${input}" is ambiguous — pass the exact mint address of the one you mean:\n${list}`,
+      `Token "${input}" is ambiguous - pass the exact mint address of the one you mean:\n${list}`,
     );
     this.name = "AmbiguousTokenError";
     this.candidates = candidates;
@@ -59,7 +59,7 @@ export class AmbiguousTokenError extends Error {
 
 /**
  * Search tokens by ticker, name, or mint. Ranked verified-first, then by
- * liquidity. Read-only — no wallet, no signing.
+ * liquidity. Read-only - no wallet, no signing.
  */
 export async function findTokens(
   query: string,
@@ -83,7 +83,7 @@ export async function findTokens(
 
 /**
  * Deterministic single-token resolution for trading. Accepts a symbol or a
- * mint address; never silently picks between plausible candidates — throws
+ * mint address; never silently picks between plausible candidates - throws
  * {@link AmbiguousTokenError} instead so the caller can pass the exact mint.
  */
 export async function resolveTradeToken(input: string, opts: TokenApiOptions = {}): Promise<TokenInfo> {
@@ -96,7 +96,7 @@ export async function resolveTradeToken(input: string, opts: TokenApiOptions = {
   }
 
   // Well-known symbols pin to a canonical mint (avoids the ~20 lookalike
-  // "BONK"s Jupiter returns) — then still fetch live data by that mint.
+  // "BONK"s Jupiter returns) - then still fetch live data by that mint.
   const pinned = SOLANA_TOKENS[key] ?? Object.values(SOLANA_TOKENS).find((t) => t.symbol.toUpperCase() === key);
   if (pinned) {
     const [info] = await searchJupiter(pinned.mint, opts);
@@ -127,7 +127,7 @@ export async function resolveTradeToken(input: string, opts: TokenApiOptions = {
     throw new AmbiguousTokenError(input, sorted.slice(0, 5));
   }
   if (symbolMatches.length > 0) {
-    // Only unverified candidates — never auto-trade those by ticker.
+    // Only unverified candidates - never auto-trade those by ticker.
     throw new AmbiguousTokenError(
       input,
       symbolMatches.sort((a, b) => (b.liquidity ?? 0) - (a.liquidity ?? 0)).slice(0, 5),
@@ -135,7 +135,7 @@ export async function resolveTradeToken(input: string, opts: TokenApiOptions = {
   }
 
   throw new Error(
-    `Unknown token "${input}" — no exact ticker match on Jupiter. ` +
+    `Unknown token "${input}" - no exact ticker match on Jupiter. ` +
       `Try \`xpay token find ${input}\` to search, or pass the mint address directly.`,
   );
 }
@@ -156,7 +156,7 @@ export interface EnrichedTokenBalance {
 /**
  * Label and price wallet balances via one batched Jupiter lookup (comma-
  * separated mints, max 100). Unknown mints get their real symbol/name; every
- * priceable token gets `usdPrice`/`usdValue`. Never throws — on any Jupiter
+ * priceable token gets `usdPrice`/`usdValue`. Never throws - on any Jupiter
  * failure the input balances are returned unchanged (a balance display must
  * not break because a market-data API hiccuped).
  */
@@ -276,7 +276,7 @@ export async function jupiterFetch(url: string, apiKey?: string, init?: RequestI
         reason = body?.error ?? body?.errorMessage ?? "";
       } catch { /* no body */ }
       throw new Error(
-        `Jupiter API ${res.status} ${res.statusText}${reason ? ` — ${reason}` : ""}` +
+        `Jupiter API ${res.status} ${res.statusText}${reason ? ` - ${reason}` : ""}` +
           (res.status === 429 ? " (rate-limited; set JUPITER_API_KEY for higher limits)" : ""),
       );
     }
@@ -292,7 +292,7 @@ function fallbackToken(mint: string, decimals: number): TokenInfo {
   return { mint, symbol: mint.slice(0, 6) + "…", name: "", decimals, verified: false };
 }
 
-/** Last resort for mints Jupiter has never indexed — decimals from chain, no price. */
+/** Last resort for mints Jupiter has never indexed - decimals from chain, no price. */
 async function onChainToken(mint: string): Promise<TokenInfo> {
   const rpc = process.env.XPAY_SOLANA_RPC ?? "https://solana-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ";
   try {
@@ -301,7 +301,7 @@ async function onChainToken(mint: string): Promise<TokenInfo> {
     return fallbackToken(mint, info.decimals);
   } catch {
     throw new Error(
-      `Token mint ${mint} not found on Jupiter or on-chain — check the address.`,
+      `Token mint ${mint} not found on Jupiter or on-chain - check the address.`,
     );
   }
 }

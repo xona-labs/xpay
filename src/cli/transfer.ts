@@ -1,5 +1,5 @@
 /**
- * `xpay transfer <amount> <token> <to>` — send SPL tokens or USDC.
+ * `xpay transfer <amount> <token> <to>` - send SPL tokens or USDC.
  *
  * Examples:
  *   xpay transfer 5 USDC 7G73PL...gC

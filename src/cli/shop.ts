@@ -1,5 +1,5 @@
 /**
- * `xpay shop <search|quote>` — product discovery across Google Shopping,
+ * `xpay shop <search|quote>` - product discovery across Google Shopping,
  * Amazon, and eBay via xona's x402-paywalled /shop/search endpoint. The
  * search POST is paid from the active profile's wallet through the normal
  * x402 flow (guardrail included); the quote preflight is free and needs no

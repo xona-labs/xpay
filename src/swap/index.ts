@@ -1,12 +1,12 @@
 /**
- * Native Solana token swap — Jupiter Swap API v2 (order → sign → execute).
+ * Native Solana token swap - Jupiter Swap API v2 (order → sign → execute).
  *
  * Swaps happen inside the user's own xpay wallet (funds never leave it), but
  * a swap is irreversible and puts wallet value at risk, so it runs through
- * the same guardrail as payments and transfers — enforced *before* signing.
+ * the same guardrail as payments and transfers - enforced *before* signing.
  *
  * Jupiter's meta-aggregator picks the router (metis / jupiterz / dflow /
- * okx), returns an unsigned v0 transaction, and lands it via POST /execute —
+ * okx), returns an unsigned v0 transaction, and lands it via POST /execute -
  * no RPC broadcast on our side.
  *
  * Complements the Sana-hosted `sana_swap` (API-key wallet): this path is
@@ -28,7 +28,7 @@ import { solUsdPrice } from "../agenc/price.js";
 
 const DEFAULT_ENDPOINT = "https://api.jup.ag";
 
-/** Swap settings — profile `config.swap`, overridable per call / via env. */
+/** Swap settings - profile `config.swap`, overridable per call / via env. */
 export interface SwapConfig {
   /** Max slippage in bps (50 = 0.5%). Unset → Jupiter dynamic slippage. */
   slippageBps?: number;
@@ -67,7 +67,7 @@ export interface SwapQuote {
   router: string;
   /** Effective slippage for this order (Jupiter dynamic unless overridden). */
   slippageBps?: number;
-  /** True when the output token is not Jupiter-verified — relay this warning. */
+  /** True when the output token is not Jupiter-verified - relay this warning. */
   outputUnverified: boolean;
 }
 
@@ -79,7 +79,7 @@ export interface SwapResult extends SwapQuote {
   totalOutAmount?: number;
 }
 
-/** Quote a swap without executing — no guardrail, no signing, no funds moved. */
+/** Quote a swap without executing - no guardrail, no signing, no funds moved. */
 export async function swapQuote(args: Omit<SwapArgs, "guardrail">): Promise<SwapQuote> {
   const prepared = await prepare(args);
   return prepared.quote;
@@ -91,7 +91,7 @@ export async function swap(args: SwapArgs): Promise<SwapResult> {
   // order here rather than reusing one from an earlier swapQuote() display.
   const { quote, order, signer, apiOpts } = await prepare(args);
 
-  // Guardrail *before* signing — same security boundary as pay/transfer.
+  // Guardrail *before* signing - same security boundary as pay/transfer.
   const requirement: PaymentRequirement = {
     asset: quote.from.mint,
     payTo: quote.to.mint,
@@ -112,7 +112,7 @@ export async function swap(args: SwapArgs): Promise<SwapResult> {
   };
   await args.guardrail.check({ resource, requirement });
 
-  // Partial-sign the v0 transaction. The signer never exposes its Keypair —
+  // Partial-sign the v0 transaction. The signer never exposes its Keypair -
   // sign the serialized message and attach the signature (same pattern as
   // the native-SOL transfer). Do NOT use tx.sign(): it needs a Keypair, and
   // JupiterZ orders may get a market-maker co-signature at /execute, so only
@@ -132,10 +132,10 @@ export async function swap(args: SwapArgs): Promise<SwapResult> {
 
   if (exec.status !== "Success") {
     const landed = exec.signature
-      ? ` The transaction may have landed and reverted — check https://solscan.io/tx/${exec.signature}`
+      ? ` The transaction may have landed and reverted - check https://solscan.io/tx/${exec.signature}`
       : "";
     throw new Error(
-      `xpay.swap: execution failed (code ${exec.code ?? "?"}) — ${exec.error ?? "unknown error"}.${landed}`,
+      `xpay.swap: execution failed (code ${exec.code ?? "?"}) - ${exec.error ?? "unknown error"}.${landed}`,
     );
   }
 
@@ -161,7 +161,7 @@ interface JupiterOrderResponse {
   inUsdValue?: number;
   errorCode?: number;
   errorMessage?: string;
-  /** Top-level failure (e.g. "Failed to get quotes") — no errorCode. */
+  /** Top-level failure (e.g. "Failed to get quotes") - no errorCode. */
   error?: string;
 }
 
@@ -179,7 +179,7 @@ async function prepare(args: Omit<SwapArgs, "guardrail"> & { guardrail?: Guardra
     throw new Error("xpay.swap: amount must be a positive number");
   }
   if (!args.wallet.has("solana")) {
-    throw new Error("xpay.swap: swaps are Solana-only — no Solana signer is configured");
+    throw new Error("xpay.swap: swaps are Solana-only - no Solana signer is configured");
   }
   const signer = args.wallet.signer("solana");
 
@@ -220,7 +220,7 @@ async function prepare(args: Omit<SwapArgs, "guardrail"> & { guardrail?: Guardra
     // 2 = wallet lacks SOL for fees; 3 = wallet lacked SOL so Jupiter tried
     // the gasless route, which has a ~$5 minimum. A top-level `error` with no
     // code ("Failed to get quotes") notably happens when slippageBps is set
-    // on the keyless tier — dynamic slippage (omitting it) works.
+    // on the keyless tier - dynamic slippage (omitting it) works.
     let reason: string;
     if (order.errorCode === 1) {
       reason = `insufficient ${from.symbol} balance in the wallet`;
@@ -229,9 +229,9 @@ async function prepare(args: Omit<SwapArgs, "guardrail"> & { guardrail?: Guardra
     } else if (order.errorCode === 3) {
       reason =
         "swap is below the gasless route's ~$5 minimum. Jupiter routes gasless when the " +
-        "wallet lacks SOL for fees — fund the wallet with SOL, or swap a larger amount";
+        "wallet lacks SOL for fees - fund the wallet with SOL, or swap a larger amount";
     } else if (order.error && slippageBps !== undefined) {
-      reason = `${order.error} — try again without an explicit slippage (Jupiter picks dynamic slippage)`;
+      reason = `${order.error} - try again without an explicit slippage (Jupiter picks dynamic slippage)`;
     } else {
       reason = order.errorMessage ?? order.error ?? "Jupiter could not build a swap transaction";
     }

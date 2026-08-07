@@ -52,11 +52,11 @@ export async function unlockActive(opts: UnlockOptions = {}): Promise<LoadedProf
     return await loadProfile({ name, passphrase });
   } catch (err) {
     // The keychain copy can go stale if the wallet was re-encrypted with a
-    // new passphrase — give the user one interactive retry instead of dying.
+    // new passphrase - give the user one interactive retry instead of dying.
     if (viaBiometric && process.stdin.isTTY) {
       console.error(
         chalk.yellow(
-          `⚠ The passphrase stored for Touch ID no longer unlocks "${name}" — run \`xpay biometric enable\` to refresh it.`,
+          `⚠ The passphrase stored for Touch ID no longer unlocks "${name}" - run \`xpay biometric enable\` to refresh it.`,
         ),
       );
       try {
@@ -85,7 +85,7 @@ async function tryBiometricUnlock(name: string): Promise<string | undefined> {
   try {
     const passphrase = await readBiometricPassphrase(name, `unlock the xPay profile "${name}"`);
     if (!passphrase && process.stdin.isTTY) {
-      console.log(chalk.dim("  (biometric unlock cancelled — enter the passphrase instead)"));
+      console.log(chalk.dim("  (biometric unlock cancelled - enter the passphrase instead)"));
     }
     return passphrase ?? undefined;
   } catch (err) {
@@ -113,7 +113,7 @@ export function guardrailWithApproval(
           return await biometricPrompt(`approve a $${usd.toFixed(2)} xPay payment to ${target}`);
         } catch (err) {
           if (!(err instanceof BiometricUnavailableError)) throw err;
-          // Biometry unavailable right now (e.g. lid closed) — fall through.
+          // Biometry unavailable right now (e.g. lid closed) - fall through.
         }
       }
       if (interactive && process.stdin.isTTY) {
@@ -129,7 +129,7 @@ export function guardrailWithApproval(
       }
       console.error(
         chalk.yellow(
-          `⚠ $${usd.toFixed(2)} call needs approval but no biometric or interactive terminal is available — denying.`,
+          `⚠ $${usd.toFixed(2)} call needs approval but no biometric or interactive terminal is available - denying.`,
         ),
       );
       return false;
@@ -150,7 +150,7 @@ export function formatUsd(amount: number): string {
 
 /** "2m ago" / "3h ago" / "5d ago". */
 export function timeAgo(ts: number | null): string {
-  if (!ts) return chalk.dim("—");
+  if (!ts) return chalk.dim(" - ");
   const s = (Date.now() - ts) / 1000;
   if (s < 60) return `${Math.floor(s)}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;

@@ -1,7 +1,7 @@
 /**
- * `xpay discover <query>` — search the agentic-commerce catalog.
+ * `xpay discover <query>` - search the agentic-commerce catalog.
  *
- * Read-only — does not load a profile or touch keys.
+ * Read-only - does not load a profile or touch keys.
  */
 
 import chalk from "chalk";
@@ -62,7 +62,7 @@ function printResource(r: Resource, index: number): void {
   const opt = r.accepts[0];
 
   if (opt?.scheme === AGENC_SCHEME) {
-    // AgenC listing — priced in native SOL (9 decimals), executed as an
+    // AgenC listing - priced in native SOL (9 decimals), executed as an
     // on-chain escrow hire rather than an HTTP call.
     const sol = opt.amount ? `◎${(Number(opt.amount) / 1e9).toFixed(4)} SOL` : chalk.dim("?");
     const name = typeof r.metadata?.name === "string" && r.metadata.name ? r.metadata.name : safeHost(r.resource);
@@ -73,7 +73,7 @@ function printResource(r: Resource, index: number): void {
     );
     console.log(`      ${chalk.dim(r.resource)}`);
     console.log(
-      `      ${chalk.dim(`↳ hires ${rep?.totalHires ?? "0"}, ratings ${rep?.ratingCount ?? 0} — xpay agenc hire ${r.metadata?.listingPda}`)}`,
+      `      ${chalk.dim(`↳ hires ${rep?.totalHires ?? "0"}, ratings ${rep?.ratingCount ?? 0} - xpay agenc hire ${r.metadata?.listingPda}`)}`,
     );
     console.log("");
     return;

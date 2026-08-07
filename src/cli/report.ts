@@ -1,8 +1,8 @@
 /**
- * `xpay report` — comprehensive USDC activity report via OrbitX402.
+ * `xpay report` - comprehensive USDC activity report via OrbitX402.
  *
  * Fetches daily / weekly / monthly aggregated data from the OrbitX402 API
- * (on-chain data is resolved server-side — no RPC calls from the CLI).
+ * (on-chain data is resolved server-side - no RPC calls from the CLI).
  */
 
 import chalk from "chalk";
@@ -49,7 +49,7 @@ export async function runReport(opts: ReportCmdOptions): Promise<void> {
   const periodLabel = { daily: "Last 24h", weekly: "Last 7 days", monthly: "Last 30 days" }[period];
 
   console.log("");
-  console.log(chalk.bold(`  USDC Report — ${periodLabel}`));
+  console.log(chalk.bold(`  USDC Report - ${periodLabel}`));
   console.log(chalk.dim(`  ${report.address}  ·  ${report.network}  ·  ${elapsed}ms`));
   console.log("");
 
@@ -108,7 +108,7 @@ export async function runReport(opts: ReportCmdOptions): Promise<void> {
     console.log(chalk.dim("  ── Biggest Transactions ───────────────────────────"));
     for (const tx of topTransactions.slice(0, 5)) {
       const dir = tx.direction === "sent" ? chalk.red("→ sent") : chalk.green("← recv");
-      const ts = tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : "—";
+      const ts = tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : " - ";
       console.log(
         "  " +
           chalk.dim(ts.padEnd(12)) +

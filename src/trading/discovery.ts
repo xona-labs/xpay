@@ -1,9 +1,9 @@
 /**
- * Robinhood Chain token discovery — GeckoTerminal public API.
+ * Robinhood Chain token discovery - GeckoTerminal public API.
  *
  * GeckoTerminal indexes Robinhood Chain under the network id "robinhood"
  * (keyless, ~30 req/min). Used for the trending/new token tools and for the
- * USD pricing attached to trade quotes. Discovery is read-only market data —
+ * USD pricing attached to trade quotes. Discovery is read-only market data -
  * the trade path itself never depends on it.
  */
 
@@ -23,7 +23,7 @@ export interface DiscoveredToken {
   priceChange24hPct?: number;
   /** Liquidity pool: 20-byte address (Uniswap v3) or 32-byte id (v4). */
   pool: string;
-  /** True for v4 pool ids — xpay_trade only routes v3 pools today. */
+  /** True for v4 pool ids - xpay_trade only routes v3 pools today. */
   poolIsV4: boolean;
   dex?: string;
   poolCreatedAt?: string;
@@ -54,7 +54,7 @@ function poolsToTokens(payload: Record<string, unknown>, limit: number): Discove
   const out: DiscoveredToken[] = [];
   for (const pool of data) {
     const attrs = pool.attributes ?? {};
-    // base_token id looks like "robinhood_0x020b…" — address after the prefix.
+    // base_token id looks like "robinhood_0x020b…" - address after the prefix.
     const baseId: string = pool.relationships?.base_token?.data?.id ?? "";
     const address = baseId.includes("_") ? baseId.slice(baseId.indexOf("_") + 1) : "";
     if (!address.startsWith("0x")) continue;
@@ -87,7 +87,7 @@ export async function trendingTokens(opts: { limit?: number } = {}): Promise<Dis
   return poolsToTokens(payload, opts.limit ?? 10);
 }
 
-/** Tokens from the most recently created pools (fresh launches — high risk). */
+/** Tokens from the most recently created pools (fresh launches - high risk). */
 export async function newTokens(opts: { limit?: number } = {}): Promise<DiscoveredToken[]> {
   const payload = await gtFetch(`/networks/${GT_NETWORK}/new_pools?page=1`);
   return poolsToTokens(payload, opts.limit ?? 10);
@@ -116,7 +116,7 @@ export interface TokenHolding {
 /**
  * All ERC-20 balances a wallet holds on Robinhood Chain, via the chain's
  * Blockscout explorer API (keyless). This is what surfaces memecoins bought
- * through `xpay trade` — the on-chain signer only knows a hardcoded token list.
+ * through `xpay trade` - the on-chain signer only knows a hardcoded token list.
  * Best-effort: returns [] if the explorer is unreachable.
  */
 export async function robinhoodHoldings(address: string): Promise<TokenHolding[]> {
@@ -162,7 +162,7 @@ function atomsToHuman(atoms: string, decimals: number): number {
 /**
  * Resolve a token symbol to its contract address via trending + new pools.
  * Throws when the symbol is unknown or matches several distinct contracts
- * (memecoin symbols are not unique — pass the address instead).
+ * (memecoin symbols are not unique - pass the address instead).
  */
 export async function resolveTokenBySymbol(symbol: string): Promise<DiscoveredToken> {
   const wanted = symbol.trim().toUpperCase();
@@ -176,7 +176,7 @@ export async function resolveTokenBySymbol(symbol: string): Promise<DiscoveredTo
   }
   if (matches.size === 0) {
     throw new Error(
-      `xpay.trade: unknown token "${symbol}" — not in Robinhood Chain trending/new pools. ` +
+      `xpay.trade: unknown token "${symbol}" - not in Robinhood Chain trending/new pools. ` +
         "Pass the token's contract address instead.",
     );
   }

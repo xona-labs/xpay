@@ -1,7 +1,7 @@
 /**
  * Multi-network wallet. Thin facade over per-network {@link Signer}s.
  *
- * The wallet doesn't hold keys — signers do. This module just exposes a
+ * The wallet doesn't hold keys - signers do. This module just exposes a
  * unified view (addresses, balances) and lets callers pick which network to
  * use for a given payment.
  */
@@ -31,7 +31,7 @@ export interface Wallet {
   pickRequirement(reqs: PaymentRequirement[]): PaymentRequirement | undefined;
   /**
    * Balance-aware picker. Among requirements we have a signer for, prefer the
-   * first (in listed order) whose wallet balance covers the cost — so a $0
+   * first (in listed order) whose wallet balance covers the cost - so a $0
    * Base wallet falls through to a funded Solana one. When there are multiple
    * payable networks but none can cover the cost, returns `undefined` so the
    * caller can raise a clear "insufficient balance" error instead of attempting
@@ -54,7 +54,7 @@ export function createWallet(opts: WalletOptions): Wallet {
   /** Normalize an EIP-155 / Solana-CAIP network string to a configured slug. */
   function matchNetwork(raw: string): Network | undefined {
     if (signers[raw]) return raw;
-    // Solana CAIP — `solana:<genesis-hash>` (mainnet/devnet/testnet) → "solana".
+    // Solana CAIP - `solana:<genesis-hash>` (mainnet/devnet/testnet) → "solana".
     if ((raw === "solana" || raw.startsWith("solana:") || raw.startsWith("solana-")) && signers["solana"]) {
       return "solana";
     }
@@ -100,7 +100,7 @@ export function createWallet(opts: WalletOptions): Wallet {
 
       // Multiple payable networks: read each balance in parallel and pick the
       // first (listed order) that covers the cost. Compare assumes USDC
-      // (6 decimals) — the asset for virtually all x402 calls.
+      // (6 decimals) - the asset for virtually all x402 calls.
       const scored = await Promise.all(
         candidates.map(async (req) => {
           const net = matchNetwork(req.network)!;

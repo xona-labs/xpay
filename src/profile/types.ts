@@ -2,7 +2,7 @@
  * Profile types. A profile is a named set of keys + config persisted under
  * `~/.xpay/<name>/` (or `<workspace>/.xpay/<name>/` when workspace-local).
  *
- * One mnemonic derives both Solana and EVM keys — standard BIP-39 + BIP-44
+ * One mnemonic derives both Solana and EVM keys - standard BIP-39 + BIP-44
  * paths so the keys are recoverable in Phantom, MetaMask, Solflare, etc.
  */
 
@@ -72,7 +72,7 @@ export interface ProfileConfig {
    * Activate with `xpay bento enable` after registering this wallet's address
    * at https://app.bentoguard.xyz. When enabled, every pay / transfer is
    * screened by Bento's protect() for prompt-injection / wallet-drain intent
-   * before signing — a second gate on top of the local guardrail caps.
+   * before signing - a second gate on top of the local guardrail caps.
    * Bento authenticates with the wallet's own key, so there is no API key.
    */
   bento?: {
@@ -91,7 +91,7 @@ export interface ProfileConfig {
     endpoint?: string;
   };
   /**
-   * Native token-swap settings (Jupiter). Optional — swaps work keyless with
+   * Native token-swap settings (Jupiter). Optional - swaps work keyless with
    * sensible defaults.
    */
   swap?: {
@@ -103,7 +103,7 @@ export interface ProfileConfig {
     endpoint?: string;
   };
   /**
-   * Robinhood Chain token-trading settings (NOXA Fun / Uniswap V3). Optional —
+   * Robinhood Chain token-trading settings (NOXA Fun / Uniswap V3). Optional -
    * trades work with sensible defaults; the RPC override lives in `rpcs.robinhood`.
    */
   trading?: {
@@ -112,7 +112,7 @@ export interface ProfileConfig {
   };
   /**
    * MagicBlock Private Ephemeral Rollup integration.
-   * Platform-level config — set once by the xpay operator via `xpay magicblock configure`.
+   * Platform-level config - set once by the xpay operator via `xpay magicblock configure`.
    * End users never need a MagicBlock account; they just pass private:true.
    */
   magicblock?: {
@@ -131,6 +131,6 @@ export interface LoadedProfile {
   path: string;
   addresses: ProfileAddresses;
   config: ProfileConfig;
-  /** Decoded mnemonic — only present while the process holds the unlocked profile. */
+  /** Decoded mnemonic - only present while the process holds the unlocked profile. */
   mnemonic: string;
 }

@@ -1,5 +1,5 @@
 /**
- * `xpay guardrail show|set|clear` — view and edit the active profile's
+ * `xpay guardrail show|set|clear` - view and edit the active profile's
  * spending guardrail. Persisted to config.json; loaded by every command that
  * builds a runtime client.
  */
@@ -28,7 +28,7 @@ export function runGuardrailShow(profileName?: string): void {
   console.log("");
   console.log(chalk.bold(`Guardrail for "${name}"`));
   if (!g || Object.keys(g).length === 0) {
-    console.log(chalk.yellow("  (no guardrail configured — calls are uncapped)"));
+    console.log(chalk.yellow("  (no guardrail configured - calls are uncapped)"));
     console.log(chalk.dim("  Set one with: xpay guardrail set --max-per-tx 1 --max-per-day 10"));
     return;
   }
@@ -73,7 +73,7 @@ export function runGuardrailSet(opts: GuardrailSetOptions): void {
 export function runGuardrailClear(profileName?: string): void {
   const name = profileName ?? getActiveProfile();
   clearProfileGuardrail(name);
-  console.log(chalk.yellow(`⚠ Guardrail cleared for "${name}" — calls are now uncapped.`));
+  console.log(chalk.yellow(`⚠ Guardrail cleared for "${name}" - calls are now uncapped.`));
 }
 
 function parseDollarsOrExit(raw: string, flag: string): number {

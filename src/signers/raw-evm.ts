@@ -1,5 +1,5 @@
 /**
- * Raw EVM signer — works for Base, Ethereum, Arbitrum, Optimism, and other
+ * Raw EVM signer - works for Base, Ethereum, Arbitrum, Optimism, and other
  * EIP-155 chains. Holds a hex private key via `ethers.Wallet`.
  */
 
@@ -12,7 +12,7 @@ const NATIVE_TOKEN: Record<string, { symbol: string; name: string }> = {
   arbitrum: { symbol: "ETH", name: "Ether" },
   optimism: { symbol: "ETH", name: "Ether" },
   robinhood: { symbol: "ETH", name: "Ether" },
-  // Stable's gas coin is USDT itself, at 18 decimals — the ERC-20 USDT0 below
+  // Stable's gas coin is USDT itself, at 18 decimals - the ERC-20 USDT0 below
   // is a different token with 6 decimals. Distinct symbols keep them apart in
   // the balance view.
   stable: { symbol: "USDT", name: "Tether USD (gas)" },
@@ -44,11 +44,11 @@ const KNOWN_ERC20S: Record<string, Array<{ symbol: string; name: string; contrac
     { symbol: "OP",   name: "Optimism",       contract: "0x4200000000000000000000000000000000000042", decimals: 18 },
   ],
   // Robinhood Chain (Arbitrum Orbit L2, chain 4663) is ETH-native; no canonical
-  // USDC exists there yet, so no USDC entry — `balance()` reports 0 by design.
+  // USDC exists there yet, so no USDC entry - `balance()` reports 0 by design.
   robinhood: [
     { symbol: "WETH", name: "Wrapped Ether",  contract: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", decimals: 18 },
   ],
-  // Stable (chain 988). USDT0 is the LayerZero OFT that x402 settles in — 6
+  // Stable (chain 988). USDT0 is the LayerZero OFT that x402 settles in - 6
   // decimals as an ERC-20, verified on-chain via decimals()/symbol().
   stable: [
     { symbol: "USDT0", name: "USDT0", contract: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", decimals: 6 },
@@ -56,7 +56,7 @@ const KNOWN_ERC20S: Record<string, Array<{ symbol: string; name: string; contrac
 };
 
 /**
- * The stablecoin x402 settles in on each network — what `balance()` reports and
+ * The stablecoin x402 settles in on each network - what `balance()` reports and
  * what payment routing compares a price against. USDC everywhere except Stable,
  * which settles USDT0. All are 6 decimals, so the `/ 1_000_000` below holds.
  */

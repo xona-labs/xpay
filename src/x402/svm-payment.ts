@@ -8,7 +8,7 @@
  * This is the path xPay 0.1.4+ takes for Solana endpoints reporting
  * `x402Version >= 2` (CAIP networks like `solana:5eykt4…`). Legacy 0.1.x
  * sent a sign-and-broadcast `txSig` header which is *not* what the
- * canonical x402 servers expect — your endpoint would 4xx on the retry.
+ * canonical x402 servers expect - your endpoint would 4xx on the retry.
  *
  * Inputs (the `PaymentRequirement` xPay parsed from the 402 challenge) are
  * normalized into `@x402/core/types`'s `PaymentRequirements` shape.
@@ -18,7 +18,7 @@ import { ExactSvmScheme } from "@x402/svm";
 import type { PaymentRequirement } from "../types.js";
 
 export interface BuildSvmPaymentArgs {
-  /** A `@solana/kit` TransactionSigner — from `signer.getKitSigner()`. */
+  /** A `@solana/kit` TransactionSigner - from `signer.getKitSigner()`. */
   kitSigner: unknown;
   /** What the server's 402 told us we owe. */
   requirement: PaymentRequirement;
@@ -61,7 +61,7 @@ export async function buildSvmPaymentHeader(args: BuildSvmPaymentArgs): Promise<
 
   // Assemble the FULL canonical PaymentPayloadV2 envelope:
   //   { x402Version, accepted: <the requirement we're paying>, payload }
-  // The `accepted` field is REQUIRED in v2 — it tells the facilitator which
+  // The `accepted` field is REQUIRED in v2 - it tells the facilitator which
   // of its advertised `accepts[]` items we picked. (Loose top-level
   // scheme/network is v1; v2 nests them inside `accepted`.)
   const envelope = {

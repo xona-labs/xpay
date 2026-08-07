@@ -2,7 +2,7 @@
  * OrbitX402 discovery client.
  *
  * Fetches from api.orbitx402.com/api/x402-discovery which combines
- * orbitx402's own probed resources, PayAI catalog, and pay.sh catalog —
+ * orbitx402's own probed resources, PayAI catalog, and pay.sh catalog -
  * all in xpay's Resource shape. Pagination matches PayAI's format.
  */
 
@@ -15,7 +15,7 @@ export interface OrbitX402ClientOptions {
   endpoint?: string;
   maxItems?: number;
   limit?: number;
-  /** Server-side search — the API ranks and returns only matching resources. */
+  /** Server-side search - the API ranks and returns only matching resources. */
   query?: string;
   fetch?: typeof fetch;
 }

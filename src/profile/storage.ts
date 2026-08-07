@@ -1,5 +1,5 @@
 /**
- * Profile storage — read/write `wallet.json` + `config.json` under
+ * Profile storage - read/write `wallet.json` + `config.json` under
  * `~/.xpay/<name>/` (or a workspace path) with passphrase-based encryption.
  *
  * Encryption uses Node's built-in crypto (no new deps): scrypt → AES-256-GCM
@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, chmodS
 import { randomBytes, scryptSync, createCipheriv, createDecipheriv } from "node:crypto";
 import type { ProfileConfig, WalletFile } from "./types.js";
 
-const SCRYPT_N = 1 << 15; // 32768 — sane default, tunable.
+const SCRYPT_N = 1 << 15; // 32768 - sane default, tunable.
 const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const KEY_LEN = 32;
@@ -115,7 +115,7 @@ export function writeWalletFile(
   ensureDir(dir);
   const file = join(dir, "wallet.json");
   writeFileSync(file, JSON.stringify(wallet, null, 2));
-  // 0600 — readable only by the owner.
+  // 0600 - readable only by the owner.
   try { chmodSync(file, 0o600); } catch { /* not POSIX */ }
 }
 
@@ -177,6 +177,6 @@ export function buildWalletFile(input: BuildWalletInput): WalletFile {
 export function unlockWalletFile(wallet: WalletFile, passphrase?: string): string {
   if (wallet.mnemonic) return wallet.mnemonic; // unencrypted
   if (!wallet.encrypted) throw new Error("Wallet file has neither mnemonic nor encrypted payload");
-  if (!passphrase) throw new Error("Wallet is encrypted — passphrase required");
+  if (!passphrase) throw new Error("Wallet is encrypted - passphrase required");
   return decryptMnemonic(wallet.encrypted, passphrase);
 }

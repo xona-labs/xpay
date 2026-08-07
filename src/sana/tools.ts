@@ -26,20 +26,20 @@ export function forSana(apiKey: string): ToolBundle<ClaudeToolDef> {
     {
       name: "sana_card",
       description:
-        "Sana agent wallet card — card metadata: type, status, last 4 digits, expiry. " +
+        "Sana agent wallet card - card metadata: type, status, last 4 digits, expiry. " +
         "Use this to check whether the card is active before spending.",
       input_schema: { type: "object", properties: {} },
     },
     {
       name: "sana_card_balance",
       description:
-        "Sana agent wallet card — available spending power / credit balance on the card.",
+        "Sana agent wallet card - available spending power / credit balance on the card.",
       input_schema: { type: "object", properties: {} },
     },
     {
       name: "sana_card_deposit",
       description:
-        "Sana agent wallet card — top up the card balance with USDC from the Sana wallet. " +
+        "Sana agent wallet card - top up the card balance with USDC from the Sana wallet. " +
         "Requires agent signing to be enabled on the API key.",
       input_schema: {
         type: "object",
@@ -52,7 +52,7 @@ export function forSana(apiKey: string): ToolBundle<ClaudeToolDef> {
     {
       name: "sana_card_transactions",
       description:
-        "Sana agent wallet card — card spending history, newest first.",
+        "Sana agent wallet card - card spending history, newest first.",
       input_schema: {
         type: "object",
         properties: {
@@ -64,12 +64,12 @@ export function forSana(apiKey: string): ToolBundle<ClaudeToolDef> {
     {
       name: "sana_portfolio",
       description:
-        "Sana wallet — total net worth in USD plus all token holdings with 24h price changes.",
+        "Sana wallet - total net worth in USD plus all token holdings with 24h price changes.",
       input_schema: { type: "object", properties: {} },
     },
     {
       name: "sana_price",
-      description: "Sana wallet — current USD price and 24h change for a token symbol.",
+      description: "Sana wallet - current USD price and 24h change for a token symbol.",
       input_schema: {
         type: "object",
         properties: {
@@ -81,7 +81,7 @@ export function forSana(apiKey: string): ToolBundle<ClaudeToolDef> {
     {
       name: "sana_swap",
       description:
-        "Sana wallet — swap tokens inside the Sana wallet. " +
+        "Sana wallet - swap tokens inside the Sana wallet. " +
         "Requires agent signing enabled on the API key.",
       input_schema: {
         type: "object",
@@ -95,7 +95,7 @@ export function forSana(apiKey: string): ToolBundle<ClaudeToolDef> {
     },
     {
       name: "sana_notifications",
-      description: "Sana wallet — recent wallet activity feed and notifications.",
+      description: "Sana wallet - recent wallet activity feed and notifications.",
       input_schema: { type: "object", properties: {} },
     },
   ];

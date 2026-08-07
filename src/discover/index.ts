@@ -1,5 +1,5 @@
 /**
- * Discovery — find paid services across catalogs.
+ * Discovery - find paid services across catalogs.
  *
  * Two sources, merged:
  *  - **OrbitX402** aggregates multiple x402 catalogs (its own probed
@@ -8,7 +8,7 @@
  *    SOL and executed as escrow hires rather than x402 calls. Its API has no
  *    text search, so queries are matched locally (the catalog is small).
  *
- * One source failing never kills discovery — its error is stashed in
+ * One source failing never kills discovery - its error is stashed in
  * {@link lastDiscoverWarnings} and the other source's results are returned.
  */
 
@@ -60,7 +60,7 @@ export async function discover(opts: InternalDiscoverOptions = {}): Promise<Reso
     process.env.XPAY_DISCOVERY_SOURCES?.split(",").map((s) => s.trim()).filter(Boolean) ??
     DEFAULT_SOURCES;
 
-  // The query is sent to OrbitX402, which searches and ranks server-side —
+  // The query is sent to OrbitX402, which searches and ranks server-side -
   // a ~50KB response instead of the full multi-MB catalog download. AgenC's
   // catalog is small enough to fetch whole and filter locally.
   const [orbitSettled, agencSettled] = await Promise.allSettled([
@@ -82,7 +82,7 @@ export async function discover(opts: InternalDiscoverOptions = {}): Promise<Reso
 
   const enabledCount = DEFAULT_SOURCES.filter((s) => sources.includes(s)).length;
   if (failures.length >= enabledCount && enabledCount > 0) {
-    throw new Error(`xpay.discover: all discovery sources failed — ${failures.join("; ")}`);
+    throw new Error(`xpay.discover: all discovery sources failed - ${failures.join("; ")}`);
   }
 
   if (query) {
@@ -93,11 +93,11 @@ export async function discover(opts: InternalDiscoverOptions = {}): Promise<Reso
       orbit = rankByScore(orbit, terms);
     }
 
-    // AgenC: no server-side query param — always match locally.
+    // AgenC: no server-side query param - always match locally.
     agenc = rankByScore(agenc, terms);
   }
 
-  // Network filter — prefix match so "solana" matches "solana:5eykt4..."
+  // Network filter - prefix match so "solana" matches "solana:5eykt4..."
   // and "eip155:8453" matches exactly. The APIs have no network param yet.
   if (opts.networks?.length) {
     const wanted = opts.networks.map((n) => NETWORK_ALIASES[n] ?? n);

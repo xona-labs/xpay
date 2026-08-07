@@ -1,11 +1,11 @@
 /**
- * Direct SPL / ERC-20 transfer — no x402, no provider, just send funds.
+ * Direct SPL / ERC-20 transfer - no x402, no provider, just send funds.
  *
  * Goes through the same guardrail as `use()` so a compromised CLI / agent
  * can't drain the wallet past the configured caps.
  *
  * Solana: any SPL token by symbol (USDC, BONK, JUP, …) or raw mint address.
- * EVM:    the network's stablecoin only — USDC, or USDT0 on Stable (other
+ * EVM:    the network's stablecoin only - USDC, or USDT0 on Stable (other
  *         ERC-20 addresses can be added to EVM_STABLECOIN as needed).
  */
 
@@ -30,7 +30,7 @@ export interface SplTokenInfo {
   symbol:   string;
 }
 
-/** Well-known Solana SPL tokens — symbol (uppercase) → info. */
+/** Well-known Solana SPL tokens - symbol (uppercase) → info. */
 export const SOLANA_TOKENS: Record<string, SplTokenInfo> = {
   USDC:    { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, symbol: "USDC"    },
   USDT:    { mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6, symbol: "USDT"    },
@@ -82,7 +82,7 @@ export interface TransferArgs {
   /**
    * Token to transfer.
    * - Solana: symbol ("USDC", "BONK", "JUP", …) or raw mint address.
-   * - EVM: only the network's stablecoin — "USDC", or "USDT0" on Stable.
+   * - EVM: only the network's stablecoin - "USDC", or "USDT0" on Stable.
    * Defaults to the network's stablecoin.
    */
   token?: string;
@@ -122,7 +122,7 @@ export async function transfer(args: TransferArgs): Promise<TransferResult> {
       throw new Error(`transfer: no stablecoin registered for EVM network "${network}"`);
     }
     // Accept the network's own symbol, plus the generic "USDC"/"USDT" the
-    // caller may default to — on Stable they all mean USDT0.
+    // caller may default to - on Stable they all mean USDT0.
     const tokenSymbol = (args.token ?? stablecoin.symbol).toUpperCase();
     const aliases = network === "stable" ? ["USDT0", "USDT", "USDC"] : ["USDC"];
     if (!aliases.includes(tokenSymbol)) {
@@ -152,7 +152,7 @@ export async function transfer(args: TransferArgs): Promise<TransferResult> {
     if (args.private) {
       throw new Error(
         `transfer: native SOL is not supported by MagicBlock PER (SPL tokens only). ` +
-        `Use "wSOL" instead — it goes through the PER and settles as wrapped SOL on the other end.`,
+        `Use "wSOL" instead - it goes through the PER and settles as wrapped SOL on the other end.`,
       );
     }
     return transferNativeSol(args);
@@ -215,7 +215,7 @@ async function transferNativeSol(args: TransferArgs): Promise<TransferResult> {
   const connection = new Connection(rpc, "confirmed");
 
   // Reconstruct keypair from the signer's signMessage so we can sign the tx.
-  // rawSolanaSigner keeps the keypair internally — we access it by signing a
+  // rawSolanaSigner keeps the keypair internally - we access it by signing a
   // known message and rebuilding. Instead, we use a lower-level approach:
   // delegate to signer.pay() with a synthetic SOL "requirement" if it supports
   // it, otherwise build the SystemProgram.transfer tx ourselves.
@@ -265,7 +265,7 @@ async function resolveSolanaToken(token: string): Promise<SplTokenInfo> {
   // Reverse lookup by mint address.
   if (BY_MINT[token]) return BY_MINT[token]!;
 
-  // Looks like a base58 mint address — fetch from chain.
+  // Looks like a base58 mint address - fetch from chain.
   if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(token)) {
     const rpc = process.env.XPAY_SOLANA_RPC ?? "https://solana-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ";
     try {
@@ -301,7 +301,7 @@ function resolveNetwork(args: TransferArgs): Network {
     // Auto-detect only across networks the profile actually opted into.
     // Robinhood and Stable signers are always registered (see
     // signersFromProfile), so keying off `wallet.has()` alone would make every
-    // EVM transfer ambiguous — reach those two with an explicit --network
+    // EVM transfer ambiguous - reach those two with an explicit --network
     // unless they're in the profile's `networks`.
     const evm = args.wallet.networks.filter(
       (n) => EVM_NETWORKS.includes(n) && args.wallet.has(n),

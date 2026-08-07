@@ -1,5 +1,5 @@
 /**
- * RWA (real-world asset) discovery on Solana — Jupiter Token API v2.
+ * RWA (real-world asset) discovery on Solana - Jupiter Token API v2.
  *
  * "RWA" covers every tokenized off-chain asset: equities, ETFs, treasuries,
  * commodities, private credit. What is actually TRADABLE on Solana DEXes
@@ -12,7 +12,7 @@
  *     so it is pinned here explicitly).
  *
  * Permissioned funds (BlackRock BUIDL, Ondo OUSG) exist on Solana but are
- * KYC-gated: unverified on Jupiter, zero DEX liquidity, not swappable — they
+ * KYC-gated: unverified on Jupiter, zero DEX liquidity, not swappable - they
  * are deliberately excluded.
  *
  * Jupiter's tag ENDPOINT rejects `rwa`/`stocks`/`xstocks` as queries (only
@@ -31,7 +31,7 @@ import { searchTokens, type TokenInfo, type TokenApiOptions } from "./index.js";
  */
 const SWEEP_QUERIES = ["xstock", "Ondo Tokenized", "tokenized", "treasury", "remora"];
 
-/** Ondo USDY — treasury-backed yieldcoin, tagged yield/yb on Jupiter rather than rwa. */
+/** Ondo USDY - treasury-backed yieldcoin, tagged yield/yb on Jupiter rather than rwa. */
 const USDY_MINT = "A1KLoBrKBde8Ty9qtNQUtq3C2ortoC3u7twggz7sEto6";
 
 const CACHE_TTL_MS = 5 * 60_000;
@@ -51,7 +51,7 @@ export interface RwaFindOptions extends TokenApiOptions {
   category?: RwaCategory;
   /** Max results. Default 20. */
   limit?: number;
-  /** Include unverified tokens (excluded by default — same scam caveat as any ticker). */
+  /** Include unverified tokens (excluded by default - same scam caveat as any ticker). */
   includeUnverified?: boolean;
 }
 

@@ -15,9 +15,9 @@ export type Network =
   | "ethereum"
   | "arbitrum"
   | "optimism"
-  /** Robinhood Chain (Arbitrum Orbit L2, eip155:4663) — ETH-native. */
+  /** Robinhood Chain (Arbitrum Orbit L2, eip155:4663) - ETH-native. */
   | "robinhood"
-  /** Stable (eip155:988) — Tether/Bitfinex payments L1, settles USDT0. */
+  /** Stable (eip155:988) - Tether/Bitfinex payments L1, settles USDT0. */
   | "stable"
   | (string & {});
 
@@ -104,7 +104,7 @@ export interface PlatformFeeResult {
   txSig?: string;
   /** Whether the fee was successfully charged. */
   success: boolean;
-  /** Error message if the fee charge failed (non-fatal — the use result is still returned). */
+  /** Error message if the fee charge failed (non-fatal - the use result is still returned). */
   error?: string;
 }
 
@@ -135,7 +135,7 @@ export interface UseResult {
 
 /** Options passed to {@link XPay.discover}. */
 export interface DiscoverOptions {
-  /** Free-text query — matched against resource URL, metadata, and category. */
+  /** Free-text query - matched against resource URL, metadata, and category. */
   query?: string;
   /** Restrict to specific networks. Defaults to all configured. */
   networks?: Network[];
@@ -165,7 +165,7 @@ export interface Signer {
   address: string;
   /**
    * Sign an arbitrary message (used for x402 payment authorization payloads).
-   * The exact bytes signed depend on the network — see implementations.
+   * The exact bytes signed depend on the network - see implementations.
    */
   signMessage(message: Uint8Array): Promise<Uint8Array>;
   /**
@@ -199,7 +199,7 @@ export interface Signer {
    * Optional (EVM signers): sign an EIP-712 typed-data payload and return the
    * hex signature. When present, `use()` pays eip155 endpoints gaslessly via
    * a signed EIP-3009 `transferWithAuthorization` (the facilitator broadcasts
-   * and covers gas — no native ETH needed); when absent, it falls back to the
+   * and covers gas - no native ETH needed); when absent, it falls back to the
    * legacy `pay()` (broadcasts an ERC-20 transfer, wallet pays its own gas).
    */
   signEvmTypedData?(typedData: {
@@ -211,7 +211,7 @@ export interface Signer {
    * Optional (EVM signers): return the underlying ethers `Wallet` (connected to
    * a provider) so higher-level flows like on-chain DEX trades can read chain
    * state and broadcast arbitrary contract calls (swaps, approvals). Typed
-   * `unknown` to keep ethers out of the core type surface — callers cast it.
+   * `unknown` to keep ethers out of the core type surface - callers cast it.
    * Mirrors {@link Signer.getKitSigner}. Implemented by `rawEvmSigner`.
    */
   getEvmWallet?(): unknown;

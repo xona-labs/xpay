@@ -1,5 +1,5 @@
 /**
- * Do — the thesis in one method. Discover by intent, pick the top result, use it.
+ * Do - the thesis in one method. Discover by intent, pick the top result, use it.
  *
  * This is the API normies (and most agents) actually want. Power users compose
  * {@link discover} + {@link use} manually when they need control over picking.
@@ -17,7 +17,7 @@ export interface DoArgs {
   wallet: Wallet;
   guardrail: Guardrail;
   body?: unknown;
-  /** AgenC hire settings — forwarded to `use()` when the top match is an AgenC listing. */
+  /** AgenC hire settings - forwarded to `use()` when the top match is an AgenC listing. */
   agenc?: AgencHireConfig;
 }
 

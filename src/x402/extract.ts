@@ -9,7 +9,7 @@
  *             envelope, or a SINGLE bare requirement object
  *   encoding: raw JSON, base64-JSON, url-encoded JSON, or "<scheme> <payload>"
  *   fields:   PayAI uses `amount`/`payTo`; the x402 spec uses
- *             `maxAmountRequired`/`payTo`; others use `recipient`/`token` —
+ *             `maxAmountRequired`/`payTo`; others use `recipient`/`token` -
  *             we alias them all into our PaymentRequirement.
  *
  * Shared by `probe()` and `useByUrl()`.

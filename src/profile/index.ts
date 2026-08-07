@@ -1,5 +1,5 @@
 /**
- * Profile API — public SDK surface for keyfile management.
+ * Profile API - public SDK surface for keyfile management.
  *
  * Programmatic usage:
  * ```ts
@@ -47,7 +47,7 @@ export interface InitProfileOptions {
   name?: string;
   /** Use existing mnemonic (import) instead of generating one. */
   mnemonic?: string;
-  /** Encrypt at rest. Strongly recommended — omit only for ephemeral dev wallets. */
+  /** Encrypt at rest. Strongly recommended - omit only for ephemeral dev wallets. */
   passphrase?: string;
   /** Use workspace-local `.xpay/` instead of `~/.xpay/`. */
   workspace?: boolean | string;
@@ -139,7 +139,7 @@ export function signersFromProfile(profile: LoadedProfile): Partial<Record<strin
   // Always register a Robinhood Chain signer (same derived EVM key) so the
   // trading tools work out of the box on any profile, even one that didn't
   // opt "robinhood" into its `networks`. It's ETH-native with no USDC/x402
-  // surface, so this doesn't affect balances or payment routing — it only
+  // surface, so this doesn't affect balances or payment routing - it only
   // makes `wallet.has("robinhood")` true so `xpay trade` can sign.
   out.robinhood ??= rawEvmSigner({
     privateKey: keys.evm.privateKey,
@@ -216,7 +216,7 @@ export function setSanaApiKey(
   return current;
 }
 
-/** Remove the Sana API key — sana_* tools will no longer be registered. */
+/** Remove the Sana API key - sana_* tools will no longer be registered. */
 export function clearSanaApiKey(
   name: string,
   opts: { workspace?: boolean | string } = {},

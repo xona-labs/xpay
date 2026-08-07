@@ -1,5 +1,5 @@
 /**
- * `xpay init` — create a new profile (or import one).
+ * `xpay init` - create a new profile (or import one).
  *
  * Flow:
  *   1. Confirm profile name (default: "default") + workspace flag.
@@ -99,7 +99,7 @@ export async function runInit(opts: InitCmdOptions): Promise<void> {
   console.log("");
 
   if (!opts.import) {
-    console.log(chalk.yellow.bold("⚠  RECOVERY PHRASE — write this down NOW. We cannot recover it for you."));
+    console.log(chalk.yellow.bold("⚠  RECOVERY PHRASE - write this down NOW. We cannot recover it for you."));
     console.log("");
     printMnemonicGrid(result.mnemonic);
     console.log("");

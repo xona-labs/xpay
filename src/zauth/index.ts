@@ -1,5 +1,5 @@
 /**
- * zauth partner integration — repository security scans behind zauth's
+ * zauth partner integration - repository security scans behind zauth's
  * x402-paywalled endpoint. The scan POST is paid (normal x402 flow); results
  * are polled from an unpaid status URL keyed by sessionToken. A repo that
  * zauth has scanned recently may return its cached report on the POST
@@ -16,7 +16,7 @@ export interface ScanPending {
 
 /**
  * Kickoff response from the paid POST: `{ status, scanId, sessionToken }`.
- * Only this response carries the sessionToken (a ~1h JWT) — poll responses
+ * Only this response carries the sessionToken (a ~1h JWT) - poll responses
  * echo just `{ status, scanId, progress }`, so callers must hold on to the
  * token themselves.
  */
@@ -41,7 +41,7 @@ export async function fetchScanStatus(sessionToken: string): Promise<unknown> {
   // only the JWT works here. Catch the mixup before it becomes an opaque 401.
   if (!sessionToken.includes(".")) {
     throw new Error(
-      `zauth: "${sessionToken}" looks like a scanId — pass the sessionToken (the long JWT from the scan kickoff) instead`,
+      `zauth: "${sessionToken}" looks like a scanId - pass the sessionToken (the long JWT from the scan kickoff) instead`,
     );
   }
   const res = await fetch(`${ZAUTH_BASE}/x402/reposcan/${encodeURIComponent(sessionToken)}`);
@@ -63,7 +63,7 @@ export async function fetchScanStatus(sessionToken: string): Promise<unknown> {
 }
 
 /**
- * Completed reports embed every provenance match with full file contents —
+ * Completed reports embed every provenance match with full file contents -
  * tens of KB the caller rarely needs (analysisMarkdown already summarizes
  * them). Swap the array for a count; use the raw payload when full detail
  * matters (CLI --json).
@@ -85,7 +85,7 @@ export interface PollOptions {
 /**
  * Poll the unpaid status endpoint until the scan leaves "scanning" or the
  * timeout elapses. On timeout the last payload (still pending) is returned
- * rather than throwing — callers surface the sessionToken for a later check.
+ * rather than throwing - callers surface the sessionToken for a later check.
  */
 export async function pollRepoScan(sessionToken: string, opts: PollOptions = {}): Promise<unknown> {
   const timeoutMs = opts.timeoutMs ?? 90_000;

@@ -1,5 +1,5 @@
 /**
- * `xpay accounts` — multi-profile management.
+ * `xpay accounts` - multi-profile management.
  *
  *   xpay accounts list             list known profiles
  *   xpay accounts show [name]      show addresses for a profile

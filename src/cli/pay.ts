@@ -1,5 +1,5 @@
 /**
- * `xpay pay <url>` — pay an x402 endpoint.
+ * `xpay pay <url>` - pay an x402 endpoint.
  *
  * Accepts either a catalog URL (we resolve metadata via discover) or any
  * URL that returns HTTP 402 (live challenge mode).

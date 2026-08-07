@@ -63,7 +63,7 @@ export async function fetchPayAIResources(opts: PayAIClientOptions = {}): Promis
       total = body.pagination.total;
       offset = body.pagination.offset + rawItems.length;
     } else {
-      // No pagination block — assume single-shot.
+      // No pagination block - assume single-shot.
       break;
     }
     // Server returned fewer items than requested → we hit the end.

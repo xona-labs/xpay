@@ -1,5 +1,5 @@
 /**
- * SOL/USD spot price — AgenC listings are priced in native SOL, but the
+ * SOL/USD spot price - AgenC listings are priced in native SOL, but the
  * guardrail's policy surface (maxPerTx / maxPerDay / requireApprovalAbove)
  * is USD-denominated. Tries several keyless public feeds in order (corporate
  * proxies commonly block one or another), cached for 60s.

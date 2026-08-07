@@ -1,5 +1,5 @@
 /**
- * `xpay swap <amount> <fromToken> <toToken>` — swap tokens in the wallet via
+ * `xpay swap <amount> <fromToken> <toToken>` - swap tokens in the wallet via
  * Jupiter (Solana only). Subject to the active guardrail, enforced before
  * signing. Shows a quote and asks for confirmation unless `-y`.
  */
@@ -30,7 +30,7 @@ export async function runSwap(
   }
   const slippageBps = opts.slippageBps ? Number(opts.slippageBps) : undefined;
 
-  // Unlock first — Jupiter needs the wallet address (taker) even for a quote.
+  // Unlock first - Jupiter needs the wallet address (taker) even for a quote.
   const profile = await unlockActive(opts);
   const xpay = createXPay({ profile, guardrail: guardrailWithApproval(profile) });
 
@@ -55,7 +55,7 @@ export async function runSwap(
   if (quote.outputUnverified) {
     console.log("");
     console.log(chalk.yellow(`  ⚠ ${quote.to.symbol} (${quote.to.mint}) is NOT verified on Jupiter.`));
-    console.log(chalk.yellow("    Unverified tokens can be scams reusing a real ticker — verify the mint."));
+    console.log(chalk.yellow("    Unverified tokens can be scams reusing a real ticker - verify the mint."));
   }
   console.log("");
 

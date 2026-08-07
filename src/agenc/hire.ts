@@ -1,12 +1,12 @@
 /**
- * AgenC hire execution — the non-x402 payment rail.
+ * AgenC hire execution - the non-x402 payment rail.
  *
  * Hiring a listing is a Solana transaction (program
  * HJsZ53Zb27b8QMRbQpuDngE44AdwCGxvEZr61Zmxw1xK) that escrows the listing's
  * price in native SOL and creates a Task + HireRecord on-chain. The provider
  * then works ASYNCHRONOUSLY: escrow → work → review → settle. So unlike an
  * x402 call, `use()` on an AgenC resource returns a hire *receipt*, not a
- * response body — poll progress with `xpay agenc status <taskPda>`.
+ * response body - poll progress with `xpay agenc status <taskPda>`.
  *
  * The humanless entry point pins the task to CreatorReview, so escrowed funds
  * never auto-release without the buyer accepting the result.
@@ -31,7 +31,7 @@ export interface AgencHireReceipt {
   kind: "agenc-hire-receipt";
   /** Listing PDA that was hired. */
   listing: string;
-  /** Task PDA created by the hire — the handle for status polling and review. */
+  /** Task PDA created by the hire - the handle for status polling and review. */
   task: string;
   /** HireRecord PDA linking the task back to the listing. */
   hireRecord: string;
@@ -59,10 +59,10 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
   const extra = parseExtra(req);
   const cfg = args.agenc ?? {};
 
-  // Guardrail runs *before* signing — same security boundary as the x402 path.
+  // Guardrail runs *before* signing - same security boundary as the x402 path.
   await args.guardrail.check({ resource: args.resource, requirement: req });
 
-  // Freshness check: the catalog snapshot may be stale — refuse if the listing
+  // Freshness check: the catalog snapshot may be stale - refuse if the listing
   // was paused/retired or repriced upward since discovery. The on-chain
   // expectedPrice/expectedVersion checks are the fail-closed backstop.
   const live = await fetchAgencListing(extra.listingPda, { endpoint: cfg.endpoint });
@@ -91,7 +91,7 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
   const rpcUrl = cfg.rpcUrl ?? process.env.XPAY_SOLANA_RPC ?? DEFAULT_RPC;
 
   // Pre-flight: the hire escrows priceLamports in NATIVE SOL (plus fees/rent),
-  // so check the SOL balance — the USDC insufficient-balance path doesn't apply.
+  // so check the SOL balance - the USDC insufficient-balance path doesn't apply.
   const { createSolanaRpc, address } = await import("@solana/kit");
   const rpc = createSolanaRpc(rpcUrl);
   const FEE_BUFFER_LAMPORTS = 10_000_000n; // ~0.01 SOL for fees + PDA rent
@@ -99,7 +99,7 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
   const { value: lamports } = await rpc.getBalance(address(signer.address)).send();
   if (BigInt(lamports) < needed) {
     throw new Error(
-      `xpay.agenc: insufficient SOL — hire needs ~${fmtSol(needed)} SOL ` +
+      `xpay.agenc: insufficient SOL - hire needs ~${fmtSol(needed)} SOL ` +
         `(${fmtSol(BigInt(live.priceLamports))} escrow + fees) but ${signer.address} ` +
         `holds ${fmtSol(BigInt(lamports))} SOL. Fund the wallet and retry.`,
     );
@@ -116,14 +116,14 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
   if (!surface.listings) {
     throw new Error(
       `xpay.agenc: the deployed AgenC program (surface revision ${surface.surfaceRevision}) ` +
-        `does not expose listings/hires on this cluster. xpay may need an update — check ` +
+        `does not expose listings/hires on this cluster. xpay may need an update - check ` +
         `for a newer @xona-labs/xpay release.`,
     );
   }
 
   // Resolve the listing's moderation attestation. The record's on-chain
   // ADDRESS has changed seed schemes across program upgrades, but its CONTENT
-  // always names the moderator the hire gate expects — so we locate the
+  // always names the moderator the hire gate expects - so we locate the
   // record (trying each known derivation, newest data wins) and pass both
   // the moderator and the explicit record address to the facade. Fail-closed
   // BEFORE the guardrail/payment path if no attestation exists.
@@ -131,7 +131,7 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
   if (!moderation) {
     throw new Error(
       `xpay.agenc: listing ${extra.listingPda} has no on-chain moderation attestation yet ` +
-        `(AgenC re-attests listings after program upgrades). The hire gate is fail-closed — ` +
+        `(AgenC re-attests listings after program upgrades). The hire gate is fail-closed - ` +
         `pick another listing or retry later.`,
     );
   }
@@ -165,7 +165,7 @@ export async function useAgencHire(args: UseArgs): Promise<UseResult> {
     status: "escrowed",
     statusHint:
       "SOL is escrowed on-chain; the provider works asynchronously. Poll progress with " +
-      `\`xpay agenc status ${taskPda}\` — funds settle to the provider after your review window.`,
+      `\`xpay agenc status ${taskPda}\` - funds settle to the provider after your review window.`,
     explorer: `https://solscan.io/tx/${signature}`,
     surfaceRevision: surface.surfaceRevision,
   };
@@ -194,7 +194,7 @@ function parseExtra(req: PaymentRequirement): AgencExtra {
     typeof version !== "string"
   ) {
     throw new Error(
-      "xpay.agenc: malformed AgenC resource — missing listingPda/specHash/version in " +
+      "xpay.agenc: malformed AgenC resource - missing listingPda/specHash/version in " +
         "accepts[].extra. Re-run discover to get a fresh listing.",
     );
   }
@@ -205,7 +205,7 @@ function parseExtra(req: PaymentRequirement): AgencExtra {
 
 type AgencSdk = typeof import("@tetsuo-ai/marketplace-sdk");
 
-/* Minimal structural view of the kit RPC — keeps these helpers decoupled from
+/* Minimal structural view of the kit RPC - keeps these helpers decoupled from
  * kit's branded generics while accepting the client hire() already builds. */
 interface MinimalRpc {
   getAccountInfo(
@@ -220,7 +220,7 @@ interface MinimalRpc {
 
 let surfaceCache: { value: { surfaceRevision: number; listings: boolean }; at: number } | undefined;
 
-/** Deployed instruction surface, cached 10 min — one account fetch. */
+/** Deployed instruction surface, cached 10 min - one account fetch. */
 async function deployedSurface(sdk: AgencSdk, rpc: unknown) {
   if (surfaceCache && Date.now() - surfaceCache.at < 600_000) return surfaceCache.value;
   const value = await sdk.getDeployedSurface(rpc as Parameters<AgencSdk["getDeployedSurface"]>[0]);
@@ -241,7 +241,7 @@ interface ResolvedModeration {
  *   2. v2 seeds ["listing_moderation_v2", listing, specHash, globalAuthority]
  *   3. getProgramAccounts scan (discriminator + listing memcmp)
  * Whatever record is found, its CONTENT names the moderator the hire gate
- * expects — return both so the facade can skip its own derivation.
+ * expects - return both so the facade can skip its own derivation.
  */
 export async function resolveListingModeration(
   sdk: AgencSdk,
@@ -255,7 +255,7 @@ export async function resolveListingModeration(
 
   const candidates: string[] = [];
 
-  // 1) v1 seeds — pre-upgrade attestations (still honored by the program).
+  // 1) v1 seeds - pre-upgrade attestations (still honored by the program).
   const [v1] = await getProgramDerivedAddress({
     programAddress: sdk.AGENC_COORDINATION_PROGRAM_ADDRESS,
     seeds: [
@@ -282,7 +282,7 @@ export async function resolveListingModeration(
       candidates.push(v2);
     }
   } catch {
-    /* moderation config unreadable — continue with what we have */
+    /* moderation config unreadable - continue with what we have */
   }
 
   for (const candidate of candidates) {
@@ -291,7 +291,7 @@ export async function resolveListingModeration(
   }
 
   // 3) Seed-agnostic: scan the program's moderation records for this listing.
-  //    Best effort — some RPCs rate-limit or forbid getProgramAccounts.
+  //    Best effort - some RPCs rate-limit or forbid getProgramAccounts.
   try {
     const disc = getBase58Decoder().decode(sdk.LISTING_MODERATION_DISCRIMINATOR);
     const rows = await (rpc as MinimalRpc)
@@ -308,7 +308,7 @@ export async function resolveListingModeration(
       if (rec) return { address: row.pubkey, moderator: rec };
     }
   } catch {
-    /* scan unavailable — fall through to fail-closed */
+    /* scan unavailable - fall through to fail-closed */
   }
 
   return null;

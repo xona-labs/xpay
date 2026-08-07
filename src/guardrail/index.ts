@@ -1,5 +1,5 @@
 /**
- * Spending guardrail — enforced *before* signing so a hallucinating agent
+ * Spending guardrail - enforced *before* signing so a hallucinating agent
  * can't sneak past it. This is the security primitive that makes xPay
  * "agentic" rather than just "an SDK with a wallet".
  *
@@ -22,7 +22,7 @@ export interface GuardrailConfig {
   requireApprovalAbove?: number;
   /**
    * Optional callback invoked when {@link GuardrailConfig.requireApprovalAbove}
-   * is hit — *or* when Bento escalates a call for human review. Implementor
+   * is hit - *or* when Bento escalates a call for human review. Implementor
    * decides how to surface the prompt (biometric, push, webhook). Resolve
    * `true` to allow, `false` to deny.
    */
@@ -32,7 +32,7 @@ export interface GuardrailConfig {
    * Bento's `protect()` (prompt-injection / wallet-drain / intent analysis)
    * *after* the local caps pass and *before* signing. Requires the wallet to
    * be registered at https://app.bentoguard.xyz and `AGENT_WALLET_PRIVATE_KEY`
-   * in the environment — `createXPay` sets that automatically from the active
+   * in the environment - `createXPay` sets that automatically from the active
    * profile. A `BLOCKED` verdict throws; an `ESCALATED` verdict defers to
    * {@link GuardrailConfig.onApprovalRequired} (or fails closed if none is set).
    */
@@ -64,8 +64,8 @@ export class Guardrail {
     const usd = await this.estimateUsd(args.requirement);
 
     // Host whitelist. Skipped for direct transfers and swaps (they target
-    // addresses/tokens, not hosts — `xpay://swap/...` would parse to a bogus
-    // host) — amount caps still apply, so a leaked CLI can't drain the wallet.
+    // addresses/tokens, not hosts, `xpay://swap/...` would parse to a bogus
+    // host), amount caps still apply, so a leaked CLI can't drain the wallet.
     if (
       !["transfer", "swap"].includes(args.resource.type) &&
       this.config.allowedHosts &&
@@ -115,7 +115,7 @@ export class Guardrail {
       }
     }
 
-    // Bento intent firewall. Runs last — it's a network round-trip to the
+    // Bento intent firewall. Runs last - it's a network round-trip to the
     // Bento relayer, so the cheap deterministic checks above reject the
     // obvious cases first. Only fires when explicitly enabled.
     if (this.config.bento?.enabled) {
@@ -153,7 +153,7 @@ export class Guardrail {
         throw new GuardrailError(
           "Bento is enabled but this agent wallet isn't registered. Log in to " +
             "https://app.bentoguard.xyz with your owner wallet and register this agent " +
-            "address, then retry — or run `xpay bento disable`.",
+            "address, then retry - or run `xpay bento disable`.",
         );
       }
       throw new GuardrailError(`Bento intent check failed: ${msg}`);
@@ -162,7 +162,7 @@ export class Guardrail {
     if (verdict.recommendation === "BLOCKED") {
       const risk = verdict.riskScore !== undefined ? ` (risk ${verdict.riskScore}/100)` : "";
       throw new GuardrailError(
-        `Bento blocked this call — ${verdict.reasoning ?? "flagged as malicious intent"}${risk}`,
+        `Bento blocked this call - ${verdict.reasoning ?? "flagged as malicious intent"}${risk}`,
       );
     }
 
@@ -177,8 +177,8 @@ export class Guardrail {
         }
         return;
       }
-      // No approver wired — fail closed (treat ambiguous as blocked).
-      const where = verdict.approveUrl ? ` — approve at ${verdict.approveUrl}` : "";
+      // No approver wired - fail closed (treat ambiguous as blocked).
+      const where = verdict.approveUrl ? ` - approve at ${verdict.approveUrl}` : "";
       throw new GuardrailError(
         `Bento escalated this call for human review${where}. Configure an ` +
           "onApprovalRequired hook to handle escalations, or run `xpay bento disable`.",
@@ -196,7 +196,7 @@ export class Guardrail {
     if (!req.amount) return 0;
     if (req.scheme === "swap") {
       // The swap module computes the input-side USD (Jupiter's estimate or
-      // spot price) and passes it along — same trust boundary as the atomic
+      // spot price) and passes it along - same trust boundary as the atomic
       // amounts on any other requirement it builds.
       const est = Number((req.extra as Record<string, unknown> | undefined)?.usdEstimate);
       if (Number.isFinite(est) && est >= 0) return est;
@@ -215,12 +215,12 @@ export class Guardrail {
       } catch (err) {
         if (this.hasCaps()) {
           throw new GuardrailError(
-            `cannot price a ${sol} SOL AgenC hire — SOL/USD feed unavailable ` +
+            `cannot price a ${sol} SOL AgenC hire - SOL/USD feed unavailable ` +
               `(${err instanceof Error ? err.message : String(err)}). ` +
               `Blocked because spending caps are configured.`,
           );
         }
-        return 0; // no caps to enforce — nothing to compare against
+        return 0; // no caps to enforce - nothing to compare against
       }
     }
     // USDC has 6 decimals on every chain we currently support.
@@ -247,7 +247,7 @@ export class Guardrail {
   }
 
   /**
-   * Toggle the Bento firewall on this live instance — lets the MCP
+   * Toggle the Bento firewall on this live instance - lets the MCP
    * `xpay_bento_enable` tool activate screening for the current session
    * without a server restart. Persisting the flag to disk is separate
    * (the caller does that via `setProfileBento`). Requires
@@ -268,7 +268,7 @@ export class GuardrailError extends Error {
 /**
  * Render a pending spend as the natural-language instruction Bento's
  * `protect()` expects. Bento screens *intent*, so we describe what the call
- * does in plain terms — amount, destination, and whether it's a service call,
+ * does in plain terms - amount, destination, and whether it's a service call,
  * an escrow hire, or a direct transfer (the case most prone to a drain attempt).
  */
 function describeSpend(resource: Resource, usd: number): string {
@@ -301,7 +301,7 @@ function safeHost(url: string): string {
 }
 
 // -----------------------------------------------------------------------------
-// Bento SDK — loaded lazily so the optional native dependency is only required
+// Bento SDK - loaded lazily so the optional native dependency is only required
 // when a profile actually enables the firewall.
 // -----------------------------------------------------------------------------
 
@@ -324,7 +324,7 @@ let bentoModule: BentoModule | null = null;
 async function loadBento(): Promise<BentoModule> {
   if (bentoModule) return bentoModule;
   // Non-literal specifier keeps TypeScript from resolving the optional package
-  // at build time — it may not be installed in every environment.
+  // at build time - it may not be installed in every environment.
   const specifier = "@bentoguard/sdk";
   try {
     bentoModule = (await import(specifier)) as unknown as BentoModule;

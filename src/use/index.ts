@@ -1,5 +1,5 @@
 /**
- * Use — call a paid resource, handling x402 payment end-to-end.
+ * Use - call a paid resource, handling x402 payment end-to-end.
  *
  * Two modes:
  *  - **Catalog mode** (`resource` has `accepts[]`): we pick a requirement up
@@ -32,12 +32,12 @@ export interface UseArgs {
   guardrail: Guardrail;
   body?: unknown;
   headers?: Record<string, string>;
-  /** AgenC hire settings (RPC, review window) — used only for AgenC resources. */
+  /** AgenC hire settings (RPC, review window) - used only for AgenC resources. */
   agenc?: AgencHireConfig;
 }
 
 export async function use(args: UseArgs): Promise<UseResult> {
-  // AgenC listings are not HTTP resources — payment is an on-chain escrow
+  // AgenC listings are not HTTP resources - payment is an on-chain escrow
   // hire, so branch before any x402 catalog / live-challenge logic.
   if (isAgencResource(args.resource)) {
     const { useAgencHire } = await import("../agenc/hire.js");
@@ -45,13 +45,13 @@ export async function use(args: UseArgs): Promise<UseResult> {
   }
 
   // If we have accepts up front, pick the network we can actually pay on
-  // (balance-aware) and take the fast path — unless the chosen option is
+  // (balance-aware) and take the fast path - unless the chosen option is
   // missing fields that only a live 402 challenge carries.
   if (args.resource.accepts.length > 0) {
     const req = await args.wallet.pickRequirementByBalance(args.resource.accepts);
     if (req) {
       if (!reqNeedsLiveChallenge(args, req)) return useWithRequirements(args, req);
-      // Chosen option needs a live 402 (SVM v2 missing feePayer) — fall through.
+      // Chosen option needs a live 402 (SVM v2 missing feePayer) - fall through.
     } else if (args.wallet.pickRequirement(args.resource.accepts)) {
       // We can sign for an option but no payable network has the funds.
       throw await insufficientBalanceError(args.resource.accepts, args.wallet);
@@ -62,7 +62,7 @@ export async function use(args: UseArgs): Promise<UseResult> {
 }
 
 /**
- * Catalog entries are snapshots — they carry payTo/asset/amount but not the
+ * Catalog entries are snapshots - they carry payTo/asset/amount but not the
  * per-facilitator settlement fields that only a fresh 402 challenge provides.
  * SVM v2 settlement needs `extra.feePayer` (the facilitator's fee-payer
  * pubkey); gasless EVM settlement needs the asset's EIP-712 domain params
@@ -83,7 +83,7 @@ function reqNeedsLiveChallenge(args: UseArgs, req: PaymentRequirement): boolean 
 
 /**
  * Convenience: call any URL with x402 support. Agents can use this when they
- * have a URL but no catalog entry — e.g. crawled from the web.
+ * have a URL but no catalog entry - e.g. crawled from the web.
  */
 export interface UseByUrlArgs {
   url: string;
@@ -114,7 +114,7 @@ async function useWithRequirements(
   args: UseArgs,
   req: PaymentRequirement,
 ): Promise<UseResult> {
-  // Guardrail runs *before* signing — this is the security boundary.
+  // Guardrail runs *before* signing - this is the security boundary.
   await args.guardrail.check({ resource: args.resource, requirement: req });
 
   const settled = await settle(args, req, args.resource.x402Version ?? 1);
@@ -128,12 +128,12 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
   // Step 1: probe without payment.
   const probe = await callResource(args, undefined);
   if (probe.res.status !== 402) {
-    // No payment required — return the probe response as-is. (Useful when a
+    // No payment required - return the probe response as-is. (Useful when a
     // resource later becomes free or for sanity checks.)
     return finalize(probe, "unknown", "0");
   }
 
-  // Step 2: parse the 402 challenge — may live in the body OR a response header.
+  // Step 2: parse the 402 challenge - may live in the body OR a response header.
   const { accepts: reqs } = extractRequirements(probe.res.headers, probe.data);
   if (reqs.length === 0) {
     throw new Error(
@@ -167,13 +167,13 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
  * value plus accounting fields. Picks the right encoding by network:
  *
  *   SVM (solana / solana:*) + signer has getKitSigner →
- *     canonical x402 v2 — sign-but-don't-broadcast, header carries the
+ *     canonical x402 v2 - sign-but-don't-broadcast, header carries the
  *     signed tx, facilitator settles. Returns header only (no txSig until
  *     the upstream call comes back).
  *
  *   EVM (eip155:* / base / ethereum / …) + signer has signEvmTypedData +
  *   requirement carries EIP-712 domain params →
- *     canonical x402 v2 — gasless EIP-3009 transferWithAuthorization
+ *     canonical x402 v2 - gasless EIP-3009 transferWithAuthorization
  *     signature in the header, facilitator broadcasts and pays gas.
  *
  *   Anything else (legacy v1) →
@@ -198,7 +198,7 @@ async function settle(
     return { header, network };
   }
 
-  // Gasless EVM v2 — sign an EIP-3009 transferWithAuthorization, facilitator
+  // Gasless EVM v2 - sign an EIP-3009 transferWithAuthorization, facilitator
   // broadcasts and pays gas. Needs the EIP-712 domain params from the 402
   // challenge; catalog snapshots without them were already routed through the
   // live flow by reqNeedsLiveChallenge().
@@ -216,7 +216,7 @@ async function settle(
     return { header, network };
   }
 
-  // Legacy path — sign + broadcast on our side, send txSig in the header.
+  // Legacy path - sign + broadcast on our side, send txSig in the header.
   const txSig = await signer.pay(req);
   return { header: paymentHeader(req, txSig, x402Version), network, txSig };
 }
@@ -236,7 +236,7 @@ async function callResource(
   };
   if (paymentHeader) {
     // Most x402 servers read `X-PAYMENT`; some (e.g. Nansen) read
-    // `Payment-Signature`. The payload is identical, so send both — servers
+    // `Payment-Signature`. The payload is identical, so send both - servers
     // ignore the header name they don't recognise.
     headers["x-payment"] = paymentHeader;
     headers["payment-signature"] = paymentHeader;
@@ -271,7 +271,7 @@ function finalize(
 ): UseResult {
   if (!raw.res.ok) {
     throw new Error(
-      `xpay.use: ${raw.res.status} ${raw.res.statusText} — ${
+      `xpay.use: ${raw.res.status} ${raw.res.statusText} - ${
         typeof raw.data === "string" ? raw.data : JSON.stringify(raw.data)
       }`,
     );
@@ -321,8 +321,8 @@ const PLATFORM_FEE_AMOUNT = 0.01;
 
 /**
  * Charge the xPay platform fee ($0.01 USDC) via the x402 endpoint.
- * Fires after every successful `use` call (including AgenC hires — exported
- * for the agenc module). Non-fatal — a failure is reported in
+ * Fires after every successful `use` call (including AgenC hires - exported
+ * for the agenc module). Non-fatal - a failure is reported in
  * `platformFee.error` rather than throwing.
  */
 export async function chargePlatformFee(wallet: Wallet): Promise<PlatformFeeResult> {
@@ -352,7 +352,7 @@ export async function chargePlatformFee(wallet: Wallet): Promise<PlatformFeeResu
       return { amount: PLATFORM_FEE_AMOUNT, success: false, error: `platform-fee: wallet has no signer for ${reqs.map(r => r.network).join(", ")}` };
     }
 
-    // Pay and retry — use a minimal UseArgs stub (no guardrail needed for our own fee).
+    // Pay and retry - use a minimal UseArgs stub (no guardrail needed for our own fee).
     const network = normalizeNetwork(req.network);
     const signer = wallet.signer(network);
     let header: string;
@@ -394,7 +394,7 @@ export async function chargePlatformFee(wallet: Wallet): Promise<PlatformFeeResu
 /**
  * Build a clear "you can't afford this" error listing the USDC balance on each
  * network the wallet could have paid on. Raised only when every payable option
- * is underfunded — better than attempting a doomed payment and surfacing a raw
+ * is underfunded - better than attempting a doomed payment and surfacing a raw
  * 402 from the upstream provider.
  */
 async function insufficientBalanceError(
@@ -406,7 +406,7 @@ async function insufficientBalanceError(
     nets.map(async (n) => `${n} $${(await wallet.balance(n).catch(() => 0)).toFixed(2)}`),
   );
   return new Error(
-    `xpay.use: insufficient USDC balance to pay on any funded network — ${parts.join(", ")}. ` +
+    `xpay.use: insufficient USDC balance to pay on any funded network - ${parts.join(", ")}. ` +
       `Fund one of these and retry.`,
   );
 }
@@ -418,7 +418,7 @@ function normalizeNetwork(raw: string): string {
   if (raw === "eip155:10") return "optimism";
   if (raw === "eip155:4663") return "robinhood";
   if (raw === "eip155:988") return "stable";
-  // Solana CAIP — any `solana:<genesis>` form collapses to our "solana" slug.
+  // Solana CAIP - any `solana:<genesis>` form collapses to our "solana" slug.
   if (raw === "solana" || raw.startsWith("solana:") || raw.startsWith("solana-")) return "solana";
   return raw;
 }

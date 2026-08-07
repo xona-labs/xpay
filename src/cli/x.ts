@@ -1,5 +1,5 @@
 /**
- * `xpay x <user|posts> <handle>` — realtime X (Twitter) account data via
+ * `xpay x <user|posts> <handle>` - realtime X (Twitter) account data via
  * xona's x402-paywalled proxy (at-cost passthrough of X API pay-per-use
  * billing: ~$0.01 profile, ~$0.06 for 10 posts). Paid from the active
  * profile's wallet through the normal x402 flow, guardrail included.

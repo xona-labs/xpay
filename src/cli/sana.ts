@@ -1,5 +1,5 @@
 /**
- * `xpay sana link|unlink|status` — manage the Sana agent card integration.
+ * `xpay sana link|unlink|status` - manage the Sana agent card integration.
  *
  * Once linked, the MCP server automatically registers sana_* tools so your
  * agent can check the card balance, top it up, view transactions, etc.
@@ -114,7 +114,7 @@ export function runSanaLink(apiKey: string, opts: { profile?: string }): void {
   setSanaApiKey(name, apiKey);
 
   console.log(chalk.green(`✔ Sana key linked to profile "${name}".`));
-  console.log(chalk.dim("  Restart your MCP client — sana_* tools will appear automatically."));
+  console.log(chalk.dim("  Restart your MCP client - sana_* tools will appear automatically."));
   console.log("");
   console.log(`  ${chalk.bold("sana_card")}              Card status & metadata`);
   console.log(`  ${chalk.bold("sana_card_balance")}      Available spending power`);
@@ -131,7 +131,7 @@ export function runSanaUnlink(opts: { profile?: string }): void {
   const name = opts.profile ?? getActiveProfile();
   clearSanaApiKey(name);
   console.log(chalk.yellow(`⚠ Sana key removed from profile "${name}".`));
-  console.log(chalk.dim("  Restart your MCP client — sana_* tools will disappear."));
+  console.log(chalk.dim("  Restart your MCP client - sana_* tools will disappear."));
 }
 
 export function runSanaStatus(opts: { profile?: string }): void {

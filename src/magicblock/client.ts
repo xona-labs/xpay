@@ -11,7 +11,7 @@
  * and recipient on the base chain.
  *
  * Platform model: xpay is the integration layer. End users never need a
- * MagicBlock account — they pass private:true and xpay handles the rest.
+ * MagicBlock account - they pass private:true and xpay handles the rest.
  * The challenge/login uses the user's own wallet key (proving transfer
  * authorization), not a separate username/password account.
  *
@@ -191,7 +191,7 @@ export interface InitializeMintParams {
 /**
  * Register an SPL mint with the MagicBlock ephemeral rollup.
  * Call this once per mint from the platform operator's wallet before enabling
- * private transfers. No auth required — this is a permissionless setup.
+ * private transfers. No auth required - this is a permissionless setup.
  */
 export async function magicBlockInitializeMint(
   params: InitializeMintParams,
@@ -241,7 +241,7 @@ export async function magicBlockIsMintInitialized(
 
 /**
  * Poll for transaction confirmation using getSignatureStatuses (pure HTTP).
- * Never calls signatureSubscribe — safe for RPCs that don't support WebSocket.
+ * Never calls signatureSubscribe - safe for RPCs that don't support WebSocket.
  * Resolves once confirmed/finalized, throws on on-chain error, times out after
  * ~60 s and resolves anyway (balance was already deducted, tx is in flight).
  */
@@ -264,7 +264,7 @@ async function pollConfirmation(
     }
     await new Promise((r) => setTimeout(r, intervalMs));
   }
-  // Timed out — transaction was submitted, confirmation just took too long.
+  // Timed out - transaction was submitted, confirmation just took too long.
   // Caller already has the sig so they can verify on-chain themselves.
 }
 

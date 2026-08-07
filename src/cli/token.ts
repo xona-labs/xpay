@@ -1,7 +1,7 @@
 /**
- * `xpay token find <query>` — search Solana tokens by ticker, name, or mint.
+ * `xpay token find <query>` - search Solana tokens by ticker, name, or mint.
  *
- * Read-only (Jupiter Token API) — does not load a profile or touch keys.
+ * Read-only (Jupiter Token API) - does not load a profile or touch keys.
  */
 
 import chalk from "chalk";

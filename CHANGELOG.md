@@ -6,6 +6,29 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.25] – 2026-08-07
+
+### Changed
+- **Rebranded to Xona Wallet.** The product name in the README, SKILL.md, and
+  on the site is now "Xona Wallet". The SDK surface is deliberately unchanged:
+  the npm package is still `@xona-labs/xpay`, the CLI is still `xpay`, the MCP
+  tools are still `xpay_*`, and the registry entry is still
+  `io.github.xona-labs/xpay`. Nothing to migrate.
+- Site moved from `xpay.xona-agent.com` to `wallet.xona-agent.com`. The npm
+  `homepage` and the registry `websiteUrl` point at the new domain. The hosted
+  MCP endpoint is now `https://wallet.xona-agent.com/mcp`.
+- Registry and npm metadata now carry the brand: `server.json` description is
+  "Xona Wallet: agent wallet for AI agents..." (82 chars, under the registry's
+  100-char cap) and `xona-wallet` was added to the npm keywords. The former
+  name stays indexed on the site, since every existing link says xpay.
+- Copy no longer uses em-dashes anywhere: docs, site, code comments, and
+  user-facing strings such as CLI output and error messages.
+
+### Note
+- 0.2.24 shipped to npm but was never tagged `v0.2.24`, so the MCP Registry
+  never picked it up and stayed on 0.2.23. Tagging `v0.2.25` carries both the
+  Stable chain release and this one to the registry in a single publish.
+
 ## [0.2.24] – 2026-08-07
 
 ### Added
@@ -15,14 +38,14 @@ versioning follows [Semantic Versioning](https://semver.org/).
   (`0x779Ded0c9e1022225f8E0630b35a9b54bE713736`, 6 decimals as an ERC-20)
   rather than USDC.
 - A Stable signer is registered on every profile from the existing derived
-  EVM key — same treatment as Robinhood Chain — so `stable` works without
+  EVM key, same treatment as Robinhood Chain, so `stable` works without
   re-running `xpay init` or editing `networks`.
 - `xpay balance` / `xpay_balance` show a `stable` row: USDT0 plus the native
   USDT gas coin (18 decimals, listed separately since the two share a name).
   USDT0 counts toward the stablecoin total.
 - Payment routing: a 402 quoting `eip155:988` resolves to the Stable signer,
   and the balance-aware picker compares USDT0 against the quoted price.
-  Payment stays gasless — the EIP-3009 typed-data path reads USDT0's EIP-712
+  Payment stays gasless - the EIP-3009 typed-data path reads USDT0's EIP-712
   domain (`USDT0` / `1`) from the live challenge's `extra`, which is the only
   reliable source since `version()` and `eip712Domain()` revert on that
   contract.
@@ -109,7 +132,7 @@ versioning follows [Semantic Versioning](https://semver.org/).
   boots in a **locked mode** instead: the connection succeeds, all tools are
   listed, and every call returns an actionable error telling the user exactly
   how to unlock (add `XPAY_PASSPHRASE` to the server's `env` in the host
-  config, or `xpay biometric enable` on macOS) — which the agent can relay
+  config, or `xpay biometric enable` on macOS) - which the agent can relay
   in-chat. Any other boot failure also falls back to locked mode with the
   underlying error, instead of killing the connection.
 
@@ -127,8 +150,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
 ### Fixed
 - **EVM x402 payments demanded native ETH gas despite the scheme being
   gasless.** Paying an `eip155:*` endpoint (e.g. xona's Base video routes)
-  went through the legacy v1 path — a literal `erc20.transfer()` broadcast
-  from the wallet — so gasless agent wallets died with "insufficient funds
+  went through the legacy v1 path, a literal `erc20.transfer()` broadcast
+  from the wallet, so gasless agent wallets died with "insufficient funds
   for intrinsic transaction cost". EVM now gets the same canonical v2
   treatment Solana has had since 0.1.4: the client signs an off-chain
   EIP-3009 `transferWithAuthorization` (EIP-712), sends it in `X-Payment`,
@@ -136,14 +159,14 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 - `Signer.signEvmTypedData` (optional capability, implemented by
-  `rawEvmSigner`) — EIP-712 typed-data signing; custom KMS/MPC signers can
+  `rawEvmSigner`) - EIP-712 typed-data signing; custom KMS/MPC signers can
   implement it to opt into gasless EVM payments.
 - `buildEvmPaymentHeader` / `isEvmNetwork` / `hasEvmDomainParams` in
   `src/x402/evm-payment.ts`, mirroring the SVM v2 header builder.
 
 ### Changed
 - Catalog-mode `use()` now falls back to the live 402 challenge for EVM
-  requirements missing EIP-712 domain params (`extra.name`/`version`) —
+  requirements missing EIP-712 domain params (`extra.name`/`version`) -
   catalog snapshots strip `extra`, and without the domain the gasless
   signature can't be built (previously this silently took the gas-burning
   legacy path). Same pattern as the existing SVM `feePayer` fallback.
@@ -155,7 +178,7 @@ versioning follows [Semantic Versioning](https://semver.org/).
   parameter (`['agenc']` / `['orbitx402']`) and the CLI gains
   `xpay discover --sources agenc`. Mixed results reserve only ~1/3 of the
   result slots for AgenC (2 of the default 5), which made "show me AgenC
-  listings" look like the marketplace had two items — a single-source browse
+  listings" look like the marketplace had two items - a single-source browse
   now returns everything (default limit 50), and the tool description tells
   agents to use it when the user asks about AgenC specifically.
 
@@ -170,7 +193,7 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - **AgenC reads now use the SDK's hosted-indexer client** (`createIndexerClient`
-  → `listActiveListings` / `getListing`) — AgenC's documented "intended scale
+  → `listActiveListings` / `getListing`) - AgenC's documented "intended scale
   read path". Discovery is back to the full active catalog; the freshness
   check is a single typed lookup. SDK bumped `^0.8.0` → `^0.10.0`.
 - **Hires are now resilient to AgenC program upgrades.** The moderation
@@ -186,7 +209,7 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - **zauth reposcan polling broke after the first check.** zauth's poll
-  responses echo only `{ status, scanId, progress }` — no `sessionToken` —
+  responses echo only `{ status, scanId, progress }`, no `sessionToken`, 
   so the scanning check never matched: the poll loop exited immediately and
   the MCP result dropped the sessionToken, leaving agents with just the
   scanId. Agents then passed the scanId to `xpay_zauth_scan_status` and got
@@ -200,14 +223,14 @@ versioning follows [Semantic Versioning](https://semver.org/).
   per scan (Solana or Base); session tokens are JWTs valid ~1 hour.
 - Completed zauth reports are compacted for MCP/CLI display: the bulky
   `matches` array (full file contents, tens of KB) is replaced by a
-  `matchCount` — `analysisMarkdown` + `zauthScore` carry the summary.
+  `matchCount` - `analysisMarkdown` + `zauthScore` carry the summary.
   `xpay zauth reposcan --json` still emits the full raw report.
 
 ## [0.2.11] – 2026-07-06
 
 ### Added
 - **zauth repo security scans (partner integration).** `xpay zauth reposcan
-  <repoUrl>` CLI and `xpay_zauth_reposcan` MCP tool — scans a git repository
+  <repoUrl>` CLI and `xpay_zauth_reposcan` MCP tool - scans a git repository
   via zauth's x402-paywalled endpoint through the normal payment flow
   (guardrail caps apply; price set by zauth's 402 challenge). Only the scan
   kickoff is paid: results are polled from a free status endpoint, with
@@ -219,8 +242,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - **Token-2022 balances were invisible.** `tokenBalances()` only scanned the
-  classic SPL token program, so tokens on the Token-2022 program — including
-  most pump.fun mints — never appeared in `xpay balance` / `xpay_balance`,
+  classic SPL token program, so tokens on the Token-2022 program, including
+  most pump.fun mints, never appeared in `xpay balance` / `xpay_balance`,
   even right after swapping into them. Both token programs are scanned now,
   and the 0.2.9 Jupiter enrichment labels and prices them.
 
@@ -232,18 +255,18 @@ versioning follows [Semantic Versioning](https://semver.org/).
   built-in registry displayed as a truncated mint with no price. Balances are
   now enriched via one batched Jupiter lookup: real symbol/name for unknown
   mints, per-token `usdValue`, a portfolio total, and an `⚠ unverified` flag
-  on suspicious tokens. Fails soft — if Jupiter is unreachable, balances
+  on suspicious tokens. Fails soft - if Jupiter is unreachable, balances
   render exactly as before. New SDK export: `enrichTokenBalances()`.
 
 ## [0.2.8] – 2026-07-04
 
 ### Added
 - **Realtime X (Twitter) data, zero setup.** `xpay x user <handle>` /
-  `xpay x posts <handle>` CLI and `xpay_x_user` / `xpay_x_posts` MCP tools —
+  `xpay x posts <handle>` CLI and `xpay_x_user` / `xpay_x_posts` MCP tools -
   live profile (followers, bio, verification) and recent posts with
   engagement metrics. Calls xona's x402-paywalled proxy of the X API v2 and
   pays per call from the wallet at **cost price** (~$0.01 profile, ~$0.06 for
-  10 posts — passthrough of X's pay-per-use billing, no markup). No X
+  10 posts - passthrough of X's pay-per-use billing, no markup). No X
   developer account or API key needed; guardrail caps apply like any paid
   call. Endpoint override: `XPAY_XDATA_ENDPOINT`.
 
@@ -254,7 +277,7 @@ versioning follows [Semantic Versioning](https://semver.org/).
   a code-execution tool sometimes hand-rolled swap scripts (bypassing the
   guardrail and token-verification safety) instead of calling the tool. The
   descriptions now explicitly forbid custom swap code and state that
-  `xpay_swap` is the single quote+sign+execute step — while also making clear
+  `xpay_swap` is the single quote+sign+execute step - while also making clear
   that `xpay_token_find` alone answers informational questions and a swap
   must never follow automatically unless the user asked to trade.
 
@@ -262,11 +285,11 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 - **Solana token discovery.** `xpay token find <query>` / `xpay.findTokens()` /
-  MCP `xpay_token_find` — search any Solana token by ticker, name, or mint via
+  MCP `xpay_token_find` - search any Solana token by ticker, name, or mint via
   Jupiter Token API v2 (keyless). Returns price, market cap, liquidity, and
   Jupiter's verification flag, ranked verified-first.
 - **Native token swap.** `xpay swap <amount> <from> <to>` / `xpay.swap()` /
-  MCP `xpay_swap` — swap tokens inside the user's own wallet via Jupiter Swap
+  MCP `xpay_swap` - swap tokens inside the user's own wallet via Jupiter Swap
   API v2 (order → partial-sign → managed execute; keyless). Accepts symbols or
   mint addresses; bare tickers resolve only to verified tokens (ambiguous
   tickers error with a candidate list; unverified tokens require the exact
@@ -282,7 +305,7 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - SKILL.md still documented the removed `xpay_transfer_confirm` staging flow
-  (dropped in 0.2.2) — rewritten for direct execution with guardrail gating.
+  (dropped in 0.2.2) - rewritten for direct execution with guardrail gating.
 
 ## [0.2.5] – 2026-07-04
 
@@ -292,7 +315,7 @@ versioning follows [Semantic Versioning](https://semver.org/).
   `moderator` argument in the hire instruction (P1.2 moderation gate) that
   SDK 0.7.1 predates. Bumped `@tetsuo-ai/marketplace-sdk` to `^0.8.0` and
   made the hire path resolve the listing's on-chain moderation record
-  (`["listing_moderation", listing, specHash]` PDA — derivable without
+  (`["listing_moderation", listing, specHash]` PDA - derivable without
   knowing the moderator; the record itself names the moderator), passing
   `moderator` + the explicit `listingModeration` account. Verified against
   mainnet by transaction simulation (executes cleanly end-to-end) and against
@@ -311,17 +334,17 @@ Re-release of 0.2.3 with no code changes (registry hygiene).
 - **AgenC marketplace (agenc.ag) as a discovery source with smart-routed
   execution.** Hireable AgenC listings now appear in `xpay discover` /
   `xpay_discover` alongside x402 services (marked `metadata.source: "agenc"`,
-  priced in SOL). Discovery merges sources with failure isolation — one
-  catalog going down no longer breaks discovery — and reserves result slots so
+  priced in SOL). Discovery merges sources with failure isolation, one
+  catalog going down no longer breaks discovery, and reserves result slots so
   marketplace listings aren't drowned out by the 21k-item x402 catalog. Opt
   out with `XPAY_DISCOVERY_SOURCES=orbitx402` or `discover({ sources })`.
 - **Smart execution routing in `use()`.** AgenC resources are detected by
   their `agenc-hire` payment scheme and executed as on-chain SOL escrow hires
-  via `@tetsuo-ai/marketplace-sdk` (humanless entry point — tasks pin to
+  via `@tetsuo-ai/marketplace-sdk` (humanless entry point - tasks pin to
   CreatorReview, so escrow never auto-releases without the buyer's
   acceptance). x402 resources keep the existing payment path; same
   `use()`/`do()` API for both. The result of a hire is a receipt
-  (`task`, `hireRecord`, `txSig`, explorer link) — the provider works
+  (`task`, `hireRecord`, `txSig`, explorer link) - the provider works
   asynchronously.
 - **CLI `xpay agenc hire <listingPda>` / `xpay agenc status <taskPda>`** and
   MCP tool `xpay_agenc_status` for tracking hire progress.
@@ -331,7 +354,7 @@ Re-release of 0.2.3 with no code changes (registry hygiene).
   while caps are configured.
 - Examples: `examples/agenc-hire.ts` (live discover → hire → poll) and
   `examples/agenc-local-sandbox.ts` (full hire lifecycle against the real
-  compiled program in-process via litesvm — no RPC, no SOL spent).
+  compiled program in-process via litesvm - no RPC, no SOL spent).
 
 ### Changed
 - `@solana/kit` bumped `^5.5.1` → `^6.9.0` (required by the AgenC SDK;
@@ -345,7 +368,7 @@ Re-release of 0.2.3 with no code changes (registry hygiene).
   and return a 6-digit code, requiring a second `xpay_transfer_confirm` call to
   actually move funds. Agents routinely skipped the follow-up call, read the
   `"Transfer staged…"` response as a receipt, and reported success with a
-  **hallucinated transaction hash** — a hash that never hit the chain (not on
+  **hallucinated transaction hash** - a hash that never hit the chain (not on
   Solscan, no funds moved). This affected private (MagicBlock PER) transfers in
   particular. The terminal path was never affected because it executes directly.
   `xpay_transfer` now runs the same direct path as the CLI, and
@@ -355,7 +378,7 @@ Re-release of 0.2.3 with no code changes (registry hygiene).
 - **The transfer spending gate no longer depends on the agent making a second
   tool call.** Safety comes from the guardrail (per-tx / per-day caps +
   `requireApprovalAbove`), which on MCP surfaces as a Touch ID prompt when
-  biometric unlock is enabled — a gate the model cannot fake or skip. Set
+  biometric unlock is enabled - a gate the model cannot fake or skip. Set
   `xpay guardrail --require-approval-above 0` with biometric enabled to require
   approval on every transfer.
 
@@ -367,7 +390,7 @@ Re-release of 0.2.3 with no code changes (registry hygiene).
   on-chain wallet registration, and the ALLOW / BLOCKED / ESCALATED verdicts),
   the MCP tool list re-includes `xpay_bento_status` / `xpay_bento_enable` /
   `xpay_bento_disable`, and SKILL.md re-adds the tools plus a safety note. No
-  code change — the firewall shipped in 0.1.28; this release publishes the docs
+  code change - the firewall shipped in 0.1.28; this release publishes the docs
   to npm.
 
 ## [0.2.0] – 2026-06-23
@@ -376,10 +399,10 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
 
 ### Easiest onboarding
 - **Zero-config wallet provisioning.** Drop the MCP server into any agent host
-  with no env — the agent is given its own persistent wallet on first boot
+  with no env - the agent is given its own persistent wallet on first boot
   (address printed to stderr to fund). Bring-your-own-key and existing profiles
   still take precedence.
-- **`SKILL.md`** — a framework-agnostic guide so any agent (Claude, Codex,
+- **`SKILL.md`**: a framework-agnostic guide so any agent (Claude, Codex,
   OpenAI, Gemini, custom) can drive xPay's tools, kept current with this release.
 
 ### Smart pay routing
@@ -398,14 +421,14 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
 
 ### Reporting
 - Comprehensive on-chain USDC usage report (daily / weekly / monthly) via
-  OrbitX402 — summary, timeline, top counterparties, and biggest transactions.
+  OrbitX402 - summary, timeline, top counterparties, and biggest transactions.
 
 ## [0.1.31] – 2026-06-23
 
 ### Fixed
 - **Payments now work against x402 servers that expect a `Payment-Signature`
   header.** The retry attaches the payment payload under both `X-PAYMENT` (the
-  common name) and `Payment-Signature` — some providers (e.g. Nansen) only read
+  common name) and `Payment-Signature` - some providers (e.g. Nansen) only read
   the latter and were silently returning `402 Payment Required` even though the
   payload was valid. Confirmed against the live Nansen endpoint: the same
   payload that was ignored under `X-PAYMENT` is accepted under
@@ -418,11 +441,11 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
 ### Fixed
 - **`use` no longer attempts a payment on an unfunded network.** 0.1.29's
   balance-aware picker fell back to the "best-funded" option when none could
-  cover the cost — which, with everything at $0, still tried to pay and surfaced
+  cover the cost - which, with everything at $0, still tried to pay and surfaced
   a raw `402 Payment Required` from the provider. Now, when multiple networks
   are payable but none has the funds, `use` raises a clear error listing each
   network's USDC balance (e.g. *"insufficient USDC balance to pay on any funded
-  network — base $0.00, solana $0.00"*) instead. The settlement flow itself is
+  network - base $0.00, solana $0.00"*) instead. The settlement flow itself is
   unchanged. A single-network resource is still attempted as before (funding is
   left to the payment flow).
 
@@ -432,31 +455,31 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
 - **`use` now picks the payment network by balance, not by list order.** When a
   resource accepts multiple networks (e.g. Base *and* Solana), xPay reads the
   wallet balance on each and pays from the first option that can cover the cost
-  — so a $0 Base wallet automatically falls through to a funded Solana one.
+ - so a $0 Base wallet automatically falls through to a funded Solana one.
   Previously it always took the first listed option (usually Base) and failed
   if that wallet was empty. Both the catalog and live-402 paths use the new
   picker. Single-network resources are unaffected (no extra balance lookups).
   Falls back to the best-funded option when none can cover the cost outright.
 
 ### Added
-- **`Wallet.pickRequirementByBalance()`** — the async, balance-aware selector
+- **`Wallet.pickRequirementByBalance()`**: the async, balance-aware selector
   behind the above. `pickRequirement()` (first-match, sync) is retained.
 
 ### Added
 - **Bento firewall controls exposed as MCP tools.** Agents can now manage the
   intent firewall directly, not just via the CLI:
-  - `xpay_bento_status` — read whether screening is on (and the agent wallet to register).
-  - `xpay_bento_enable` — turn it on; returns the agent wallet address to register at app.bentoguard.xyz.
-  - `xpay_bento_disable` — turn it off; the escape hatch when the wallet isn't registered and payments are being rejected.
+  - `xpay_bento_status` - read whether screening is on (and the agent wallet to register).
+  - `xpay_bento_enable` - turn it on; returns the agent wallet address to register at app.bentoguard.xyz.
+  - `xpay_bento_disable` - turn it off; the escape hatch when the wallet isn't registered and payments are being rejected.
   Enable/disable take effect live on the running guardrail (no restart) and
-  persist to the profile. Only available on profile-backed wallets — raw-key
+  persist to the profile. Only available on profile-backed wallets - raw-key
   (`XPAY_SOLANA_SECRET`) mode reports `profileBacked: false`.
 - **`Guardrail.bentoEnabled()` / `setBentoEnabled()`** for runtime toggling.
 
 ## [0.1.27] – 2026-06-23
 
 ### Added
-- **`SKILL.md` — framework-agnostic onboarding guide.** A single page that
+- **`SKILL.md` - framework-agnostic onboarding guide.** A single page that
   teaches any agent (Claude, Codex, OpenAI, Gemini, custom) how to drive xPay:
   zero-config setup, the tool surface, the pay-per-call model, the safety rules
   (guardrail, transfer confirmation, Bento), and copy-paste recipes. Shipped in
@@ -472,7 +495,7 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
 
 ### Added
 - **Zero-config wallet onboarding for the MCP server.** Drop xPay into any
-  agent host with no env at all — on first boot the agent is given its own
+  agent host with no env at all - on first boot the agent is given its own
   persistent wallet (generated, saved under `~/.xpay`/`XPAY_HOME`, address
   printed to stderr to fund). Reused on every later boot, so the agent keeps a
   stable address. The wallet source order is: existing profile → raw key env
@@ -485,7 +508,7 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
 ### Changed
 - **`mcp-server.ts` header now documents the zero-config form as primary.** The
   previous example showed `XPAY_PASSPHRASE` alone, which only works once a
-  profile already exists — a setup trap for fresh hosts.
+  profile already exists - a setup trap for fresh hosts.
 
 ## [0.1.25] – 2026-06-23
 
@@ -508,8 +531,8 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
 ### Added
 - **Bento Guard intent firewall (optional).** A second enforcement gate on top
   of the local guardrail caps. When enabled, every `use` / `transfer` is
-  screened by Bento's `protect()` for malicious *intent* — prompt-injection,
-  wallet-drain, intent-vs-execution mismatch — before signing. The local
+  screened by Bento's `protect()` for malicious *intent*, prompt-injection,
+  wallet-drain, intent-vs-execution mismatch, before signing. The local
   guardrail still owns spend caps; Bento adds the AI intent layer xPay can't
   compute itself.
   - Enable per-profile with `xpay bento enable` (also `disable` / `status`).
@@ -519,7 +542,7 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
     [app.bentoguard.xyz](https://app.bentoguard.xyz/); `enable` prints it.
   - `BLOCKED` verdicts throw a `GuardrailError`; `ESCALATED` verdicts defer to
     the existing `onApprovalRequired` hook, or fail closed if none is set.
-  - `@bentoguard/sdk` is an **optional** dependency loaded lazily — installs
+  - `@bentoguard/sdk` is an **optional** dependency loaded lazily - installs
     that can't build its native bindings won't break `npm i @xona-labs/xpay`,
     and the SDK is only required once a profile turns the firewall on.
 
@@ -538,32 +561,32 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
 ### Changed
 - **Discovery searches server-side.** `discover({ query })` now passes the
   query to the OrbitX402 API (`?query=`), which searches and ranks the
-  catalog and returns only the matches — one small request instead of
+  catalog and returns only the matches - one small request instead of
   downloading the entire 33k-item catalog (~2 minutes of sequential page
   fetches) to filter locally. Cold `xpay discover <query>` drops from
   minutes to ~2s. Local filtering remains as a fallback for endpoints that
   ignore the query param; no-query browsing still fetches the full catalog.
 
 ### Fixed
-- **MCP server no longer unlocks the wallet just to read the Sana API key** —
+- **MCP server no longer unlocks the wallet just to read the Sana API key** -
   `config.json` is plaintext, so `sana_*` tools now register correctly when
   the server starts without `XPAY_PASSPHRASE` (e.g. biometric-unlock setups).
 
 ## [0.1.18] – 2026-06-12
 
 ### Fixed
-- **`xpay balance` now unlocks via Touch ID** — it had its own inline
+- **`xpay balance` now unlocks via Touch ID**: it had its own inline
   passphrase prompt instead of the shared unlock path, so it never offered
   biometric unlock. It now uses `unlockActive` like every other command.
 
 ## [0.1.17] – 2026-06-12
 
 ### Added
-- **Biometric unlock (macOS Touch ID)** — `xpay biometric enable|disable|status`.
+- **Biometric unlock (macOS Touch ID)**: `xpay biometric enable|disable|status`.
   When enabled, the wallet passphrase is stored in the login keychain and
   released by a native LocalAuthentication helper (compiled on first use to
   `~/.xpay/bin/`, requires Xcode Command Line Tools) after a Touch ID check.
-  The scrypt/AES wallet encryption is unchanged — the passphrase remains the
+  The scrypt/AES wallet encryption is unchanged - the passphrase remains the
   fallback and recovery path. Unlock order is now: `--passphrase` flag →
   `$XPAY_PASSPHRASE` → Touch ID → interactive prompt.
 - **Guardrail approval hook is now wired in the CLI and MCP server.**
@@ -571,32 +594,32 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
   configured"); `xpay pay` / `xpay transfer` now resolve it via Touch ID (when
   biometric unlock is enabled) or a y/n confirm on a TTY. The MCP server uses
   Touch ID only (no TTY) and denies above-threshold calls otherwise.
-- **MCP server can start without `XPAY_PASSPHRASE`** — when the profile has
+- **MCP server can start without `XPAY_PASSPHRASE`**: when the profile has
   biometric unlock enabled, the server prompts Touch ID once at startup
   instead of requiring the passphrase in plaintext host config.
 
 ## [0.1.5] – 2026-05-26
 
 ### Added
-- **`UseResult.txSig` is now populated on SVM v2 calls** — extracted from
+- **`UseResult.txSig` is now populated on SVM v2 calls**: extracted from
   the facilitator's `PAYMENT-RESPONSE` (or `X-PAYMENT-RESPONSE`) header,
   which carries the canonical `SettleResponse` envelope (base64 JSON).
   Previously `useByUrl()` returned `txSig: undefined` for v2 because the
   facilitator (not the client) broadcasts the transaction.
-- **`UseResult.settlement?: SettleEnvelope`** — full settle envelope from
+- **`UseResult.settlement?: SettleEnvelope`**: full settle envelope from
   the facilitator when present: `{ transaction, payer?, network, amount?,
   success?, extensions?, extra? }`. Useful for reconciliation
   (payer address, actual settled amount in `upto`-style schemes, etc.).
 
 ### Verified
-- Live against `api.xona-agent.com/audio/x-text-to-speech` — 200 OK,
+- Live against `api.xona-agent.com/audio/x-text-to-speech` - 200 OK,
   $0.01 USDC settled, real on-chain signature
   (`3puHTvEY…EpEHi`) returned in both `txSig` and `settlement.transaction`.
 
 ## [0.1.4] – 2026-05-26
 
 ### Fixed
-- **`useByUrl()` against canonical x402 SVM v2 servers** — the SDK now signs
+- **`useByUrl()` against canonical x402 SVM v2 servers**: the SDK now signs
   but does **not** broadcast the USDC transfer, and sends the canonical
   `PaymentPayloadV2` envelope (`{ x402Version, accepted, payload: { transaction } }`)
   base64-encoded in the `X-Payment` header. The facilitator verifies + settles.
@@ -607,19 +630,19 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
   reject with `"Unsupported x402 payload"`.
 
 ### Added
-- New `Signer.getKitSigner?()` (optional, additive) — returns a `@solana/kit`
+- New `Signer.getKitSigner?()` (optional, additive) - returns a `@solana/kit`
   `TransactionSigner`. `rawSolanaSigner` implements it out of the box.
   Custom signers (KMS/MPC) implementing it gain canonical x402 v2 support
   for SVM endpoints; existing custom signers without it keep working via
   the legacy broadcast-then-`txSig` path for non-SVM networks.
-- New module `src/x402/svm-payment.ts` — wraps `@x402/svm`'s
+- New module `src/x402/svm-payment.ts` - wraps `@x402/svm`'s
   `ExactSvmScheme.createPaymentPayload` and assembles the canonical
   `PaymentPayloadV2` envelope. Used by `useByUrl()` for any network matching
   `solana` / `solana:*` / `solana-*`.
 
 ### Dependencies
-- `@x402/core`, `@x402/svm` — canonical x402 encoding (no spec drift).
-- `@solana/kit` — pulled in transitively by `@x402/svm`; used to construct
+- `@x402/core`, `@x402/svm` - canonical x402 encoding (no spec drift).
+- `@solana/kit` - pulled in transitively by `@x402/svm`; used to construct
   `TransactionSigner` instances from existing `@solana/web3.js` Keypairs via
   `createKeyPairSignerFromBytes`.
 
@@ -628,29 +651,29 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
   facilitator broadcasts; we never see the resulting signature client-side).
   Downstream reconciliation can still use the upstream response + your own
   correlationId in your DB.
-- Direct `transfer()` is unchanged — still uses `signer.pay()` (broadcasts
+- Direct `transfer()` is unchanged - still uses `signer.pay()` (broadcasts
   client-side, returns the real `txSig`), since there's no facilitator in
   the direct-transfer path.
 
 ## [0.1.3] – 2026-05-26
 
 ### Fixed
-- **`useByUrl()` against x402-spec endpoints** — now resolves the CAIP form
+- **`useByUrl()` against x402-spec endpoints**: now resolves the CAIP form
   of Solana (`solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` and `solana:*` /
   `solana-*` variants) to the configured `solana` signer. Previously failed
   with "no matching signer" against any endpoint reporting network in CAIP.
-- **`xpay pay` defaulted to GET** — most x402 service endpoints are POST, so
+- **`xpay pay` defaulted to GET**: most x402 service endpoints are POST, so
   the CLI returned 404 from the upstream. Added a `--method <m>` flag and
   documented it in the help text.
-- **Blank error output on signing failures** — `xpay pay` and `xpay transfer`
+- **Blank error output on signing failures**: `xpay pay` and `xpay transfer`
   printed a bare `✗` when the underlying Solana / SPL error had an empty
   `.message`. Now falls back to `toString()` and surfaces optional `logs`.
-- **402 challenges in response headers** were not parsed — only the body was
+- **402 challenges in response headers** were not parsed - only the body was
   checked. Now reads the requirements from either the body OR a header
   (`Payment-Required`, `X-Payment`, `X-Accept-Payment`, `WWW-Authenticate`,
   `X-402`, …), decoded as raw JSON, base64-JSON, URL-encoded JSON, or
   `<scheme> <payload>`.
-- **x402-spec field names not recognized** — the parser now aliases
+- **x402-spec field names not recognized**: the parser now aliases
   `maxAmountRequired → amount`, `recipient → payTo`, `token` / `mint` →
   `asset`, etc. Also accepts a bare requirement object, an `{accepts:[]}` /
   `{items:[]}` envelope, or a v1 bare array.
@@ -666,7 +689,7 @@ Milestone release consolidating the 0.1.24–0.1.31 line into four themes.
   shipped `dist/` so internal pipelines (e.g. curation) can deep-import.
 
 ### Internal
-- New shared `src/x402/extract.ts` module — single source of truth for
+- New shared `src/x402/extract.ts` module - single source of truth for
   parsing x402 challenges, consumed by both `useByUrl()` and the internal
   curation pipeline. Replaces the duplicated parser that used to live in
   `use/` and `probe/`.
@@ -681,22 +704,22 @@ GitHub releases page for the diff against 0.1.0.
 Initial public release.
 
 ### Added
-- Multi-network wallet — Solana + Base from one BIP-39 mnemonic, encrypted
+- Multi-network wallet - Solana + Base from one BIP-39 mnemonic, encrypted
   on disk with scrypt + AES-256-GCM.
-- `discover()` — search across the live x402 catalog (PayAI facilitator).
-- `useByUrl()` / `use()` — pay any x402 endpoint, handles the 402
+- `discover()` - search across the live x402 catalog (PayAI facilitator).
+- `useByUrl()` / `use()` - pay any x402 endpoint, handles the 402
   challenge → sign → retry-with-`X-Payment` flow.
-- `transfer()` — direct USDC send to an address, gated by the same guardrail.
-- `balance()` — unified USDC balance across configured networks.
-- `history()` — recent on-chain USDC activity (Solana via RPC, EVM via
+- `transfer()` - direct USDC send to an address, gated by the same guardrail.
+- `balance()` - unified USDC balance across configured networks.
+- `history()` - recent on-chain USDC activity (Solana via RPC, EVM via
   chunked `eth_getLogs`).
-- `Guardrail` — per-tx and per-day caps + allowed-host whitelist, enforced
+- `Guardrail` - per-tx and per-day caps + allowed-host whitelist, enforced
   before any signature.
-- Profile management — `initProfile()`, `loadProfile()`, multi-profile via
+- Profile management - `initProfile()`, `loadProfile()`, multi-profile via
   `~/.xpay/<name>/`.
 - CLI: `xpay init / accounts / discover / pay / transfer / balance / history /
   guardrail / mcp`.
-- MCP server (`xpay-mcp`) on stdio — exposes the SDK as tools for Claude
+- MCP server (`xpay-mcp`) on stdio - exposes the SDK as tools for Claude
   Desktop, Cursor, Codex.
 - LLM tool exporters: `forClaude(xpay)`, `forOpenAI(xpay)`, `forGemini(xpay)`.
 

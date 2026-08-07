@@ -1,10 +1,10 @@
 /**
- * `xpay trade <amount> <fromToken> <toToken>` — trade tokens on Robinhood
+ * `xpay trade <amount> <fromToken> <toToken>` - trade tokens on Robinhood
  * Chain via Uniswap V3 (NOXA Fun launchpad). Buy a token with native ETH or
  * sell it back to ETH. Subject to the active guardrail, enforced before
  * signing. Shows a quote and asks for confirmation unless `-y`.
  *
- * `xpay trending` — list what's hot on Robinhood Chain (read-only, no wallet).
+ * `xpay trending` - list what's hot on Robinhood Chain (read-only, no wallet).
  */
 
 import chalk from "chalk";
@@ -107,7 +107,7 @@ function printQuote(quote: TradeQuote): void {
   if (quote.unverified) {
     console.log("");
     console.log(chalk.yellow(`  ⚠ ${quote.to.symbol} is NOT a confirmed NOXA Fun launch.`));
-    console.log(chalk.yellow("    Verify the contract address — memecoin tickers are not unique and can be spoofed."));
+    console.log(chalk.yellow("    Verify the contract address - memecoin tickers are not unique and can be spoofed."));
   }
   if (quote.restriction) {
     console.log("");
@@ -121,7 +121,7 @@ function printQuote(quote: TradeQuote): void {
   console.log("");
 }
 
-/** Adaptive number formatting — thousands separators for big amounts, enough
+/** Adaptive number formatting - thousands separators for big amounts, enough
  *  significant digits for small ones (memecoin token counts vs tiny ETH sums). */
 function fmtAmount(n: number): string {
   if (n === 0) return "0";
@@ -157,13 +157,13 @@ export async function runTrending(opts: TrendingCmdOptions): Promise<void> {
       return;
     }
     for (const t of tokens) {
-      const price = t.priceUsd !== undefined ? `$${formatPrice(t.priceUsd)}` : "—";
-      const vol = t.volume24hUsd !== undefined ? `$${abbrev(t.volume24hUsd)}` : "—";
+      const price = t.priceUsd !== undefined ? `$${formatPrice(t.priceUsd)}` : " - ";
+      const vol = t.volume24hUsd !== undefined ? `$${abbrev(t.volume24hUsd)}` : " - ";
       const chg =
         t.priceChange24hPct !== undefined
           ? (t.priceChange24hPct >= 0 ? chalk.green : chalk.red)(`${t.priceChange24hPct.toFixed(1)}%`)
-          : "—";
-      const flag = t.poolIsV4 ? chalk.dim(" [v4 pool — not tradeable via xpay yet]") : "";
+          : " - ";
+      const flag = t.poolIsV4 ? chalk.dim(" [v4 pool - not tradeable via xpay yet]") : "";
       console.log(`  ${chalk.bold(t.symbol.padEnd(12))} ${price.padEnd(14)} 24h ${chg.padEnd(16)} vol ${vol}`);
       console.log(`  ${chalk.dim(t.address)}${flag}`);
     }

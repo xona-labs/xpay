@@ -61,7 +61,7 @@ function writeDisk(key: string, data: Resource[]): void {
     const blob: DiskEntry = { expiresAt: Date.now() + ttlMs, data };
     writeFileSync(diskCachePath(key), JSON.stringify(blob));
   } catch {
-    // Best-effort — cache failures should never break the call.
+    // Best-effort - cache failures should never break the call.
   }
 }
 

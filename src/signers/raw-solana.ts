@@ -1,5 +1,5 @@
 /**
- * Raw Solana signer — for tests, server-side agents, and other scenarios where
+ * Raw Solana signer - for tests, server-side agents, and other scenarios where
  * you hold a Solana keypair directly.
  *
  * Production wallets should prefer Privy or Phantom signers.
@@ -69,7 +69,7 @@ export function rawSolanaSigner(opts: RawSolanaSignerOptions): Signer {
      * `useByUrl()` can use `@x402/svm` for canonical x402 SVM v2 payloads.
      */
     async getKitSigner(): Promise<unknown> {
-      // Dynamic import — keeps @solana/signers off the hot path for users
+      // Dynamic import - keeps @solana/signers off the hot path for users
       // who never call useByUrl against an SVM endpoint.
       const { createKeyPairSignerFromBytes } = await import("@solana/signers");
       return createKeyPairSignerFromBytes(keypair.secretKey);
@@ -103,7 +103,7 @@ export function rawSolanaSigner(opts: RawSolanaSignerOptions): Signer {
         }
       } catch { /* skip */ }
 
-      // All SPL token accounts — both the classic token program AND
+      // All SPL token accounts - both the classic token program AND
       // Token-2022 (newer mints, e.g. pump.fun tokens, live there and were
       // previously invisible to balance).
       for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
@@ -168,7 +168,7 @@ export function rawSolanaSigner(opts: RawSolanaSignerOptions): Signer {
   };
 }
 
-/** Minimal Base58 decode — avoids pulling in bs58 just for this. */
+/** Minimal Base58 decode - avoids pulling in bs58 just for this. */
 function decodeBase58(s: string): Uint8Array {
   const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
   const map = new Map<string, number>();

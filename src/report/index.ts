@@ -1,5 +1,5 @@
 /**
- * Report — comprehensive USDC activity report fetched from the OrbitX402 API.
+ * Report - comprehensive USDC activity report fetched from the OrbitX402 API.
  *
  * Replaces the old direct-RPC history module. On-chain data is fetched
  * server-side by OrbitX402; xpay only receives the aggregated report.
@@ -70,7 +70,7 @@ export async function fetchReport(
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`xpay report: ${res.status} ${res.statusText}${body ? ` — ${body}` : ""}`);
+    throw new Error(`xpay report: ${res.status} ${res.statusText}${body ? ` - ${body}` : ""}`);
   }
 
   return res.json() as Promise<WalletReport>;

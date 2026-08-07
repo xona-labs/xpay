@@ -3,7 +3,7 @@
  *
  * Spec flow (`exact` scheme on eip155 networks):
  *   client signs an EIP-3009 `TransferWithAuthorization` typed-data payload
- *   (an off-chain signature — USDC supports it natively) → header carries
+ *   (an off-chain signature - USDC supports it natively) → header carries
  *   the authorization + signature → facilitator submits the transfer
  *   on-chain and pays the gas.
  *
@@ -43,7 +43,7 @@ const NAMED_CHAIN_IDS: Record<string, number> = {
 export interface BuildEvmPaymentArgs {
   /** Payer address (the EVM signer's wallet address). */
   address: string;
-  /** EIP-712 typed-data signer — from `signer.signEvmTypedData`. */
+  /** EIP-712 typed-data signer - from `signer.signEvmTypedData`. */
   signTypedData: (typedData: {
     domain: Record<string, unknown>;
     types: Record<string, Array<{ name: string; type: string }>>;
@@ -74,7 +74,7 @@ export function isEvmNetwork(network: string): boolean {
 /**
  * True when this requirement carries the EIP-712 domain params (`extra.name`
  * + `extra.version`) the gasless signature needs. Catalog snapshots usually
- * strip `extra` — a fresh 402 challenge always has it.
+ * strip `extra` - a fresh 402 challenge always has it.
  */
 export function hasEvmDomainParams(req: PaymentRequirement): boolean {
   return Boolean(req.extra?.name && req.extra?.version);
@@ -82,18 +82,18 @@ export function hasEvmDomainParams(req: PaymentRequirement): boolean {
 
 /**
  * Returns the value of the `X-Payment` header (base64 of canonical JSON
- * envelope), ready to attach to the retry request. Nothing is broadcast —
+ * envelope), ready to attach to the retry request. Nothing is broadcast -
  * the facilitator settles server-side.
  */
 export async function buildEvmPaymentHeader(args: BuildEvmPaymentArgs): Promise<string> {
   const req = args.requirement;
-  // The EIP-3009 payload shape only exists in x402 v2 — never emit a v1
+  // The EIP-3009 payload shape only exists in x402 v2 - never emit a v1
   // envelope here (v1 catalog entries without a version reach us as 1).
   const version = Math.max(args.x402Version ?? 2, 2);
 
   if (!hasEvmDomainParams(req)) {
     throw new Error(
-      `buildEvmPaymentHeader: EIP-712 domain params (extra.name/extra.version) missing for asset ${req.asset} — re-fetch the live 402 challenge`,
+      `buildEvmPaymentHeader: EIP-712 domain params (extra.name/extra.version) missing for asset ${req.asset} - re-fetch the live 402 challenge`,
     );
   }
 
@@ -102,7 +102,7 @@ export async function buildEvmPaymentHeader(args: BuildEvmPaymentArgs): Promise<
   const nonce = "0x" + Buffer.from(nonceBytes).toString("hex");
 
   // Authorization values travel as decimal strings in the header payload but
-  // are signed as uint256 — same split @x402/evm's client makes.
+  // are signed as uint256 - same split @x402/evm's client makes.
   const authorization = {
     from: args.address,
     to: req.payTo,

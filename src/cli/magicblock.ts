@@ -1,5 +1,5 @@
 /**
- * `xpay magicblock` — platform-level MagicBlock PER integration commands.
+ * `xpay magicblock` - platform-level MagicBlock PER integration commands.
  *
  * xpay acts as the privacy platform: end users never need a MagicBlock account.
  * These commands are for the xpay operator (platform team) to run once.
@@ -48,13 +48,13 @@ export async function runMagicBlockStatus(opts: { profile?: string }): Promise<v
   const initialized = await magicBlockIsMintInitialized(USDC_SOLANA, mb).catch(() => false);
   process.stdout.write("\r");
   if (initialized) {
-    console.log(`  ${chalk.green("●")} USDC mint is initialized — private transfers are ready.`);
+    console.log(`  ${chalk.green("●")} USDC mint is initialized - private transfers are ready.`);
   } else {
     console.log(`  ${chalk.yellow("●")} USDC mint is not yet initialized.`);
     console.log(chalk.dim("    Run: xpay magicblock init-mint"));
   }
   console.log("");
-  console.log(chalk.dim("  End users pass private:true to xpay_transfer — no MagicBlock account needed."));
+  console.log(chalk.dim("  End users pass private:true to xpay_transfer - no MagicBlock account needed."));
   console.log("");
 }
 
@@ -118,7 +118,7 @@ export function runMagicBlockConfigure(opts: {
 
   if (opts.clear) {
     clearMagicBlockConfig(name);
-    console.log(chalk.yellow(`⚠ MagicBlock config cleared from profile "${name}" — using defaults.`));
+    console.log(chalk.yellow(`⚠ MagicBlock config cleared from profile "${name}" - using defaults.`));
     return;
   }
 

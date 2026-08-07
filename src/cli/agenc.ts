@@ -1,5 +1,5 @@
 /**
- * `xpay agenc <hire|status>` — AgenC marketplace (agenc.ag).
+ * `xpay agenc <hire|status>` - AgenC marketplace (agenc.ag).
  *
  * AgenC listings show up in `xpay discover` alongside x402 services, but they
  * execute differently: hiring escrows the price in native SOL on-chain, the
@@ -80,7 +80,7 @@ export async function runAgencHire(listingPda: string, opts: AgencHireCmdOptions
     const elapsed = Date.now() - t0;
 
     console.log("");
-    console.log(chalk.green(`✔ Hired — ◎${sol.toFixed(4)} SOL escrowed in ${elapsed}ms`));
+    console.log(chalk.green(`✔ Hired - ◎${sol.toFixed(4)} SOL escrowed in ${elapsed}ms`));
     console.log(`  ${chalk.dim("task:")}     ${receipt.task}`);
     console.log(`  ${chalk.dim("tx:")}       ${receipt.txSig}`);
     console.log(`  ${chalk.dim("explorer:")} ${receipt.explorer}`);
@@ -99,7 +99,7 @@ export interface AgencStatusCmdOptions {
   json?: boolean;
 }
 
-/** Read-only — no profile unlock needed. */
+/** Read-only - no profile unlock needed. */
 export async function runAgencStatus(taskPda: string, opts: AgencStatusCmdOptions): Promise<void> {
   try {
     const task = await fetchAgencTask(taskPda);
@@ -126,7 +126,7 @@ export async function runAgencStatus(taskPda: string, opts: AgencStatusCmdOption
     }
     console.log("");
     if (task.status === "review") {
-      console.log(chalk.dim("The provider submitted a result — review it at:"));
+      console.log(chalk.dim("The provider submitted a result - review it at:"));
       console.log(chalk.cyan(`  https://agenc.ag/tasks/${taskPda}`));
     } else if (!["settled", "cancelled", "disputed"].includes(task.status)) {
       console.log(chalk.dim("Escrow settles to the provider after review. Check again later."));

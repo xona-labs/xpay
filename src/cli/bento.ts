@@ -1,14 +1,14 @@
 /**
- * `xpay bento enable|disable|status` — toggle the Bento Guard intent firewall
+ * `xpay bento enable|disable|status` - toggle the Bento Guard intent firewall
  * for the active profile.
  *
  * Unlike Sana, Bento has no API key: it authenticates with the wallet's own
  * key (createXPay exposes it via AGENT_WALLET_PRIVATE_KEY at runtime). The one
- * manual step is registering the wallet address once at app.bentoguard.xyz —
+ * manual step is registering the wallet address once at app.bentoguard.xyz -
  * `enable` prints that address and walks you through it.
  *
  * When enabled, every pay / transfer is screened by Bento's protect() for
- * malicious intent (prompt-injection, wallet-drain) before signing — a second
+ * malicious intent (prompt-injection, wallet-drain) before signing - a second
  * gate on top of the local guardrail caps.
  */
 
@@ -37,16 +37,16 @@ export function runBentoEnable(opts: { profile?: string }): void {
   console.log("");
   console.log(chalk.green(`✔ Bento intent firewall enabled for "${name}".`));
   console.log("");
-  console.log(chalk.bold("  One-time setup — register this AGENT wallet:"));
+  console.log(chalk.bold("  One-time setup - register this AGENT wallet:"));
   console.log(`    1. Log in to ${chalk.cyan(DASHBOARD)} with your owner wallet (e.g. Phantom).`);
-  console.log(`    2. Register THIS agent wallet address (an on-chain tx — owner pays gas):`);
+  console.log(`    2. Register THIS agent wallet address (an on-chain tx - owner pays gas):`);
   console.log(`       ${chalk.yellow(addresses.solana)}`);
   console.log(
-    `    3. Leave spend limits unset — xPay's own guardrail handles caps; Bento adds intent screening.`,
+    `    3. Leave spend limits unset - xPay's own guardrail handles caps; Bento adds intent screening.`,
   );
   console.log(
     chalk.dim(
-      "    Note: the owner wallet (dashboard login) and this agent wallet are usually different —",
+      "    Note: the owner wallet (dashboard login) and this agent wallet are usually different - ",
     ),
   );
   console.log(chalk.dim("    register the address shown above, not your login wallet."));
@@ -54,7 +54,7 @@ export function runBentoEnable(opts: { profile?: string }): void {
   console.log(chalk.dim("  From now on every pay / transfer is screened by Bento's intent"));
   console.log(chalk.dim("  analysis (prompt-injection / wallet-drain) before signing."));
   console.log(chalk.dim("  Until the address is registered, paid calls fail with a"));
-  console.log(chalk.dim('  "not registered" error — that is expected.'));
+  console.log(chalk.dim('  "not registered" error - that is expected.'));
   console.log("");
 }
 
