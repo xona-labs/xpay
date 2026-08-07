@@ -1,19 +1,19 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.xona-labs/xpay",
-  "description": "Agentic commerce for AI agents: multi-network wallet, x402 payments, AgenC hires, 20k+ services",
+  "description": "Xona Wallet: agent wallet for AI agents. x402 payments, AgenC hires, 20k+ services",
   "repository": {
     "url": "https://github.com/xona-labs/xpay",
     "source": "github"
   },
-  "websiteUrl": "https://xpay.xona-agent.com",
-  "version": "0.2.24",
+  "websiteUrl": "https://wallet.xona-agent.com",
+  "version": "0.2.25",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@xona-labs/xpay",
-      "version": "0.2.24",
+      "version": "0.2.25",
       "transport": {
         "type": "stdio"
       },
