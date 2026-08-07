@@ -9,7 +9,17 @@
 import { z } from "zod";
 
 /** A network slug. Keep this open-ended so new chains can be added without an SDK release. */
-export type Network = "solana" | "base" | "ethereum" | "arbitrum" | "optimism" | (string & {});
+export type Network =
+  | "solana"
+  | "base"
+  | "ethereum"
+  | "arbitrum"
+  | "optimism"
+  /** Robinhood Chain (Arbitrum Orbit L2, eip155:4663) — ETH-native. */
+  | "robinhood"
+  /** Stable (eip155:988) — Tether/Bitfinex payments L1, settles USDT0. */
+  | "stable"
+  | (string & {});
 
 /**
  * One payment option attached to a {@link Resource}.

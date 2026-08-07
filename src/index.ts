@@ -140,7 +140,7 @@ export interface XPay {
   /**
    * Direct token transfer (no x402). Subject to the same guardrail.
    * Solana: USDC, USDT, wSOL, BONK, JUP, PYTH, or any mint address.
-   * EVM: USDC only.
+   * EVM: the network's stablecoin only — USDC, or USDT0 on Stable.
    * Pass private:true for MagicBlock PER privacy (Solana only).
    */
   transfer(args: { amount: number; to: string; network?: Network; token?: string; private?: boolean }): Promise<TransferResult>;

@@ -23,15 +23,14 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
   const name = profile.name;
 
   const signers = signersFromProfile(profile);
-  // Robinhood Chain always has a signer (see signersFromProfile) even when it's
-  // not in the profile's `networks`, so surface it in the default view too —
-  // handy as the deposit address for funding trades.
+  // Robinhood Chain and Stable always have a signer (see signersFromProfile)
+  // even when they're not in the profile's `networks`, so surface them in the
+  // default view too — handy as the deposit address for funding trades and
+  // for /stable/* x402 calls.
   const configured = profile.config.networks;
   const networks = opts.network
     ? [opts.network]
-    : configured.includes("robinhood")
-      ? configured
-      : [...configured, "robinhood"];
+    : [...configured, ...["robinhood", "stable"].filter((n) => !configured.includes(n))];
 
   console.log("");
   console.log(chalk.bold(`Profile "${name}"`));
@@ -73,7 +72,9 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
         const usd = t.usdValue !== undefined ? chalk.dim(`≈ $${t.usdValue.toFixed(2)}`) : "";
         const flag = t.verified === false && !t.isNative ? chalk.yellow(" ⚠ unverified") : "";
         console.log(`    ${label.padEnd(18)}  ${chalk.white(val.padEnd(14))} ${usd}${flag}`);
-        if (t.symbol === "USDC" || t.symbol === "USDT") usdcTotal += t.balance;
+        // USDT0 is Stable's USDT (an ERC-20 OFT), and its native gas coin
+        // reports as USDT — both are dollars, so both count.
+        if (t.symbol === "USDC" || t.symbol === "USDT" || t.symbol === "USDT0") usdcTotal += t.balance;
         if (t.usdValue !== undefined) portfolioUsd += t.usdValue;
         else portfolioComplete = false;
       }
@@ -87,7 +88,7 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
     console.log("");
   }
 
-  console.log(`  ${chalk.bold(`$${usdcTotal.toFixed(4)}`)} ${chalk.dim("stablecoin total (USDC + USDT)")}`);
+  console.log(`  ${chalk.bold(`$${usdcTotal.toFixed(4)}`)} ${chalk.dim("stablecoin total (USDC + USDT + USDT0)")}`);
   if (portfolioUsd > 0) {
     console.log(
       `  ${chalk.bold(`$${portfolioUsd.toFixed(2)}`)} ${chalk.dim(`portfolio total${portfolioComplete ? "" : " (some tokens unpriced)"}`)}`,

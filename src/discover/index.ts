@@ -32,6 +32,20 @@ const DEFAULT_SOURCES = ["orbitx402", "agenc"];
  */
 const SERVER_QUERY_MAX = 1000;
 
+/**
+ * Named EVM slugs → the CAIP-2 id catalogs actually publish. Without this,
+ * filtering on `stable` or `base` matches nothing, since every EVM listing
+ * carries `eip155:<id>`.
+ */
+const NETWORK_ALIASES: Record<string, string> = {
+  base: "eip155:8453",
+  ethereum: "eip155:1",
+  arbitrum: "eip155:42161",
+  optimism: "eip155:10",
+  robinhood: "eip155:4663",
+  stable: "eip155:988",
+};
+
 let warnings: string[] = [];
 
 /** Non-fatal source failures from the most recent {@link discover} call. */
@@ -86,9 +100,10 @@ export async function discover(opts: InternalDiscoverOptions = {}): Promise<Reso
   // Network filter — prefix match so "solana" matches "solana:5eykt4..."
   // and "eip155:8453" matches exactly. The APIs have no network param yet.
   if (opts.networks?.length) {
+    const wanted = opts.networks.map((n) => NETWORK_ALIASES[n] ?? n);
     const matchesNet = (r: Resource) =>
       r.accepts.some((a) =>
-        opts.networks!.some((n) => a.network === n || a.network.startsWith(n + ":")),
+        wanted.some((n) => a.network === n || a.network.startsWith(n + ":")),
       );
     orbit = orbit.filter(matchesNet);
     agenc = agenc.filter(matchesNet);

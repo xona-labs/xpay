@@ -41,7 +41,7 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_discover` | Find paid services by natural-language query. Returns ranked candidates with price, network, and payee. |
 | `xpay_use` | Pay for and call a specific service. Pass the full `resource` object from `xpay_discover` (preferred), or a `resourceUrl`. Handles the x402 402-challenge → pay → retry flow. |
 | `xpay_do` | One step: discover the best service for an intent **and** call it. Use when you don't need to compare options. |
-| `xpay_transfer` | Send USDC (or any Solana SPL token) directly to an address. Executes immediately, gated by the user's guardrail — confirm amount + destination with the user before calling. |
+| `xpay_transfer` | Send USDC (or any Solana SPL token, or USDT0 on Stable) directly to an address. Executes immediately, gated by the user's guardrail — confirm amount + destination with the user before calling. |
 | `xpay_token_find` | Find Solana tokens by ticker, name, or mint (price, mcap, liquidity, `verified` flag). Read-only. |
 | `xpay_rwa_find` | List tradable RWA tokens on Solana: tokenized stocks/ETFs (xStocks, Ondo, Remora) + treasury-backed USDY. Free, read-only; results swappable via `xpay_swap`. |
 | `xpay_swap` | Swap tokens inside the wallet via Jupiter (Solana only). Irreversible; guardrail-gated. Confirm with the user first. |
@@ -70,9 +70,16 @@ balance covers the cost, so a $0 Base wallet falls through to a funded Solana
 one. If no network has the funds, the call fails fast with a clear
 "insufficient balance" message naming each network's balance.
 
+Networks the wallet can pay from: Solana, Base and the other EVM chains,
+Robinhood Chain, and **Stable** (chain 988, Tether's payments L1). Stable
+settles in **USDT0**, not USDC — one derived EVM key covers it, so it is
+always available and needs no setup. Fund it with USDT0; payments there are
+gasless, so no native gas token is needed to pay.
+
 The agent pays from its own wallet, so **it must be funded first**. If a call
-fails for lack of funds, ask the user to send USDC to the address from
-`xpay_balance` (Solana mainnet or Base).
+fails for lack of funds, ask the user to send the right stablecoin to the
+matching address from `xpay_balance` — USDC on Solana mainnet or Base, USDT0
+on Stable.
 
 ## AgenC marketplace listings — a different execution rail
 

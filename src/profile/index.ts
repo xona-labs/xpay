@@ -128,7 +128,7 @@ export function signersFromProfile(profile: LoadedProfile): Partial<Record<strin
         secretKey: keys.solana.keypair.secretKey,
         rpcUrl: profile.config.rpcs?.solana,
       });
-    } else if (["base", "ethereum", "arbitrum", "optimism", "robinhood"].includes(network)) {
+    } else if (["base", "ethereum", "arbitrum", "optimism", "robinhood", "stable"].includes(network)) {
       out[network] = rawEvmSigner({
         privateKey: keys.evm.privateKey,
         network,
@@ -145,6 +145,15 @@ export function signersFromProfile(profile: LoadedProfile): Partial<Record<strin
     privateKey: keys.evm.privateKey,
     network: "robinhood",
     rpcUrl: profile.config.rpcs?.robinhood,
+  });
+  // Same for Stable (chain 988): one derived EVM key covers every EIP-155
+  // chain, so registering it unconditionally lets any profile read its USDT0
+  // balance and pay /stable/* x402 routes without re-running `xpay init`.
+  // Payment routing only picks it when a 402 actually quotes eip155:988.
+  out.stable ??= rawEvmSigner({
+    privateKey: keys.evm.privateKey,
+    network: "stable",
+    rpcUrl: profile.config.rpcs?.stable,
   });
   return out;
 }

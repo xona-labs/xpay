@@ -12,6 +12,10 @@ const NATIVE_TOKEN: Record<string, { symbol: string; name: string }> = {
   arbitrum: { symbol: "ETH", name: "Ether" },
   optimism: { symbol: "ETH", name: "Ether" },
   robinhood: { symbol: "ETH", name: "Ether" },
+  // Stable's gas coin is USDT itself, at 18 decimals — the ERC-20 USDT0 below
+  // is a different token with 6 decimals. Distinct symbols keep them apart in
+  // the balance view.
+  stable: { symbol: "USDT", name: "Tether USD (gas)" },
 };
 
 const KNOWN_ERC20S: Record<string, Array<{ symbol: string; name: string; contract: string; decimals: number }>> = {
@@ -44,14 +48,24 @@ const KNOWN_ERC20S: Record<string, Array<{ symbol: string; name: string; contrac
   robinhood: [
     { symbol: "WETH", name: "Wrapped Ether",  contract: "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73", decimals: 18 },
   ],
+  // Stable (chain 988). USDT0 is the LayerZero OFT that x402 settles in — 6
+  // decimals as an ERC-20, verified on-chain via decimals()/symbol().
+  stable: [
+    { symbol: "USDT0", name: "USDT0", contract: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", decimals: 6 },
+  ],
 };
 
-/** Per-network USDC contract addresses. */
-const USDC_CONTRACTS: Record<string, string> = {
+/**
+ * The stablecoin x402 settles in on each network — what `balance()` reports and
+ * what payment routing compares a price against. USDC everywhere except Stable,
+ * which settles USDT0. All are 6 decimals, so the `/ 1_000_000` below holds.
+ */
+const SETTLEMENT_STABLECOIN: Record<string, string> = {
   base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
   ethereum: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
   arbitrum: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
   optimism: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+  stable: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736",
 };
 
 const DEFAULT_RPCS: Record<string, string> = {
@@ -60,6 +74,7 @@ const DEFAULT_RPCS: Record<string, string> = {
   arbitrum: "https://arb-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
   optimism: "https://opt-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
   robinhood: "https://rpc.mainnet.chain.robinhood.com",
+  stable: "https://rpc.stable.xyz",
 };
 
 const ERC20_ABI = [
@@ -105,10 +120,10 @@ export function rawEvmSigner(opts: RawEvmSignerOptions): Signer {
     },
 
     async balance(): Promise<number> {
-      const usdc = USDC_CONTRACTS[opts.network];
-      if (!usdc) return 0;
+      const asset = SETTLEMENT_STABLECOIN[opts.network];
+      if (!asset) return 0;
       try {
-        const erc20 = new Contract(usdc, ERC20_ABI, provider);
+        const erc20 = new Contract(asset, ERC20_ABI, provider);
         const raw = (await erc20.balanceOf!(wallet.address)) as bigint;
         return Number(raw) / 1_000_000;
       } catch {

@@ -132,7 +132,7 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       description:
         "Send tokens directly to an address (no x402, no provider). Subject to the user's guardrail. " +
         "Solana supports any SPL token: USDC, USDT, wSOL, mSOL, JitoSOL, BONK, JUP, PYTH, or any mint address. " +
-        "EVM supports USDC only. " +
+        "EVM supports the network's stablecoin only: USDC, or USDT0 on Stable (network \"stable\", chain 988). " +
         "Pass private:true on Solana to route through MagicBlock's Private Ephemeral Rollup, " +
         "which obscures the amount and recipient via delayed execution + fund splitting.",
       input_schema: {
@@ -149,11 +149,13 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
     },
     {
       name: "xpay_balance",
-      description: "USDC balance on each configured network, plus a total.",
+      description:
+        "Token balances on each configured network, plus a stablecoin total. " +
+        "Covers Solana, Base and the other EVM chains, Robinhood Chain, and Stable (USDT0).",
       input_schema: {
         type: "object",
         properties: {
-          network: { type: "string", description: "Restrict to one network." },
+          network: { type: "string", description: "Restrict to one network (solana, base, stable, robinhood, ...)." },
         },
       },
     },
@@ -585,20 +587,21 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       xpay.transfer({
         amount:  input.amount  as number,
         to:      input.to      as string,
-        token:   (input.token as string | undefined) ?? "USDC",
+        // Left undefined, transfer() picks the network's stablecoin: USDC on
+        // most EVM chains, USDT0 on Stable, USDC on Solana.
+        token:   input.token as string | undefined,
         network: input.network as string | undefined,
         private: input.private as boolean | undefined,
       }),
 
     xpay_balance: async (input) => {
-      // Robinhood Chain always has a signer (see signersFromProfile) even when
-      // it's not in the profile's `networks`, so include it in the default view.
+      // Robinhood Chain and Stable always have a signer (see
+      // signersFromProfile) even when they're not in the profile's `networks`,
+      // so include them in the default view.
       const configured = xpay.wallet.networks;
       const networks = input.network
         ? [input.network as string]
-        : configured.includes("robinhood")
-          ? configured
-          : [...configured, "robinhood"];
+        : [...configured, ...["robinhood", "stable"].filter((n) => !configured.includes(n))];
 
       const perNetwork: Record<string, unknown> = {};
       let stablecoinTotal = 0;
@@ -636,7 +639,11 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
             })),
           };
           for (const t of tokens) {
-            if (t.symbol === "USDC" || t.symbol === "USDT") stablecoinTotal += t.balance;
+            // USDT0 is Stable's USDT (an ERC-20 OFT); its native gas coin
+            // reports as USDT. Both are dollars, so both count.
+            if (t.symbol === "USDC" || t.symbol === "USDT" || t.symbol === "USDT0") {
+              stablecoinTotal += t.balance;
+            }
           }
         } else {
           // Fallback: USDC only.

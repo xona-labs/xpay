@@ -6,6 +6,40 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.24] – 2026-08-07
+
+### Added
+- **Stable chain (eip155:988) as a first-class wallet network.** xpay is now
+  an agent wallet on Tether/Bitfinex's payments L1, matching xona's
+  `/stable/*` x402 route family. It settles **USDT0**
+  (`0x779Ded0c9e1022225f8E0630b35a9b54bE713736`, 6 decimals as an ERC-20)
+  rather than USDC.
+- A Stable signer is registered on every profile from the existing derived
+  EVM key — same treatment as Robinhood Chain — so `stable` works without
+  re-running `xpay init` or editing `networks`.
+- `xpay balance` / `xpay_balance` show a `stable` row: USDT0 plus the native
+  USDT gas coin (18 decimals, listed separately since the two share a name).
+  USDT0 counts toward the stablecoin total.
+- Payment routing: a 402 quoting `eip155:988` resolves to the Stable signer,
+  and the balance-aware picker compares USDT0 against the quoted price.
+  Payment stays gasless — the EIP-3009 typed-data path reads USDT0's EIP-712
+  domain (`USDT0` / `1`) from the live challenge's `extra`, which is the only
+  reliable source since `version()` and `eip712Domain()` revert on that
+  contract.
+- `xpay transfer --network stable` sends USDT0. Accepts `USDT0`, `USDT`, or
+  `USDC` as the token name on that chain.
+- RPC override via profile `rpcs.stable` (default `https://rpc.stable.xyz`).
+
+### Fixed
+- `discover({ networks })` / `--network` now resolve named EVM slugs to the
+  CAIP-2 ids catalogs actually publish. `--network base` previously matched
+  nothing, since every EVM listing carries `eip155:8453`.
+- EVM network auto-detection in `transfer` now considers only networks the
+  profile opted into, instead of a hardcoded list. Always-registered signers
+  (Robinhood, Stable) no longer make every EVM transfer ambiguous, and a
+  profile configured for an EVM chain outside the old literal is no longer
+  reported as having no EVM signer.
+
 ## [0.2.23] – 2026-08-02
 
 ### Added

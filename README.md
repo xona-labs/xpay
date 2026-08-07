@@ -65,7 +65,7 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 |---|---|
 | `xpay init [name]` | Create a profile (Solana + EVM keys from one BIP-39 seed). `--import` to restore from a phrase, `--no-encrypt` for dev wallets, `--workspace` to store locally. |
 | `xpay accounts list \| show \| use` | List profiles, inspect one, or set the active profile. |
-| `xpay balance` | USDC balance per network for the active profile. |
+| `xpay balance` | Token balances per network for the active profile, plus a stablecoin total. Covers Solana, Base and other EVM chains, Robinhood Chain, and [Stable](#stable-chain). `--network`. |
 | `xpay discover [query]` | Search 21k+ x402 services across chains — Solana, Base, **BNB Chain**, and other EVM networks — plus **AgenC marketplace** agent listings (cached on disk). `--network`, `--limit`, `--json`. |
 | `xpay pay <url>` | Pay an x402 endpoint. Works on catalog URLs and any URL that returns 402. `--max-usd`, `--body`, `-y`. |
 | `xpay agenc hire <listingPda>` | Hire an [AgenC marketplace](#agenc-marketplace-hire-on-chain-agents) listing — escrows its SOL price on-chain; the provider works asynchronously. `--max-usd`, `--review-window`, `-y`. |
@@ -80,7 +80,7 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay zauth status <sessionToken>` | Check a running zauth scan (free, read-only, no wallet). `--json`. |
 | `xpay shop search "<query>"` | [Product discovery](#xona-shop-product-discovery) across Google Shopping, Amazon, and eBay from one query (~$0.02 USDC via x402, less for fewer marketplaces). `--marketplaces`, `--price-min/max`, `--condition`, `--sort`, `--json`, `-y`. |
 | `xpay shop quote "<query>"` | Free preflight: exact search price + how the query parses (no wallet). `--json`. |
-| `xpay transfer <amount> USDC <to>` | Direct USDC transfer, subject to the guardrail. `--network`, `-y`. |
+| `xpay transfer <amount> USDC <to>` | Direct stablecoin transfer (USDC, or USDT0 on [Stable](#stable-chain)), subject to the guardrail. `--network`, `-y`. |
 | `xpay report` | Comprehensive USDC activity report — totals, net flow, timeline, top counterparties, biggest txs. `--period daily\|weekly\|monthly`, `--network`, `--json`. |
 | `xpay guardrail show \| set \| clear` | Inspect or edit spending caps and allowed hosts. |
 | `xpay biometric status \| enable \| disable` | Touch ID unlock for the wallet passphrase (macOS). |
@@ -488,16 +488,38 @@ MCP: `xpay_shop_lens` (paid) / `xpay_shop_lens_quote` (free preflight: validates
 ```json
 {
   "version": 1,
-  "networks": ["solana", "base", "arbitrum"],
+  "networks": ["solana", "base", "arbitrum", "stable"],
   "defaultNetwork": "solana",
   "rpcs": {
     "solana": "https://your-helius-endpoint",
-    "base":   "https://your-alchemy-endpoint"
+    "base":   "https://your-alchemy-endpoint",
+    "stable": "https://rpc.stable.xyz"
   }
 }
 ```
 
 Public RPCs work for development but rate-limit hard. Production deployments should configure dedicated RPC endpoints.
+
+### Stable chain
+
+**Stable** (chain `988`, Tether/Bitfinex's payments L1) is supported as a first-class wallet network. It settles **USDT0** — the LayerZero OFT at `0x779Ded0c9e1022225f8E0630b35a9b54bE713736`, 6 decimals as an ERC-20 — not USDC.
+
+The same derived EVM key covers it, so a Stable signer is registered on **every** profile whether or not `stable` is in `networks`. You get it without re-running `xpay init`:
+
+```bash
+xpay balance                               # includes a stable row: USDT0 + native USDT gas
+xpay balance --network stable
+xpay discover "image generation" --network stable
+xpay transfer 1.5 0xRecipient --network stable          # sends USDT0
+```
+
+Notes:
+
+- **Payments are gasless.** x402 calls on Stable sign an EIP-3009 `transferWithAuthorization` and the facilitator broadcasts, so the wallet needs USDT0 only — no native gas. Direct `xpay transfer` *is* broadcast from your wallet, so that path needs a little native USDT for gas.
+- **The EIP-712 domain is `USDT0` / `1`, not the USDC default.** xpay never hardcodes it: the domain is read from `extra` on the live 402 challenge, which is the only reliable source (`version()` and `eip712Domain()` both revert on this contract).
+- **Two tokens share a name.** The native gas coin is USDT at 18 decimals; the ERC-20 that x402 settles is USDT0 at 6. `xpay balance` lists them separately.
+- **Routing is automatic.** A 402 quoting `eip155:988` resolves to the Stable signer, and `use()` compares USDT0 balance against the price when several chains are offered.
+- RPC override: profile `rpcs.stable` (default `https://rpc.stable.xyz`). Explorer: [stablescan.xyz](https://stablescan.xyz).
 
 ## How it works
 

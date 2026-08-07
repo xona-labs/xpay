@@ -5,7 +5,8 @@
  * can't drain the wallet past the configured caps.
  *
  * Solana: any SPL token by symbol (USDC, BONK, JUP, …) or raw mint address.
- * EVM:    USDC only (other ERC-20 addresses can be added to EVM_USDC as needed).
+ * EVM:    the network's stablecoin only — USDC, or USDT0 on Stable (other
+ *         ERC-20 addresses can be added to EVM_STABLECOIN as needed).
  */
 
 import {
@@ -53,12 +54,21 @@ export const KNOWN_SOLANA_SYMBOLS = Object.values(SOLANA_TOKENS).map((t) => t.sy
 
 // ─── EVM token addresses (USDC only for now) ─────────────────────────────────
 
-const EVM_USDC: Record<string, string> = {
-  base:      "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  ethereum:  "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-  arbitrum:  "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-  optimism:  "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+/**
+ * The stablecoin each EVM network transfers by default: USDC everywhere except
+ * Stable, whose stablecoin is USDT0. All are 6 decimals, so the atomic-amount
+ * math below is shared.
+ */
+const EVM_STABLECOIN: Record<string, { symbol: string; contract: string }> = {
+  base:      { symbol: "USDC",  contract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
+  ethereum:  { symbol: "USDC",  contract: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" },
+  arbitrum:  { symbol: "USDC",  contract: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" },
+  optimism:  { symbol: "USDC",  contract: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" },
+  stable:    { symbol: "USDT0", contract: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736" },
 };
+
+/** EVM network slugs xpay knows how to derive a signer for. */
+const EVM_NETWORKS = ["base", "ethereum", "arbitrum", "optimism", "robinhood", "stable"];
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -72,8 +82,8 @@ export interface TransferArgs {
   /**
    * Token to transfer.
    * - Solana: symbol ("USDC", "BONK", "JUP", …) or raw mint address.
-   * - EVM: only "USDC" supported today.
-   * Defaults to "USDC".
+   * - EVM: only the network's stablecoin — "USDC", or "USDT0" on Stable.
+   * Defaults to the network's stablecoin.
    */
   token?: string;
   /**
@@ -105,21 +115,26 @@ export async function transfer(args: TransferArgs): Promise<TransferResult> {
 
   const network = resolveNetwork(args);
 
-  // ── EVM path: USDC only ──────────────────────────────────────────────────
+  // ── EVM path: the network's stablecoin only ──────────────────────────────
   if (network !== "solana") {
-    const tokenSymbol = (args.token ?? "USDC").toUpperCase();
-    if (tokenSymbol !== "USDC") {
+    const stablecoin = EVM_STABLECOIN[network];
+    if (!stablecoin) {
+      throw new Error(`transfer: no stablecoin registered for EVM network "${network}"`);
+    }
+    // Accept the network's own symbol, plus the generic "USDC"/"USDT" the
+    // caller may default to — on Stable they all mean USDT0.
+    const tokenSymbol = (args.token ?? stablecoin.symbol).toUpperCase();
+    const aliases = network === "stable" ? ["USDT0", "USDT", "USDC"] : ["USDC"];
+    if (!aliases.includes(tokenSymbol)) {
       throw new Error(
-        `transfer: only USDC is supported on EVM networks (got "${args.token}"). ` +
+        `transfer: only ${stablecoin.symbol} is supported on "${network}" (got "${args.token}"). ` +
         `Multi-token EVM support coming soon.`,
       );
     }
-    const asset = EVM_USDC[network];
-    if (!asset) throw new Error(`transfer: no USDC address registered for "${network}"`);
 
     const atoms = BigInt(Math.round(args.amount * 1_000_000)).toString();
     const requirement: PaymentRequirement = {
-      asset, payTo: args.to, amount: atoms, scheme: "exact",
+      asset: stablecoin.contract, payTo: args.to, amount: atoms, scheme: "exact",
       network: networkToScheme(network),
     };
     await args.guardrail.check({
@@ -128,7 +143,7 @@ export async function transfer(args: TransferArgs): Promise<TransferResult> {
     });
     const signer = args.wallet.signer(network);
     const txSig = await signer.pay(requirement);
-    return { network, txSig, amount: args.amount, token: "USDC", to: args.to };
+    return { network, txSig, amount: args.amount, token: stablecoin.symbol, to: args.to };
   }
 
   // ── Solana path: native SOL ──────────────────────────────────────────────
@@ -283,7 +298,14 @@ function resolveNetwork(args: TransferArgs): Network {
   }
   const looksLikeEvm = /^0x[0-9a-fA-F]{40}$/.test(args.to);
   if (looksLikeEvm) {
-    const evm = ["base", "ethereum", "arbitrum", "optimism"].filter((n) => args.wallet.has(n));
+    // Auto-detect only across networks the profile actually opted into.
+    // Robinhood and Stable signers are always registered (see
+    // signersFromProfile), so keying off `wallet.has()` alone would make every
+    // EVM transfer ambiguous — reach those two with an explicit --network
+    // unless they're in the profile's `networks`.
+    const evm = args.wallet.networks.filter(
+      (n) => EVM_NETWORKS.includes(n) && args.wallet.has(n),
+    );
     if (evm.length === 0) throw new Error(`transfer: address looks EVM but no EVM signer is configured`);
     if (evm.length === 1) return evm[0]!;
     throw new Error(
@@ -302,6 +324,8 @@ function networkToScheme(net: Network): string {
     case "ethereum":  return "eip155:1";
     case "arbitrum":  return "eip155:42161";
     case "optimism":  return "eip155:10";
+    case "robinhood": return "eip155:4663";
+    case "stable":    return "eip155:988";
     default:          return net;
   }
 }
