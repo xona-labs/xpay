@@ -39,7 +39,7 @@ import { profileExists } from "../profile/storage.js";
 import { readProfileConfig, setProfileBento } from "../profile/index.js";
 import { rawSolanaSigner } from "../signers/raw-solana.js";
 import { rawEvmSigner } from "../signers/raw-evm.js";
-import { forClaude } from "../tools/index.js";
+import { forClaude, TOOL_ANNOTATIONS } from "../tools/index.js";
 import { getActiveProfile } from "./accounts.js";
 import { guardrailWithApproval } from "./common.js";
 import type { Network, Signer } from "../types.js";
@@ -171,6 +171,9 @@ export async function startMcpServer(): Promise<void> {
       name: t.name,
       description: t.description,
       inputSchema: "input_schema" in t ? t.input_schema : t.inputSchema,
+      // ChatGPT Apps review requires explicit readOnly/openWorld/destructive
+      // hints on every tool; sana_* tools (key-gated) fall back to undefined.
+      annotations: TOOL_ANNOTATIONS[t.name],
     })),
   }));
 

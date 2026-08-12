@@ -55,6 +55,55 @@ export interface ToolOptions {
   sanaApiKey?: string;
 }
 
+/** MCP tool annotations (readOnly / openWorld / destructive hints). */
+export interface ToolAnnotations {
+  readOnlyHint: boolean;
+  openWorldHint: boolean;
+  destructiveHint: boolean;
+}
+
+/** Fetches or computes only - no payment, no signing, no state change. */
+const READ: ToolAnnotations = { readOnlyHint: true, openWorldHint: false, destructiveHint: false };
+/** Spends from the wallet: settles an irreversible on-chain payment and/or calls an external system. */
+const SPEND: ToolAnnotations = { readOnlyHint: false, openWorldHint: true, destructiveHint: true };
+/** Writes local profile config only - reversible, nothing leaves the machine. */
+const LOCAL_CONFIG: ToolAnnotations = { readOnlyHint: false, openWorldHint: false, destructiveHint: false };
+
+/**
+ * Annotations for every tool the MCP server exposes, keyed by tool name.
+ * Kept out of the vendor tool defs (forClaude/forOpenAI/forGemini) because
+ * provider APIs reject unknown fields; the MCP server merges these into its
+ * ListTools response. Includes the three bento tools registered directly in
+ * mcp-server.ts.
+ */
+export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
+  xpay_discover: READ,
+  xpay_use: SPEND,
+  xpay_do: SPEND,
+  xpay_transfer: SPEND,
+  xpay_balance: READ,
+  xpay_report: READ,
+  xpay_guardrail: READ,
+  xpay_token_find: READ,
+  xpay_swap: SPEND,
+  xpay_trending_tokens: READ,
+  xpay_trade_quote: READ,
+  xpay_trade: SPEND,
+  xpay_x_user: SPEND,
+  xpay_x_posts: SPEND,
+  xpay_zauth_reposcan: SPEND,
+  xpay_zauth_scan_status: READ,
+  xpay_rwa_find: READ,
+  xpay_shop_quote: READ,
+  xpay_shop_search: SPEND,
+  xpay_shop_lens_quote: READ,
+  xpay_shop_lens: SPEND,
+  xpay_agenc_status: READ,
+  xpay_bento_status: READ,
+  xpay_bento_enable: LOCAL_CONFIG,
+  xpay_bento_disable: LOCAL_CONFIG,
+};
+
 /** Anthropic Claude tool definitions. */
 export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<ClaudeToolDef> {
   const tools: ClaudeToolDef[] = [
