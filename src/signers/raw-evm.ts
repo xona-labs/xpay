@@ -16,6 +16,8 @@ const NATIVE_TOKEN: Record<string, { symbol: string; name: string }> = {
   // is a different token with 6 decimals. Distinct symbols keep them apart in
   // the balance view.
   stable: { symbol: "USDT", name: "Tether USD (gas)" },
+  // Tempo (Stripe/Paradigm payments L1, chain 4217) has no native gas token -
+  // fees are paid in TIP-20 stablecoins - so no NATIVE_TOKEN entry either.
 };
 
 const KNOWN_ERC20S: Record<string, Array<{ symbol: string; name: string; contract: string; decimals: number }>> = {
@@ -53,6 +55,12 @@ const KNOWN_ERC20S: Record<string, Array<{ symbol: string; name: string; contrac
   stable: [
     { symbol: "USDT0", name: "USDT0", contract: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", decimals: 6 },
   ],
+  // Tempo (chain 4217). USDC.e is the bridged Circle USDC as a TIP-20 - it
+  // answers the standard ERC-20 read surface (symbol/decimals/balanceOf
+  // verified on-chain), so balances work over plain JSON-RPC.
+  tempo: [
+    { symbol: "USDC.e", name: "USD Coin (Tempo)", contract: "0x20C000000000000000000000b9537d11c60E8b50", decimals: 6 },
+  ],
 };
 
 /**
@@ -66,6 +74,7 @@ const SETTLEMENT_STABLECOIN: Record<string, string> = {
   arbitrum: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
   optimism: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
   stable: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736",
+  tempo: "0x20C000000000000000000000b9537d11c60E8b50",
 };
 
 const DEFAULT_RPCS: Record<string, string> = {
@@ -75,6 +84,7 @@ const DEFAULT_RPCS: Record<string, string> = {
   optimism: "https://opt-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
   robinhood: "https://rpc.mainnet.chain.robinhood.com",
   stable: "https://rpc.stable.xyz",
+  tempo: "https://rpc.tempo.xyz",
 };
 
 const ERC20_ABI = [

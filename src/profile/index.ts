@@ -128,7 +128,7 @@ export function signersFromProfile(profile: LoadedProfile): Partial<Record<strin
         secretKey: keys.solana.keypair.secretKey,
         rpcUrl: profile.config.rpcs?.solana,
       });
-    } else if (["base", "ethereum", "arbitrum", "optimism", "robinhood", "stable"].includes(network)) {
+    } else if (["base", "ethereum", "arbitrum", "optimism", "robinhood", "stable", "tempo"].includes(network)) {
       out[network] = rawEvmSigner({
         privateKey: keys.evm.privateKey,
         network,
@@ -154,6 +154,15 @@ export function signersFromProfile(profile: LoadedProfile): Partial<Record<strin
     privateKey: keys.evm.privateKey,
     network: "stable",
     rpcUrl: profile.config.rpcs?.stable,
+  });
+  // Same for Tempo (chain 4217, Stripe/Paradigm payments L1): registering it
+  // unconditionally lets any profile read its USDC.e balance and settle MPP
+  // tempo/charge 402s without re-running `xpay init`. Routing only picks it
+  // when a challenge actually quotes a Tempo chain.
+  out.tempo ??= rawEvmSigner({
+    privateKey: keys.evm.privateKey,
+    network: "tempo",
+    rpcUrl: profile.config.rpcs?.tempo,
   });
   return out;
 }

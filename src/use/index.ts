@@ -23,6 +23,10 @@ import type { Guardrail } from "../guardrail/index.js";
 import { extractRequirements, extractSettleEnvelope } from "../x402/extract.js";
 import { buildSvmPaymentHeader, isSvmNetwork } from "../x402/svm-payment.js";
 import { buildEvmPaymentHeader, hasEvmDomainParams, isEvmNetwork } from "../x402/evm-payment.js";
+import { parseMppChallenges, settleableMppOptions, type MppOption } from "../mpp/challenge.js";
+import { buildMppAuthorizationHeader, extractMppReceipt } from "../mpp/credential.js";
+import { buildMppEvmAuthorization } from "../mpp/evm-charge.js";
+import { buildMppTempoCharge } from "../mpp/tempo-charge.js";
 import { isAgencResource } from "../agenc/api.js";
 import type { AgencHireConfig } from "../agenc/hire.js";
 
@@ -133,9 +137,27 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
     return finalize(probe, "unknown", "0");
   }
 
-  // Step 2: parse the 402 challenge - may live in the body OR a response header.
+  // Step 2a: MPP servers announce options via `WWW-Authenticate: Payment ...`
+  // (Stripe + Tempo's 402 standard). Try the native MPP flow first; hybrid
+  // servers also emit x402 challenges, so anything we can't settle as MPP
+  // (e.g. tempo-only endpoints) falls through to the x402 path below.
+  const mppChallenges = parseMppChallenges(probe.res.headers);
+  const mppOptions = settleableMppOptions(mppChallenges);
+  if (mppOptions.length > 0) {
+    const picked = await pickMppOption(args, mppOptions);
+    if (picked) return useWithMppOption(args, picked);
+  }
+
+  // Step 2b: parse the x402 challenge - may live in the body OR a response header.
   const { accepts: reqs } = extractRequirements(probe.res.headers, probe.data);
   if (reqs.length === 0) {
+    if (mppChallenges.length > 0) {
+      throw new Error(
+        `xpay.use: ${args.resource.resource} offers MPP methods [${mppChallenges
+          .map((c) => `${c.method}/${c.intent}`)
+          .join(", ")}] that this wallet cannot settle yet, and no x402 fallback`,
+      );
+    }
     throw new Error(
       `xpay.use: ${args.resource.resource} returned 402 but no parseable accepts[] in body or headers`,
     );
@@ -158,6 +180,85 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
   // Step 3: retry with X-Payment.
   const res = await callResource(args, settled.header);
   const result = await finalize(res, settled.network, req.amount ?? "0", settled.txSig);
+  result.platformFee = await chargePlatformFee(args.wallet);
+  return result;
+}
+
+/**
+ * Pick the MPP option this wallet can fund, balance-aware. Returns undefined
+ * when no settleable option has a matching signer (caller falls back to
+ * x402); throws when we could sign for one but every funded network is short
+ * (an accurate "top up" beats a misleading protocol error downstream).
+ */
+async function pickMppOption(args: UseArgs, options: MppOption[]): Promise<MppOption | undefined> {
+  const reqs = options.map((o) => o.requirement);
+  const req = await args.wallet.pickRequirementByBalance(reqs);
+  if (req) return options.find((o) => o.requirement === req);
+  if (args.wallet.pickRequirement(reqs)) {
+    throw await insufficientBalanceError(reqs, args.wallet);
+  }
+  return undefined;
+}
+
+/**
+ * Settle an MPP charge: sign the method-specific proof bound to the
+ * challenge (EIP-3009 authorization for `evm`, pull-mode Tempo transaction
+ * for `tempo`), retry with `Authorization: Payment ...`, and read the
+ * settlement tx hash from the `Payment-Receipt` header. Nothing is
+ * broadcast client-side - the server submits the transfer, and on Tempo
+ * fee-sponsored challenges it covers gas too.
+ */
+async function useWithMppOption(args: UseArgs, opt: MppOption): Promise<UseResult> {
+  const req = opt.requirement;
+  // Guardrail runs *before* signing - same security boundary as x402.
+  await args.guardrail.check({ resource: args.resource, requirement: req });
+
+  const network = normalizeNetwork(req.network);
+  const signer = args.wallet.signer(network);
+
+  let payload: Record<string, unknown>;
+  let source: string;
+  if (opt.challenge.method === "tempo") {
+    // Tempo txs (expiring nonces, fee sponsorship) need the raw key for
+    // viem's tempo signer - available from key-holding EVM signers.
+    const evmWallet = signer.getEvmWallet?.() as { privateKey?: string } | undefined;
+    if (!evmWallet?.privateKey) {
+      throw new Error(
+        `xpay.use: MPP tempo/charge on ${req.network} requires a key-holding EVM signer (getEvmWallet)`,
+      );
+    }
+    ({ payload, source } = await buildMppTempoCharge({
+      privateKey: evmWallet.privateKey,
+      challenge: opt.challenge,
+    }));
+  } else {
+    if (typeof signer.signEvmTypedData !== "function") {
+      throw new Error(
+        `xpay.use: MPP evm/charge on ${req.network} requires an EIP-712 typed-data signer`,
+      );
+    }
+    ({ payload, source } = await buildMppEvmAuthorization({
+      address: signer.address,
+      signTypedData: signer.signEvmTypedData.bind(signer),
+      challenge: opt.challenge,
+    }));
+  }
+  const header = buildMppAuthorizationHeader({ challenge: opt.challenge, payload, source });
+
+  const res = await callResource(args, header, "mpp");
+  const result = finalize(res, network, req.amount ?? "0");
+
+  const receipt = extractMppReceipt(res.res.headers);
+  if (receipt) {
+    result.txSig = receipt.reference;
+    result.settlement = {
+      transaction: receipt.reference,
+      network: req.network,
+      amount: req.amount,
+      success: receipt.status === "success",
+    };
+  }
+
   result.platformFee = await chargePlatformFee(args.wallet);
   return result;
 }
@@ -229,12 +330,16 @@ interface RawResponse {
 async function callResource(
   args: UseArgs,
   paymentHeader: string | undefined,
+  protocol: "x402" | "mpp" = "x402",
 ): Promise<RawResponse> {
   const headers: Record<string, string> = {
     accept: "application/json",
     ...args.headers,
   };
-  if (paymentHeader) {
+  if (paymentHeader && protocol === "mpp") {
+    // MPP credentials ride the standard auth header (`Authorization: Payment ...`).
+    headers["authorization"] = paymentHeader;
+  } else if (paymentHeader) {
     // Most x402 servers read `X-PAYMENT`; some (e.g. Nansen) read
     // `Payment-Signature`. The payload is identical, so send both - servers
     // ignore the header name they don't recognise.
@@ -418,6 +523,9 @@ function normalizeNetwork(raw: string): string {
   if (raw === "eip155:10") return "optimism";
   if (raw === "eip155:4663") return "robinhood";
   if (raw === "eip155:988") return "stable";
+  // Tempo mainnet + Moderato testnet share the slug: the MPP tempo builder
+  // picks the actual chain from the challenge's chainId, not the signer RPC.
+  if (raw === "eip155:4217" || raw === "eip155:42431") return "tempo";
   // Solana CAIP - any `solana:<genesis>` form collapses to our "solana" slug.
   if (raw === "solana" || raw.startsWith("solana:") || raw.startsWith("solana-")) return "solana";
   return raw;

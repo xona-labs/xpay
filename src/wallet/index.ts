@@ -64,6 +64,9 @@ export function createWallet(opts: WalletOptions): Wallet {
     if (raw === "eip155:10" && signers["optimism"]) return "optimism";
     if (raw === "eip155:4663" && signers["robinhood"]) return "robinhood";
     if (raw === "eip155:988" && signers["stable"]) return "stable";
+    // Tempo mainnet + Moderato testnet both route to the "tempo" signer; the
+    // MPP tempo builder picks the actual chain from the challenge's chainId.
+    if ((raw === "eip155:4217" || raw === "eip155:42431") && signers["tempo"]) return "tempo";
     return undefined;
   }
 

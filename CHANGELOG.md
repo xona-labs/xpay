@@ -6,6 +6,47 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.27] – 2026-08-18
+
+### Added
+- **Tempo wallet.** New `tempo` network (eip155:4217, Stripe/Paradigm
+  payments L1, `rpc.tempo.xyz`), settling USDC.e (TIP-20, 6 decimals,
+  `0x20C0...8b50`). Registered unconditionally from any profile like
+  Robinhood and Stable, so existing wallets get a Tempo address without
+  re-running `xpay init`; `xpay balance` includes it. Tempo has no native
+  gas token - fees are paid in stablecoins, and MPP challenges are
+  fee-sponsored by the server anyway.
+- **MPP tempo/charge settlement.** `use()`/`useByUrl()` settle `tempo`
+  method challenges by signing a pull-mode Tempo transaction (TIP-20
+  `transferWithMemo` with the MPP attribution memo binding the challenge
+  id, expiring nonce, fee-payer sponsorship when offered) via viem's tempo
+  extensions - the server broadcasts, so no gas is needed client-side.
+  Verified end to end against mpp.dev's paid ping endpoint on Moderato:
+  a faucet-funded wallet paid through `useByUrl()` and got the settlement
+  tx hash back from the `Payment-Receipt` header. Adds `viem` as a
+  dependency (Tempo's transaction type needs it; ethers stays for
+  everything else).
+- **MPP (Machine Payments Protocol) charge support.** `use()` and `useByUrl()`
+  now settle against MPP servers (the Stripe + Tempo open 402 standard,
+  mpp.dev) in addition to x402. When a 402 carries `WWW-Authenticate: Payment`
+  challenges, xpay picks a fundable option, signs an EIP-3009
+  `transferWithAuthorization` bound to the challenge id (gasless, server
+  broadcasts), retries with `Authorization: Payment <credential>`, and reads
+  the settlement tx hash from the `Payment-Receipt` header. Hybrid servers
+  fall back to the x402 flow for any method xpay cannot settle as MPP yet.
+  Settleable today: `evm`/`charge` paying a known EIP-3009 stablecoin (USDC
+  on Base, Ethereum, Arbitrum, Optimism, Base Sepolia). `tempo` and `solana`
+  methods land with their chain support. Wire format cross-validated against
+  the official `mppx` client: credentials deserialize cleanly and pass the
+  server-side HMAC challenge-id check.
+
+## [0.2.26] – 2026-08-12
+
+### Added
+- **MCP tool annotations.** Every MCP tool now carries behavior hints
+  (`readOnlyHint`, `openWorldHint`, `destructiveHint`) for the ChatGPT Apps
+  submission and other MCP clients that surface them.
+
 ## [0.2.25] – 2026-08-07
 
 ### Changed

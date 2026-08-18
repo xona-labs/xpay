@@ -38,6 +38,7 @@ const NAMED_CHAIN_IDS: Record<string, number> = {
   optimism: 10,
   robinhood: 4663,
   stable: 988,
+  tempo: 4217,
 };
 
 export interface BuildEvmPaymentArgs {

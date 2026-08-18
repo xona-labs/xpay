@@ -30,7 +30,7 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
   const configured = profile.config.networks;
   const networks = opts.network
     ? [opts.network]
-    : [...configured, ...["robinhood", "stable"].filter((n) => !configured.includes(n))];
+    : [...configured, ...["robinhood", "stable", "tempo"].filter((n) => !configured.includes(n))];
 
   console.log("");
   console.log(chalk.bold(`Profile "${name}"`));

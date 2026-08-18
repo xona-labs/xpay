@@ -19,6 +19,8 @@ export type Network =
   | "robinhood"
   /** Stable (eip155:988) - Tether/Bitfinex payments L1, settles USDT0. */
   | "stable"
+  /** Tempo (eip155:4217) - Stripe/Paradigm payments L1, settles USDC.e (TIP-20). */
+  | "tempo"
   | (string & {});
 
 /**
