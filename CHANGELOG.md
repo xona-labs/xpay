@@ -6,6 +6,17 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.28] – 2026-08-18
+
+### Fixed
+- **MPP settlement is now opt-in (`XPAY_MPP=1`).** 0.2.27 tried MPP challenges
+  before x402 on every 402. Agents with unfunded Tempo wallets then locked onto
+  tempo/charge challenges they could not pay (e.g. xona's MPP image endpoints,
+  which offer no x402 fallback) and the paid flow failed before settlement.
+  Default behavior is back to 0.2.26: x402 only, `WWW-Authenticate: Payment`
+  ignored. Set `XPAY_MPP=1` to re-enable the MPP flow; the Tempo wallet and
+  balance support are unaffected.
+
 ## [0.2.27] – 2026-08-18
 
 ### Added

@@ -141,7 +141,10 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
   // (Stripe + Tempo's 402 standard). Try the native MPP flow first; hybrid
   // servers also emit x402 challenges, so anything we can't settle as MPP
   // (e.g. tempo-only endpoints) falls through to the x402 path below.
-  const mppChallenges = parseMppChallenges(probe.res.headers);
+  // Opt-in via XPAY_MPP=1 while the ecosystem is young: agents were eagerly
+  // picking tempo/charge challenges from wallets holding no Tempo funds,
+  // failing endpoints that previously settled fine as x402.
+  const mppChallenges = process.env.XPAY_MPP === "1" ? parseMppChallenges(probe.res.headers) : [];
   const mppOptions = settleableMppOptions(mppChallenges);
   if (mppOptions.length > 0) {
     const picked = await pickMppOption(args, mppOptions);
