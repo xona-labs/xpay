@@ -137,23 +137,17 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
     return finalize(probe, "unknown", "0");
   }
 
-  // Step 2a: MPP servers announce options via `WWW-Authenticate: Payment ...`
-  // (Stripe + Tempo's 402 standard). Try the native MPP flow first; hybrid
-  // servers also emit x402 challenges, so anything we can't settle as MPP
-  // (e.g. tempo-only endpoints) falls through to the x402 path below.
-  // Opt-in via XPAY_MPP=1 while the ecosystem is young: agents were eagerly
-  // picking tempo/charge challenges from wallets holding no Tempo funds,
-  // failing endpoints that previously settled fine as x402.
-  const mppChallenges = process.env.XPAY_MPP === "1" ? parseMppChallenges(probe.res.headers) : [];
+  // Step 2: gather every option the server offers, across BOTH protocols.
+  // MPP servers announce options via `WWW-Authenticate: Payment ...` (Stripe +
+  // Tempo's 402 standard); x402 challenges live in the body or a header.
+  // Hybrid servers (e.g. glim.sh) emit both, so the two pools are picked over
+  // together, balance-aware - an unfunded Tempo signer must never shadow a
+  // funded Base/Solana x402 option. XPAY_MPP=0 is the kill switch.
+  const mppChallenges = process.env.XPAY_MPP === "0" ? [] : parseMppChallenges(probe.res.headers);
   const mppOptions = settleableMppOptions(mppChallenges);
-  if (mppOptions.length > 0) {
-    const picked = await pickMppOption(args, mppOptions);
-    if (picked) return useWithMppOption(args, picked);
-  }
+  const { accepts: x402Reqs } = extractRequirements(probe.res.headers, probe.data);
 
-  // Step 2b: parse the x402 challenge - may live in the body OR a response header.
-  const { accepts: reqs } = extractRequirements(probe.res.headers, probe.data);
-  if (reqs.length === 0) {
+  if (x402Reqs.length === 0 && mppOptions.length === 0) {
     if (mppChallenges.length > 0) {
       throw new Error(
         `xpay.use: ${args.resource.resource} offers MPP methods [${mppChallenges
@@ -166,41 +160,49 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
     );
   }
 
-  const req = await args.wallet.pickRequirementByBalance(reqs);
+  // Unified pick: x402 options first (battle-tested while the MPP ecosystem
+  // is young), MPP after - so MPP wins only when it is the sole settleable
+  // route (tempo-only endpoints) or the only funded one. "Insufficient
+  // balance" is only accurate when NO option in either protocol is funded.
+  const unified = [...x402Reqs, ...mppOptions.map((o) => o.requirement)];
+  const req = await args.wallet.pickRequirementByBalance(unified);
   if (!req) {
-    // Distinguish "can't sign anywhere" from "can sign but unfunded".
-    if (args.wallet.pickRequirement(reqs)) {
-      throw await insufficientBalanceError(reqs, args.wallet);
+    if (args.wallet.pickRequirement(unified)) {
+      throw await insufficientBalanceError(unified, args.wallet);
     }
     throw new Error(
-      `xpay.use: ${args.resource.resource} accepts ${reqs.map((r) => r.network).join(", ")} but wallet has no matching signer`,
+      `xpay.use: ${args.resource.resource} accepts ${unified.map((r) => r.network).join(", ")} but wallet has no matching signer`,
     );
   }
 
+  const mppPicked = mppOptions.find((o) => o.requirement === req);
+  if (mppPicked) {
+    // Guardrail runs *before* signing - and outside the fallback try/catch: a
+    // policy deny is a decision, not a settlement failure to route around.
+    await args.guardrail.check({ resource: args.resource, requirement: req });
+    try {
+      return await useWithMppOption(args, mppPicked);
+    } catch (err) {
+      // MPP settlement failed (stale balance read, server-side reject,
+      // expired challenge, ...). Fall back to a funded x402 option so MPP
+      // support can never make a hybrid endpoint worse than x402-only.
+      const fallback = await args.wallet.pickRequirementByBalance(x402Reqs);
+      if (!fallback) throw err;
+      return useWithX402Requirement(args, fallback);
+    }
+  }
+  return useWithX402Requirement(args, req);
+}
+
+/** Settle a live-challenge x402 requirement and retry with X-Payment. */
+async function useWithX402Requirement(args: UseArgs, req: PaymentRequirement): Promise<UseResult> {
   await args.guardrail.check({ resource: args.resource, requirement: req });
   const settled = await settle(args, req, 2);
 
-  // Step 3: retry with X-Payment.
   const res = await callResource(args, settled.header);
   const result = await finalize(res, settled.network, req.amount ?? "0", settled.txSig);
   result.platformFee = await chargePlatformFee(args.wallet);
   return result;
-}
-
-/**
- * Pick the MPP option this wallet can fund, balance-aware. Returns undefined
- * when no settleable option has a matching signer (caller falls back to
- * x402); throws when we could sign for one but every funded network is short
- * (an accurate "top up" beats a misleading protocol error downstream).
- */
-async function pickMppOption(args: UseArgs, options: MppOption[]): Promise<MppOption | undefined> {
-  const reqs = options.map((o) => o.requirement);
-  const req = await args.wallet.pickRequirementByBalance(reqs);
-  if (req) return options.find((o) => o.requirement === req);
-  if (args.wallet.pickRequirement(reqs)) {
-    throw await insufficientBalanceError(reqs, args.wallet);
-  }
-  return undefined;
 }
 
 /**
@@ -213,9 +215,7 @@ async function pickMppOption(args: UseArgs, options: MppOption[]): Promise<MppOp
  */
 async function useWithMppOption(args: UseArgs, opt: MppOption): Promise<UseResult> {
   const req = opt.requirement;
-  // Guardrail runs *before* signing - same security boundary as x402.
-  await args.guardrail.check({ resource: args.resource, requirement: req });
-
+  // Guardrail already ran at the call site (outside the x402-fallback catch).
   const network = normalizeNetwork(req.network);
   const signer = args.wallet.signer(network);
 

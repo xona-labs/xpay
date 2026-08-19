@@ -6,6 +6,31 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.29] – 2026-08-19
+
+### Fixed
+- **MPP is on by default again, without breaking x402 on hybrid servers.**
+  The 0.2.28 regression had three causes: every EVM profile silently gets a
+  tempo signer, the balance-aware picker skipped the balance check for a
+  single candidate, and the MPP pool was picked over before x402 was even
+  parsed. Live-challenge selection now merges MPP options and x402 accepts
+  into one balance-aware pool (x402 first while the ecosystem is young), so
+  an unfunded Tempo signer can no longer shadow a funded Base/Solana x402
+  option. "Insufficient balance" is only raised when no option in either
+  protocol is funded.
+- **x402 fallback when MPP settlement fails.** A failed MPP attempt (stale
+  balance read, server-side reject, expired challenge) now retries a funded
+  x402 option instead of failing the call. Guardrail denials are not routed
+  around: the policy check runs before the fallback boundary.
+
+### Changed
+- `XPAY_MPP` is now a kill switch (`XPAY_MPP=0` disables MPP) instead of an
+  opt-in. The `XPAY_MPP=1` form from 0.2.28 is accepted but no longer needed.
+
+Verified live against glim.sh (hybrid x402 + MPP tempo/charge on Tempo
+mainnet): a wallet with a $0 tempo signer and funded Solana now settles via
+x402 - the exact scenario that failed in 0.2.27.
+
 ## [0.2.28] – 2026-08-18
 
 ### Fixed
