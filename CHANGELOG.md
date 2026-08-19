@@ -6,6 +6,19 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.30] – 2026-08-19
+
+### Added
+- **MPP service discovery via the MPPScan registry** (mppscan.com, 350+ live
+  MPP/x402 services). New MCP tools `xpay_mpp_find` (semantic search with a
+  query, top-registry listing without) and `xpay_mpp_resources` (one
+  service's callable endpoints with prices), plus CLI commands
+  `xpay mpp find [query]` and `xpay mpp resources <service>`. Free: the
+  registry API is SIWX-gated (CAIP-122 wallet sign-in), so the wallet signs
+  an EIP-191 identity proof and nothing is paid. Discovered endpoints are
+  payable directly via `xpay_use` / `xpay pay`, which settle MPP or x402
+  automatically.
+
 ## [0.2.29] – 2026-08-19
 
 ### Fixed

@@ -49,6 +49,7 @@ import { runTrade, runTrending } from "./trade.js";
 import { runXUser, runXPosts } from "./x.js";
 import { runZauthScan, runZauthStatus } from "./zauth.js";
 import { runShopSearch, runShopQuote } from "./shop.js";
+import { runMppFind, runMppResources } from "./mpp.js";
 import { startMcpServer } from "./mcp-server.js";
 
 const program = new Command();
@@ -206,6 +207,34 @@ zauth
   .option("--json", "Emit raw JSON")
   .action(async (sessionToken: string, opts) => {
     await runZauthStatus(sessionToken, opts);
+  });
+
+// ---------------------------------------------------------------- mpp
+const mpp = program
+  .command("mpp")
+  .description("MPP (Machine Payments Protocol) service discovery via the MPPScan registry.");
+
+mpp
+  .command("find [query]")
+  .description("Discover MPP/x402 services: query = semantic search, none = top registry by usage. Free (SIWX wallet sign-in).")
+  .option("--profile <name>", "Profile whose EVM key signs the SIWX proof (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--protocol <p>", "mpp | x402 (semantic search only, default mpp)")
+  .option("--registry", "Force registry substring listing instead of semantic search")
+  .option("--limit <n>", "Max results for registry listing (default 10)")
+  .option("--json", "Emit raw JSON")
+  .action(async (query: string | undefined, opts) => {
+    await runMppFind(query, opts);
+  });
+
+mpp
+  .command("resources <service>")
+  .description("List the callable paid endpoints of one MPP service (registry id or domain). Free.")
+  .option("--profile <name>", "Profile whose EVM key signs the SIWX proof (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase")
+  .option("--json", "Emit raw JSON")
+  .action(async (service: string, opts) => {
+    await runMppResources(service, opts);
   });
 
 // ---------------------------------------------------------------- shop

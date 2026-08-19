@@ -35,6 +35,7 @@ import {
   type ShopLensParams,
 } from "../shop/index.js";
 import { findRwaTokens, type RwaCategory } from "../token/rwa.js";
+import { findMppServices, searchMppServices, mppServiceResources } from "../discover/mppscan.js";
 
 /** Base URL for xona's paid X (Twitter) data endpoints (x402-gated). */
 const XDATA_BASE = process.env.XPAY_XDATA_ENDPOINT ?? "https://api.xona-agent.com";
@@ -94,6 +95,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   xpay_zauth_reposcan: SPEND,
   xpay_zauth_scan_status: READ,
   xpay_rwa_find: READ,
+  xpay_mpp_find: READ,
+  xpay_mpp_resources: READ,
   xpay_shop_quote: READ,
   xpay_shop_search: SPEND,
   xpay_shop_lens_quote: READ,
@@ -432,6 +435,52 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
           },
           limit: { type: "number", description: "Max results. Default 20." },
         },
+      },
+    },
+    {
+      name: "xpay_mpp_find",
+      description:
+        "Discover MPP (Machine Payments Protocol, the Stripe+Tempo HTTP 402 standard) and x402 " +
+        "services from the MPPScan registry (mppscan.com, 350+ live services). FREE: gated by a " +
+        "SIWX wallet sign-in (an EIP-191 identity signature), nothing is paid. With `query`, runs " +
+        "semantic search and returns matching service origins with the protocols each speaks; " +
+        "without, lists the registry's top services by transaction volume. Drill into one " +
+        "service's callable endpoints with xpay_mpp_resources; pay any discovered endpoint with " +
+        "xpay_use, which settles MPP or x402 automatically.",
+      input_schema: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "Natural-language task description for semantic search, e.g. 'image generation' or " +
+              "'web search'. Omit to list the top registry services by usage.",
+          },
+          protocol: {
+            type: "string",
+            enum: ["mpp", "x402"],
+            description: "Restrict semantic search to one protocol. Default mpp.",
+          },
+          limit: { type: "number", description: "Max results for the registry listing. Default 10." },
+        },
+      },
+    },
+    {
+      name: "xpay_mpp_resources",
+      description:
+        "List the callable paid endpoints registered under one MPP service from the MPPScan " +
+        "registry: URL, method, price, network. FREE (SIWX wallet sign-in, no payment). Pass a " +
+        "service id from xpay_mpp_find or a domain/origin like 'glim.sh'. Returned URLs are " +
+        "payable via xpay_use.",
+      input_schema: {
+        type: "object",
+        properties: {
+          service: {
+            type: "string",
+            description: "Registry service id (64-char hex) or domain/origin, e.g. 'stablestudio.dev'.",
+          },
+        },
+        required: ["service"],
       },
     },
     {
@@ -796,6 +845,26 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         query: input.query as string | undefined,
         category: input.category as RwaCategory | undefined,
         limit: (input.limit as number) ?? 20,
+      }),
+
+    xpay_mpp_find: async (input) => {
+      if (input.query) {
+        return searchMppServices({
+          wallet: xpay.wallet,
+          query: input.query as string,
+          protocol: input.protocol as "mpp" | "x402" | undefined,
+        });
+      }
+      return findMppServices({
+        wallet: xpay.wallet,
+        limit: (input.limit as number) ?? 10,
+      });
+    },
+
+    xpay_mpp_resources: async (input) =>
+      mppServiceResources({
+        wallet: xpay.wallet,
+        service: input.service as string,
       }),
 
     xpay_shop_quote: async (input) =>
