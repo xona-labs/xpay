@@ -75,7 +75,14 @@ export async function runPay(url: string, opts: PayCmdOptions): Promise<void> {
     const amount = Number(result.amountPaid) / 1_000_000;
 
     console.log("");
-    console.log(chalk.green(`✔ Paid ${formatUsd(amount)} on ${chalk.cyan(result.network)} in ${elapsed}ms`));
+    if (result.free) {
+      console.log(chalk.green(`✔ FREE via wallet sign-in (token holder tier) in ${elapsed}ms - $0.00 paid`));
+      if (result.freeRemaining !== undefined) {
+        console.log(`  ${chalk.dim("free uses left today:")} ${result.freeRemaining}`);
+      }
+    } else {
+      console.log(chalk.green(`✔ Paid ${formatUsd(amount)} on ${chalk.cyan(result.network)} in ${elapsed}ms`));
+    }
     if (result.txSig) {
       console.log(`  ${chalk.dim("tx:")} ${result.txSig}`);
     }

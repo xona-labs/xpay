@@ -6,6 +6,21 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.31] – 2026-08-20
+
+### Added
+- **SIWX free tier: sign in instead of paying.** When a 402 advertises a
+  Solana `sign-in-with-x` (CAIP-122) challenge - e.g. Xona's $XONA holder
+  perk (free daily image generations for wallets holding 50k+ $XONA) - the
+  live-challenge flow now signs the challenge with the Solana wallet and
+  retries with the `SIGN-IN-WITH-X` header before settling any payment. A
+  decline (not enough tokens, daily quota used) falls back to the normal
+  paid flow. `UseResult` gains `free` and `freeRemaining`, `xpay pay`
+  prints `FREE via wallet sign-in` with the remaining daily quota, and no
+  platform fee is charged on free calls. Catalog entries carrying a
+  `sign-in-with-x` extension are routed through the live flow so the free
+  tier is never skipped.
+
 ## [0.2.30] – 2026-08-19
 
 ### Added

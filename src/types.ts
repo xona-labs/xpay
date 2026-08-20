@@ -71,6 +71,12 @@ export const ResourceSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
   inputSchema: z.record(z.unknown()).optional(),
   outputSchema: z.record(z.unknown()).nullable().optional(),
+  /**
+   * x402 extensions carried by the listing, when the catalog preserves them.
+   * A `sign-in-with-x` entry here routes `use()` through the live-challenge
+   * flow so the free tier can be attempted (challenges are per-402).
+   */
+  extensions: z.record(z.unknown()).optional(),
 });
 export type Resource = z.infer<typeof ResourceSchema>;
 
@@ -133,6 +139,13 @@ export interface UseResult {
   settlement?: SettleEnvelope;
   /** xPay platform fee of $0.01 USDC charged per pay-per-use call. */
   platformFee?: PlatformFeeResult;
+  /**
+   * True when the call was granted for free via a SIWX (sign-in-with-x)
+   * wallet proof instead of a payment - e.g. the $XONA holder free tier.
+   */
+  free?: boolean;
+  /** Free-tier uses remaining today, when the server reports it. */
+  freeRemaining?: number;
 }
 
 /** Options passed to {@link XPay.discover}. */

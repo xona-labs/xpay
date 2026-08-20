@@ -23,6 +23,11 @@ import type { Guardrail } from "../guardrail/index.js";
 import { extractRequirements, extractSettleEnvelope } from "../x402/extract.js";
 import { buildSvmPaymentHeader, isSvmNetwork } from "../x402/svm-payment.js";
 import { buildEvmPaymentHeader, hasEvmDomainParams, isEvmNetwork } from "../x402/evm-payment.js";
+import {
+  extractSiwxFreeChallenge,
+  buildSiwxFreeHeader,
+  SIWX_FREE_REMAINING_HEADER,
+} from "../x402/siwx-free.js";
 import { parseMppChallenges, settleableMppOptions, type MppOption } from "../mpp/challenge.js";
 import { buildMppAuthorizationHeader, extractMppReceipt } from "../mpp/credential.js";
 import { buildMppEvmAuthorization } from "../mpp/evm-charge.js";
@@ -50,8 +55,12 @@ export async function use(args: UseArgs): Promise<UseResult> {
 
   // If we have accepts up front, pick the network we can actually pay on
   // (balance-aware) and take the fast path - unless the chosen option is
-  // missing fields that only a live 402 challenge carries.
-  if (args.resource.accepts.length > 0) {
+  // missing fields that only a live 402 challenge carries, or the catalog
+  // entry advertises a sign-in-with-x free tier (the challenge nonce is
+  // per-402, so free access always needs the live flow).
+  const offersSiwxFree =
+    args.resource.extensions?.["sign-in-with-x"] !== undefined && args.wallet.has("solana");
+  if (args.resource.accepts.length > 0 && !offersSiwxFree) {
     const req = await args.wallet.pickRequirementByBalance(args.resource.accepts);
     if (req) {
       if (!reqNeedsLiveChallenge(args, req)) return useWithRequirements(args, req);
@@ -137,6 +146,14 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
     return finalize(probe, "unknown", "0");
   }
 
+  // Step 1.5: free tier before any payment. Servers can advertise a
+  // `sign-in-with-x` challenge on paid routes that grants free access to
+  // qualifying wallets (e.g. Xona's $XONA holder perk). Attempting costs
+  // nothing - one ed25519 identity signature - and a decline (not enough
+  // tokens, daily quota used) falls straight through to the paid flow.
+  const freeResult = await trySiwxFreeAccess(args, probe);
+  if (freeResult) return freeResult;
+
   // Step 2: gather every option the server offers, across BOTH protocols.
   // MPP servers announce options via `WWW-Authenticate: Payment ...` (Stripe +
   // Tempo's 402 standard); x402 challenges live in the body or a header.
@@ -192,6 +209,46 @@ async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
     }
   }
   return useWithX402Requirement(args, req);
+}
+
+/**
+ * Attempt SIWX free access for a 402 that advertises a Solana
+ * `sign-in-with-x` challenge. Returns the finished result on success, or
+ * null to fall through to the paid flow (no challenge, no Solana signer,
+ * or the server declined the proof). No guardrail needed: nothing is
+ * signed except an identity message, and nothing is spent.
+ */
+async function trySiwxFreeAccess(args: UseArgs, probe: RawResponse): Promise<UseResult | null> {
+  const challenge = extractSiwxFreeChallenge(probe.data);
+  if (!challenge) return null;
+
+  // Only sign challenges bound to the host we're actually calling - a
+  // malicious body must not get a sign-in message for another domain signed.
+  try {
+    if (challenge.info.domain !== new URL(args.resource.resource).hostname) return null;
+  } catch {
+    return null;
+  }
+
+  let header: string | null;
+  try {
+    header = await buildSiwxFreeHeader(args.wallet, challenge);
+  } catch {
+    return null;
+  }
+  if (!header) return null;
+
+  const res = await callResource(args, undefined, "x402", { "sign-in-with-x": header });
+  // Any non-2xx (typically another 402 with the decline reason) means the
+  // free tier didn't apply - fall back to paying rather than surfacing it.
+  if (!res.res.ok) return null;
+
+  const result = finalize(res, "solana", "0");
+  result.free = true;
+  const remaining = res.res.headers.get(SIWX_FREE_REMAINING_HEADER);
+  if (remaining !== null && remaining !== "") result.freeRemaining = Number(remaining);
+  // No platform fee: nothing was paid, keep free genuinely free.
+  return result;
 }
 
 /** Settle a live-challenge x402 requirement and retry with X-Payment. */
@@ -334,10 +391,12 @@ async function callResource(
   args: UseArgs,
   paymentHeader: string | undefined,
   protocol: "x402" | "mpp" = "x402",
+  extraHeaders?: Record<string, string>,
 ): Promise<RawResponse> {
   const headers: Record<string, string> = {
     accept: "application/json",
     ...args.headers,
+    ...extraHeaders,
   };
   if (paymentHeader && protocol === "mpp") {
     // MPP credentials ride the standard auth header (`Authorization: Payment ...`).
