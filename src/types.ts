@@ -157,7 +157,8 @@ export interface DiscoverOptions {
   /** Max results to return. */
   limit?: number;
   /**
-   * Catalog sources to query. Defaults to all (`["orbitx402", "agenc"]`);
+   * Catalog sources to query. Defaults to all
+   * (`["orbitx402", "agenticmarket", "agenc"]`);
    * also overridable via the XPAY_DISCOVERY_SOURCES env var (csv).
    */
   sources?: string[];

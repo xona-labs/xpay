@@ -42,12 +42,12 @@ interface DiskEntry {
   data: Resource[];
 }
 
-function readDisk(key: string): Resource[] | null {
+function readDisk(key: string, allowStale = false): Resource[] | null {
   try {
     const file = diskCachePath(key);
     if (!existsSync(file)) return null;
     const blob = JSON.parse(readFileSync(file, "utf8")) as DiskEntry;
-    if (blob.expiresAt > Date.now()) return blob.data;
+    if (allowStale || blob.expiresAt > Date.now()) return blob.data;
     return null;
   } catch {
     return null;
@@ -98,11 +98,58 @@ export async function cached(key: string, loader: Loader): Promise<Resource[]> {
     },
     (err) => {
       store.delete(key);
+      // Stale-on-error: a snapshot past its TTL beats a hard failure when the
+      // upstream is down. Memory first (expired entries keep their data), then
+      // disk with staleness allowed. Not re-cached as fresh, so the next call
+      // retries the loader.
+      const staleMem = entry?.data;
+      if (staleMem) return staleMem;
+      const staleDisk = readDisk(key, true);
+      if (staleDisk) return staleDisk;
       throw err;
     },
   );
   store.set(key, { expiresAt: 0, inflight });
   return inflight;
+}
+
+// ── Source-down cooldown markers ─────────────────────────────────────────
+// A failing catalog upstream (timeouts, 504s) should not re-charge its full
+// timeout on every discover() call - especially from the CLI, where each
+// invocation is a fresh process. Markers persist to the same disk dir.
+
+const downStore = new Map<string, number>();
+
+function downMarkerPath(source: string): string {
+  return join(diskCacheDir(), `down_${source.replace(/[^a-zA-Z0-9_-]+/g, "_")}.json`);
+}
+
+/** Record that `source` is failing; callers should skip it for `ms`. */
+export function markSourceDown(source: string, ms: number): void {
+  const until = Date.now() + ms;
+  downStore.set(source, until);
+  try {
+    const dir = diskCacheDir();
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
+    writeFileSync(downMarkerPath(source), JSON.stringify({ until }));
+  } catch {
+    // Best-effort.
+  }
+}
+
+/** Whether `source` is inside a failure cooldown window. */
+export function isSourceDown(source: string): boolean {
+  const mem = downStore.get(source);
+  if (mem !== undefined) return mem > Date.now();
+  try {
+    const file = downMarkerPath(source);
+    if (!existsSync(file)) return false;
+    const { until } = JSON.parse(readFileSync(file, "utf8")) as { until: number };
+    downStore.set(source, until);
+    return until > Date.now();
+  } catch {
+    return false;
+  }
 }
 
 /** Force-evict a cache entry (or all entries with no arg). */
