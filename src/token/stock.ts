@@ -17,6 +17,7 @@
 
 import { findRwaTokens, type RwaToken } from "./rwa.js";
 import { jupiterFetch, type TokenApiOptions } from "./index.js";
+import { SOLANA_TOKENS } from "../transfer/index.js";
 
 /** Keyless Price v3 host. With JUPITER_API_KEY the api.jup.ag mirror is used. */
 const LITE_PRICE_URL = "https://lite-api.jup.ag/price/v3";
@@ -99,6 +100,177 @@ export async function findStocks(opts: StockFindOptions = {}): Promise<StockFind
     marketStatus,
     stocks: tokens.map((t) => enrich(baseQuote(t), priced.get(t.mint))),
   };
+}
+
+// ─── Trading ──────────────────────────────────────────────────────────────────
+
+/** Solana mainnet USDC - the settlement side of every stock trade. */
+export const USDC_MINT = SOLANA_TOKENS.USDC!.mint;
+
+/** Below this DEX liquidity a stock trade is blocked (price impact eats the fill). */
+const DEFAULT_MIN_LIQUIDITY_USD = 50_000;
+/** Adverse premium/discount beyond this % blocks the trade. */
+const DEFAULT_MAX_PREMIUM_PCT = 2;
+
+export interface StockTradeArgs extends TokenApiOptions {
+  /** Underlying ticker (AAPL), tokenized symbol (AAPLx), or mint address. */
+  stock: string;
+  side: "buy" | "sell";
+  /** Override the adverse premium/discount block, %. Default 2 (env XPAY_STOCK_MAX_PREMIUM_PCT). */
+  maxPremiumPct?: number;
+  /** Override the liquidity floor, USD. Default 50000 (env XPAY_STOCK_MIN_LIQUIDITY_USD). */
+  minLiquidityUsd?: number;
+}
+
+export interface StockTradePlan {
+  stock: StockQuote;
+  marketStatus: UsMarketStatus;
+  /** Non-blocking risk notes to relay to the user before executing. */
+  warnings: string[];
+}
+
+/**
+ * Resolve a stock and run the equity-specific risk checks, WITHOUT touching
+ * a wallet. Throws on blocking conditions (unverified token, liquidity under
+ * the floor, adverse premium/discount beyond the threshold, ambiguous
+ * ticker); every block names its override so the caller can decide. A closed
+ * US market only warns - premiums are a fact of off-hours trading, not an
+ * error.
+ */
+export async function prepareStockTrade(args: StockTradeArgs): Promise<StockTradePlan> {
+  const stock = await resolveStock(args.stock, args);
+  const marketStatus = usEquityMarketStatus();
+  const warnings: string[] = [];
+
+  const minLiquidity =
+    args.minLiquidityUsd ?? numericEnv("XPAY_STOCK_MIN_LIQUIDITY_USD") ?? DEFAULT_MIN_LIQUIDITY_USD;
+  const maxPremium =
+    args.maxPremiumPct ?? numericEnv("XPAY_STOCK_MAX_PREMIUM_PCT") ?? DEFAULT_MAX_PREMIUM_PCT;
+
+  if (!stock.verified) {
+    throw new Error(
+      `xpay.stock: ${stock.symbol} (${stock.mint}) is not Jupiter-verified - refusing to trade it. ` +
+        `If the user confirms this exact mint, use xpay_swap directly.`,
+    );
+  }
+
+  if ((stock.liquidityUsd ?? 0) < minLiquidity) {
+    throw new Error(
+      `xpay.stock: ${stock.symbol} has only $${Math.round(stock.liquidityUsd ?? 0).toLocaleString()} ` +
+        `on-chain liquidity (floor: $${minLiquidity.toLocaleString()}) - price impact would eat the fill. ` +
+        `Lower the floor with minLiquidityUsd if the user accepts that, or use xpay_swap directly.`,
+    );
+  }
+
+  const premium = stock.premiumDiscountPct;
+  if (premium === undefined) {
+    warnings.push(
+      `No underlying reference price available for ${stock.symbol} - cannot check the ` +
+        `premium/discount vs the real share price.`,
+    );
+  } else {
+    // Adverse direction only: buying rich or selling cheap. The favorable
+    // direction (buying at a discount, selling at a premium) is upside.
+    const adverse = args.side === "buy" ? premium : -premium;
+    const label =
+      premium >= 0
+        ? `${premium.toFixed(2)}% premium`
+        : `${Math.abs(premium).toFixed(2)}% discount`;
+    if (adverse > maxPremium) {
+      throw new Error(
+        `xpay.stock: ${stock.symbol} trades at a ${label} vs the underlying ` +
+          `($${stock.onchainPrice} on-chain vs $${stock.underlyingPrice} reference) - ` +
+          `${args.side === "buy" ? "buying rich" : "selling cheap"} beyond the ${maxPremium}% threshold. ` +
+          `Raise maxPremiumPct if the user accepts the ${label}, or wait for it to normalize.`,
+      );
+    }
+    if (adverse > maxPremium / 2) {
+      warnings.push(
+        `${stock.symbol} trades at a ${label} vs the underlying - within the ${maxPremium}% ` +
+          `threshold but worth relaying before ${args.side === "buy" ? "buying" : "selling"}.`,
+      );
+    }
+  }
+
+  if (marketStatus !== "open") {
+    warnings.push(
+      `US market is ${marketStatus.replace("_", " ")} - premiums/discounts widen off-hours and ` +
+        `the on-chain price may gap at the next open.`,
+    );
+  }
+
+  return { stock, marketStatus, warnings };
+}
+
+/**
+ * Deterministic tokenized-stock resolution. Accepts a mint, an exact
+ * tokenized symbol (AAPLx, TSLAon), or the underlying ticker (AAPL) - the
+ * ticker matches every issuer's version, and is auto-picked only when the
+ * liquidity leader dwarfs the runner-up 5x (mirrors resolveTradeToken).
+ */
+export async function resolveStock(input: string, opts: TokenApiOptions = {}): Promise<StockQuote> {
+  const key = input.trim().toUpperCase();
+
+  // Match against the full (cached, unpriced) universe first, then price only
+  // the matches - the universe is a few hundred mints and pricing all of them
+  // for one resolution would burn the keyless Price v3 bucket.
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(input.trim())) {
+    const universe = await findRwaTokens({ ...opts, category: "stocks", limit: 1_000 });
+    const token = universe.find((t) => t.mint === input.trim());
+    if (!token) {
+      throw new Error(
+        `xpay.stock: mint ${input.trim()} is not in the tokenized-stock universe - ` +
+          `use xpay_token_find / xpay_swap for non-stock tokens.`,
+      );
+    }
+    const { stocks } = await findStocks({ ...opts, query: token.symbol, limit: 10 });
+    return stocks.find((s) => s.mint === token.mint) ?? baseQuote(token);
+  }
+
+  const { stocks } = await findStocks({ ...opts, query: input.trim(), limit: 20 });
+
+  const exact = stocks.filter((s) => s.symbol.toUpperCase() === key);
+  if (exact.length === 1) return exact[0]!;
+
+  // Underlying ticker: match each issuer's suffix convention (AAPLx, AAPLon).
+  const candidates =
+    exact.length > 0
+      ? exact
+      : stocks.filter((s) => {
+          const sym = s.symbol.toUpperCase();
+          return sym === `${key}X` || sym === `${key}ON` || s.name.toUpperCase().includes(key);
+        });
+
+  if (candidates.length === 0) {
+    throw new Error(
+      `xpay.stock: no tokenized stock matches "${input}" - list what is tradable with xpay_stock_find.`,
+    );
+  }
+  if (candidates.length === 1) return candidates[0]!;
+
+  const sorted = [...candidates].sort((a, b) => (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0));
+  const [leader, runnerUp] = [sorted[0]!, sorted[1]!];
+  if ((leader.liquidityUsd ?? 0) > 0 && (leader.liquidityUsd ?? 0) >= 5 * (runnerUp.liquidityUsd ?? 0)) {
+    return leader;
+  }
+
+  const list = sorted
+    .slice(0, 5)
+    .map(
+      (s) =>
+        `  ${s.symbol} (${s.issuer}) mint ${s.mint} liquidity $${Math.round(s.liquidityUsd ?? 0).toLocaleString()}`,
+    )
+    .join("\n");
+  throw new Error(
+    `xpay.stock: "${input}" matches several tokenized versions - pass the exact symbol or mint:\n${list}`,
+  );
+}
+
+function numericEnv(name: string): number | undefined {
+  const v = process.env[name];
+  if (v === undefined || v === "") return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 // ─── Internals ────────────────────────────────────────────────────────────────

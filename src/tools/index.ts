@@ -35,7 +35,7 @@ import {
   type ShopLensParams,
 } from "../shop/index.js";
 import { findRwaTokens, type RwaCategory } from "../token/rwa.js";
-import { findStocks } from "../token/stock.js";
+import { findStocks, prepareStockTrade, USDC_MINT } from "../token/stock.js";
 import { findMppServices, searchMppServices, mppServiceResources } from "../discover/mppscan.js";
 
 /** Base URL for xona's paid X (Twitter) data endpoints (x402-gated). */
@@ -97,6 +97,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   xpay_zauth_scan_status: READ,
   xpay_rwa_find: READ,
   xpay_stock_find: READ,
+  xpay_stock_trade: SPEND,
   xpay_mpp_find: READ,
   xpay_mpp_resources: READ,
   xpay_shop_quote: READ,
@@ -464,6 +465,58 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
           },
           limit: { type: "number", description: "Max results. Default 20." },
         },
+      },
+    },
+    {
+      name: "xpay_stock_trade",
+      description:
+        "Buy or sell a tokenized stock on Solana with USDC, by ticker: 'buy $20 of AAPL' is one " +
+        "call. Resolves AAPL/AAPLx/mint to the right tokenized version, runs equity-specific " +
+        "risk checks, then swaps USDC<->stock inside the user's xpay wallet via Jupiter (same " +
+        "engine and guardrail caps as xpay_swap - irreversible once executed). Checks that BLOCK " +
+        "with an explanatory error: unverified token, on-chain liquidity under $50k, buying at a " +
+        "premium (or selling at a discount) beyond 2% vs the underlying share price - each names " +
+        "its override parameter; only raise an override when the user explicitly accepts that " +
+        "risk. A closed US market only WARNS (in `warnings` - always relay them). Before calling, " +
+        "show the user the stock's live quote (xpay_stock_find) and get explicit approval; never " +
+        "trade unprompted. These are issuer IOUs tracking the underlying, not brokerage shares.",
+      input_schema: {
+        type: "object",
+        properties: {
+          side: {
+            type: "string",
+            enum: ["buy", "sell"],
+            description: "buy = spend USDC for the stock; sell = sell stock tokens back to USDC.",
+          },
+          stock: {
+            type: "string",
+            description:
+              "Underlying ticker (AAPL), tokenized symbol (AAPLx, TSLAon), or exact mint address.",
+          },
+          amount: {
+            type: "number",
+            description:
+              "For buy: USDC to spend (e.g. 20). For sell: number of stock tokens/shares to sell " +
+              "(e.g. 0.05).",
+          },
+          slippageBps: {
+            type: "number",
+            description: "Max slippage in bps (50 = 0.5%). Default: Jupiter dynamic slippage (recommended).",
+          },
+          maxPremiumPct: {
+            type: "number",
+            description:
+              "Override the adverse premium/discount block, %. Default 2. Raise only with " +
+              "explicit user consent.",
+          },
+          minLiquidityUsd: {
+            type: "number",
+            description:
+              "Override the liquidity floor, USD. Default 50000. Lower only with explicit user " +
+              "consent.",
+          },
+        },
+        required: ["side", "stock", "amount"],
       },
     },
     {
@@ -881,6 +934,31 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         query: input.query as string | undefined,
         limit: (input.limit as number) ?? 20,
       }),
+
+    xpay_stock_trade: async (input) => {
+      const side = input.side as "buy" | "sell";
+      if (side !== "buy" && side !== "sell") {
+        throw new Error(`xpay.stock: side must be "buy" or "sell", got "${String(input.side)}"`);
+      }
+      const plan = await prepareStockTrade({
+        stock: input.stock as string,
+        side,
+        maxPremiumPct: input.maxPremiumPct as number | undefined,
+        minLiquidityUsd: input.minLiquidityUsd as number | undefined,
+      });
+      const result = await xpay.swap({
+        amount: input.amount as number,
+        from: side === "buy" ? USDC_MINT : plan.stock.mint,
+        to: side === "buy" ? plan.stock.mint : USDC_MINT,
+        slippageBps: input.slippageBps as number | undefined,
+      });
+      return {
+        ...result,
+        stock: plan.stock,
+        marketStatus: plan.marketStatus,
+        warnings: plan.warnings,
+      };
+    },
 
     xpay_mpp_find: async (input) => {
       if (input.query) {
