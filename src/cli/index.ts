@@ -43,7 +43,7 @@ import {
 } from "./magicblock.js";
 import { runBentoEnable, runBentoDisable, runBentoStatus } from "./bento.js";
 import { runAgencHire, runAgencStatus } from "./agenc.js";
-import { runTokenFind, runTokenRwa } from "./token.js";
+import { runTokenFind, runTokenRwa, runTokenStock } from "./token.js";
 import { runSwap } from "./swap.js";
 import { runTrade, runTrending } from "./trade.js";
 import { runXUser, runXPosts } from "./x.js";
@@ -155,6 +155,15 @@ token
   .option("--json", "Emit raw JSON")
   .action(async (query: string | undefined, opts) => {
     await runTokenRwa(query, opts);
+  });
+
+token
+  .command("stock [query]")
+  .description("Live tokenized-stock quotes on Solana: on-chain vs underlying price, premium/discount, liquidity. Read-only, no wallet.")
+  .option("--limit <n>", "Max results (default 20)")
+  .option("--json", "Emit raw JSON")
+  .action(async (query: string | undefined, opts) => {
+    await runTokenStock(query, opts);
   });
 
 // ---------------------------------------------------------------- x (Twitter)

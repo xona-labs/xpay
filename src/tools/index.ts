@@ -35,6 +35,7 @@ import {
   type ShopLensParams,
 } from "../shop/index.js";
 import { findRwaTokens, type RwaCategory } from "../token/rwa.js";
+import { findStocks } from "../token/stock.js";
 import { findMppServices, searchMppServices, mppServiceResources } from "../discover/mppscan.js";
 
 /** Base URL for xona's paid X (Twitter) data endpoints (x402-gated). */
@@ -95,6 +96,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   xpay_zauth_reposcan: SPEND,
   xpay_zauth_scan_status: READ,
   xpay_rwa_find: READ,
+  xpay_stock_find: READ,
   xpay_mpp_find: READ,
   xpay_mpp_resources: READ,
   xpay_shop_quote: READ,
@@ -433,6 +435,32 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
             type: "string",
             enum: ["stocks", "treasuries"],
             description: "Restrict to tokenized stocks/ETFs or treasury-backed tokens. Default: both.",
+          },
+          limit: { type: "number", description: "Max results. Default 20." },
+        },
+      },
+    },
+    {
+      name: "xpay_stock_find",
+      description:
+        "Live quotes for tokenized stocks/ETFs on Solana (Backed xStocks like TSLAx/SPYx, Ondo " +
+        "Global Markets, Remora, Backpack): FREE, read-only, no wallet. For each stock returns " +
+        "the on-chain DEX price, the underlying share reference price, the premium/discount % " +
+        "between them, 24h change, and DEX liquidity, plus the current US market session " +
+        "(open/closed/pre_market/after_hours). Use this over xpay_rwa_find when the user asks " +
+        "about stock prices or wants to buy a stock: the premium/discount and liquidity are the " +
+        "numbers to check before swapping into one via xpay_swap (confirm with the user first). " +
+        "Caveats to relay when relevant: these are issuer IOUs tracking the underlying, not " +
+        "brokerage shares; premiums widen while the US market is closed, and a large " +
+        "premium/discount on thin liquidity is not actionable.",
+      input_schema: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description:
+              "Ticker or name filter: 'AAPL', 'AAPLx', and 'apple' all match. Omit to list all " +
+              "by liquidity.",
           },
           limit: { type: "number", description: "Max results. Default 20." },
         },
@@ -845,6 +873,12 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       findRwaTokens({
         query: input.query as string | undefined,
         category: input.category as RwaCategory | undefined,
+        limit: (input.limit as number) ?? 20,
+      }),
+
+    xpay_stock_find: async (input) =>
+      findStocks({
+        query: input.query as string | undefined,
         limit: (input.limit as number) ?? 20,
       }),
 
