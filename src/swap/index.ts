@@ -85,6 +85,22 @@ export async function swapQuote(args: Omit<SwapArgs, "guardrail">): Promise<Swap
   return prepared.quote;
 }
 
+/**
+ * Failure after the signed transaction was handed to Jupiter. Anything thrown
+ * before this point (quote, guardrail, signing) moved no funds and is safe to
+ * retry; `maybeLanded` says whether this one might have.
+ */
+export class SwapSubmitError extends Error {
+  constructor(
+    message: string,
+    readonly maybeLanded: boolean,
+    readonly txSig?: string,
+  ) {
+    super(message);
+    this.name = "SwapSubmitError";
+  }
+}
+
 /** Execute a swap inside the wallet. Guardrail runs before signing. */
 export async function swap(args: SwapArgs): Promise<SwapResult> {
   // A quote's transaction embeds a recent blockhash, so always build a fresh
@@ -124,18 +140,26 @@ export async function swap(args: SwapArgs): Promise<SwapResult> {
   const signedTransaction = Buffer.from(tx.serialize()).toString("base64");
 
   const endpoint = apiOpts.endpoint ?? DEFAULT_ENDPOINT;
-  const exec = (await jupiterFetch(new URL("/swap/v2/execute", endpoint).toString(), apiOpts.apiKey, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ signedTransaction, requestId: order.requestId }),
-  })) as JupiterExecuteResponse;
+  let exec: JupiterExecuteResponse;
+  try {
+    exec = (await jupiterFetch(new URL("/swap/v2/execute", endpoint).toString(), apiOpts.apiKey, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ signedTransaction, requestId: order.requestId }),
+    })) as JupiterExecuteResponse;
+  } catch (err) {
+    // The signed transaction left this process - it may have landed.
+    throw new SwapSubmitError(`xpay.swap: execute request failed - ${(err as Error).message}`, true);
+  }
 
   if (exec.status !== "Success") {
     const landed = exec.signature
       ? ` The transaction may have landed and reverted - check https://solscan.io/tx/${exec.signature}`
       : "";
-    throw new Error(
+    throw new SwapSubmitError(
       `xpay.swap: execution failed (code ${exec.code ?? "?"}) - ${exec.error ?? "unknown error"}.${landed}`,
+      Boolean(exec.signature),
+      exec.signature,
     );
   }
 

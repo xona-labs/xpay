@@ -35,7 +35,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { createXPay, loadProfile, initProfile, deriveKeysFromMnemonic } from "../index.js";
-import { profileExists } from "../profile/storage.js";
+import { profileExists, profilePath } from "../profile/storage.js";
 import { readProfileConfig, setProfileBento } from "../profile/index.js";
 import { rawSolanaSigner } from "../signers/raw-solana.js";
 import { rawEvmSigner } from "../signers/raw-evm.js";
@@ -68,7 +68,10 @@ export async function startMcpServer(): Promise<void> {
     });
   }
   const sanaApiKey = await resolveSanaApiKey();
-  const { tools, handlers } = forClaude(xpay, { sanaApiKey });
+  // Orders live next to the profile; same dir loadProfile() reads.
+  const ordersDir = profileName && profileExists(profileName) ? profilePath(profileName) : undefined;
+  const maxPerDay = profileName && ordersDir ? readProfileConfig(profileName).guardrail?.maxPerDay : undefined;
+  const { tools, handlers } = forClaude(xpay, { sanaApiKey, ordersDir, maxPerDay });
 
   // Note: xpay_transfer executes directly (via the forClaude handler) - the same
   // path as the CLI. We deliberately do NOT stage transfers behind a second

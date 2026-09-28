@@ -27,6 +27,7 @@ import { runAccountsList, runAccountsShow, runAccountsUse } from "./accounts.js"
 import { runBalance } from "./balance.js";
 import { runDiscover } from "./discover.js";
 import { runTrust } from "./trust.js";
+import { runOrdersAdd, runOrdersList, runOrdersAction, runOrdersRun } from "./orders.js";
 import { runPay } from "./pay.js";
 import { runReport } from "./report.js";
 import { runTransfer } from "./transfer.js";
@@ -176,6 +177,63 @@ token
   .option("--json", "Emit raw JSON")
   .action(async (query: string | undefined, opts) => {
     await runTokenStock(query, opts);
+  });
+
+// ---------------------------------------------------------------- orders
+const orders = program
+  .command("orders")
+  .description("Standing tokenized-stock orders: recurring buys and conditional one-shots, executed by `xpay orders run`.");
+
+orders
+  .command("add <side> <amount> <stock>")
+  .description("Create an order: `buy 25 SPY --every weekly --budget 500`, or `buy 100 NVDA --max-premium 0.5` (one-shot). Buy amounts are USDC; sell amounts are stock tokens.")
+  .option("--every <interval>", "Repeat: 12h, 1d, 1w, 1m, daily, weekly, monthly (omit for a one-shot)")
+  .option("--start <when>", "First attempt: duration from now (2d) or ISO date (default now)")
+  .option("--max-premium <pct>", "Only fill when the adverse premium/discount vs the underlying is <= this % (default 2)")
+  .option("--min-liquidity <usd>", "Only fill with at least this much on-chain liquidity (default 50000)")
+  .option("--market-hours", "Only fill while the US market is open")
+  .option("--budget <usd>", "Total USD this order may trade (required for recurring unless --max-fills)")
+  .option("--max-fills <n>", "Max number of fills")
+  .option("--expires <when>", "Stop after: duration (30d) or ISO date (one-shots default to 7d)")
+  .option("--slippage-bps <n>", "Max slippage per fill")
+  .option("--profile <name>", "Profile (defaults to active)")
+  .option("--json", "Emit the created order as JSON")
+  .option("-y, --yes", "Skip the confirmation prompt")
+  .action(async (side: string, amount: string, stock: string, opts) => {
+    await runOrdersAdd(side, amount, stock, opts);
+  });
+
+orders
+  .command("list")
+  .description("Show open orders (--all includes finished ones).")
+  .option("--all", "Include completed, cancelled and expired orders")
+  .option("--profile <name>", "Profile (defaults to active)")
+  .option("--json", "Emit raw JSON")
+  .action((opts) => runOrdersList(opts));
+
+for (const [action, desc] of [
+  ["approve", "Activate an order an agent created (pending_approval)."],
+  ["cancel", "Cancel an order."],
+  ["pause", "Pause an active order."],
+  ["resume", "Resume a paused, blocked or needs_review order (--filled if the unconfirmed fill landed)."],
+] as const) {
+  const cmd = orders
+    .command(`${action} <id>`)
+    .description(desc)
+    .option("--profile <name>", "Profile (defaults to active)");
+  if (action === "resume") cmd.option("--filled", "Count the unconfirmed last fill as done");
+  cmd.action(async (id: string, opts) => runOrdersAction(action, id, opts));
+}
+
+orders
+  .command("run")
+  .description("Execute every due order whose conditions hold now. Idempotent - safe to call from cron, a scheduler, or an agent.")
+  .option("--dry-run", "Evaluate and quote only - never sign")
+  .option("--profile <name>", "Profile (defaults to active)")
+  .option("--passphrase <value>", "Non-interactive passphrase (or $XPAY_PASSPHRASE)")
+  .option("--json", "Emit the run report as JSON")
+  .action(async (opts) => {
+    await runOrdersRun(opts);
   });
 
 // ---------------------------------------------------------------- x (Twitter)

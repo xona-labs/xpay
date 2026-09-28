@@ -75,6 +75,7 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay agenc status <taskPda>` | Check a hire's progress (read-only, no wallet). `--json`. |
 | `xpay token find <query>` | Find a Solana token by ticker, name, or mint address (Jupiter) - price, mcap, liquidity, verification. Read-only. `--limit`, `--json`. |
 | `xpay token rwa [query]` | List tradable [RWA tokens](#rwa-discovery-solana) on Solana: tokenized stocks/ETFs (xStocks, Ondo, Remora) + USDY. Read-only. `--category`, `--limit`, `--json`. |
+| `xpay orders add \| list \| run` | [Standing stock orders](#standing-stock-orders): recurring buys and conditional one-shots on tokenized stocks, executed by `xpay orders run` from cron, a scheduler, or an agent. Also `approve`, `cancel`, `pause`, `resume`. |
 | `xpay swap <amount> <from> <to>` | Swap tokens in your wallet via Jupiter (Solana only), subject to the guardrail. `--slippage-bps`, `-y`. |
 | `xpay trade <amount> <from> <to>` | Trade tokens on [Robinhood Chain](#robinhood-chain-trading) via Uniswap V3 / NOXA Fun (ETH↔token), subject to the guardrail. `--slippage-bps`, `--quote-only`, `-y`. |
 | `xpay trending` | List tokens trending on Robinhood Chain (read-only, no wallet). `--new`, `--limit`. |
@@ -182,7 +183,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** - fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_shop_lens`, `xpay_shop_lens_quote`, `xpay_rwa_find`, `xpay_trust_check`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_shop_lens`, `xpay_shop_lens_quote`, `xpay_rwa_find`, `xpay_trust_check`, `xpay_order_create`, `xpay_orders_list`, `xpay_order_cancel`, `xpay_orders_run`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** - the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -434,6 +435,34 @@ Notes:
 - Permissioned funds on Solana (BlackRock BUIDL, Ondo OUSG) are excluded: they are KYC-gated, unverified on Jupiter, and have no DEX liquidity, so they can't be swapped into anyway.
 - MCP: `xpay_rwa_find` (free). Everything returned is swappable from USDC via `xpay_swap` / `xpay swap`.
 
+## Standing stock orders
+
+Recurring buys and conditional one-shots on tokenized stocks (xStocks and other Solana issuers), stored in the wallet profile so any agent framework can create them and any scheduler can run them:
+
+```bash
+xpay orders add buy 25 SPY --every weekly --budget 500              # $25 of SPYx every week, $500 total
+xpay orders add buy 100 NVDA --max-premium 0.5 --market-hours       # once, when the premium is <= 0.5% during US hours
+xpay orders list                                                     # status, caps used, why an order is still waiting
+xpay orders run --dry-run                                            # what would fill right now, nothing signed
+xpay orders run                                                      # execute due orders (cron: */15 * * * *)
+```
+
+```ts
+await createStockOrder(profile.path, { side: "buy", stock: "SPY", amount: 25, every: "weekly", limits: { maxTotalUsd: 500 }, approved: true });
+const report = await runDueOrders(profile.path, xpay, { maxPerDay: 200 });
+```
+
+How a run decides, per due order: expiry and caps, then market hours (if `--market-hours`), then the same checks as a direct stock trade (verified token, liquidity floor, adverse premium/discount vs the real share price, default 2%), then the profile's `maxPerDay`. Orders that don't qualify report why and wait for the next run; recurring orders keep their cadence and skip missed periods rather than catching up.
+
+Safety model, since runs are usually unattended:
+- **Every order is finite.** Recurring orders need `--budget` and/or `--max-fills`; one-shots expire after 7 days by default.
+- **Agents can't activate orders.** `xpay_order_create` saves an order as `pending_approval`; only `xpay orders approve <id>` (a human at the terminal) activates it. Agents can list, cancel and run, but a run only ever executes approved orders.
+- **Daily cap across runs.** `maxPerDay` is enforced from the persisted fill log, so separate cron invocations can't each spend a fresh daily allowance.
+- **Never double-buys.** A fill that was submitted but not confirmed parks the order in `needs_review`; check the wallet, then `xpay orders resume <id>` (add `--filled` if it landed). A guardrail denial (per-tx cap, approval threshold) parks it in `blocked`. Only one run executes at a time.
+- The token is pinned at creation (SPY → SPYx mint), so a later run can't resolve to a different issuer.
+
+Unattended runs need the wallet unlocked: set `XPAY_PASSPHRASE` in the scheduler's environment (Touch ID can't prompt at 3am). Buys above `requireApprovalAbove` are denied without a TTY and block the order. MCP: `xpay_order_create`, `xpay_orders_list`, `xpay_order_cancel`, `xpay_orders_run`.
+
 ## Robinhood Chain trading
 
 Trade the [NOXA Fun](https://fun.noxa.fi/robinhood) memecoin scene on **Robinhood Chain** (Robinhood's Arbitrum L2, chain `4663`) straight from your own wallet - no API key. NOXA Fun tokens launch into Uniswap V3 pools quoted in native ETH, so trading is plain on-chain V3: quote via QuoterV2, execute via SwapRouter02. Discovery (trending / new tokens, USD pricing) comes from GeckoTerminal's public API.
@@ -564,6 +593,7 @@ Notes:
 - ✅ Realtime X (Twitter) data at cost via x402 (`xpay x user|posts`)
 - ✅ zauth repo security scans via x402 (`xpay zauth reposcan`)
 - ✅ xona shop product discovery via x402 (`xpay shop search`), free quote preflight
+- ✅ Standing stock orders (`xpay orders`): recurring buys + conditional one-shots, human-approved, idempotent runs
 - ✅ ERC-8004 merchant trust on Solana (`xpay trust`, trust lines in `xpay discover`)
 - ✅ RWA discovery on Solana (`xpay token rwa`): tokenized stocks/ETFs + USDY, swappable via `xpay swap`
 - ✅ Solana + Base mainnet with disk caching

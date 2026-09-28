@@ -45,6 +45,10 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 | `xpay_transfer` | Send USDC (or any Solana SPL token, or USDT0 on Stable) directly to an address. Executes immediately, gated by the user's guardrail - confirm amount + destination with the user before calling. |
 | `xpay_token_find` | Find Solana tokens by ticker, name, or mint (price, mcap, liquidity, `verified` flag). Read-only. |
 | `xpay_rwa_find` | List tradable RWA tokens on Solana: tokenized stocks/ETFs (xStocks, Ondo, Remora) + treasury-backed USDY. Free, read-only; results swappable via `xpay_swap`. |
+| `xpay_order_create` | Save a standing tokenized-stock order (recurring buy, or a one-shot that waits for e.g. premium <= 0.5%). Starts `pending_approval`: tell the user to run the returned `xpay orders approve <id>`; agents cannot approve. |
+| `xpay_orders_list` | Standing orders with status, caps used, next run, and why an active one is still waiting. Read-only. |
+| `xpay_order_cancel` | Cancel a standing order by id. |
+| `xpay_orders_run` | Execute due, approved orders whose conditions hold now (irreversible swaps). Idempotent; `dryRun: true` previews. |
 | `xpay_swap` | Swap tokens inside the wallet via Jupiter (Solana only). Irreversible; guardrail-gated. Confirm with the user first. |
 | `xpay_x_user` | Realtime X (Twitter) profile - followers, bio, verification. Paid (~$0.01 at cost via x402). |
 | `xpay_x_posts` | Recent posts from an X account with engagement metrics. Paid (~$0.06 at cost via x402). |

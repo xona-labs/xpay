@@ -15,6 +15,7 @@ import type { XPay } from "../index.js";
 import { ResourceSchema } from "../types.js";
 import { fetchAgencTask } from "../agenc/api.js";
 import { lookupMerchantTrust } from "../trust/index.js";
+import { cancelOrder, createStockOrder, loadOrders, runDueOrders } from "../orders/index.js";
 import { enrichTokenBalances } from "../token/index.js";
 import { robinhoodHoldings } from "../trading/discovery.js";
 import { forSana } from "../sana/tools.js";
@@ -56,6 +57,13 @@ export interface ClaudeToolDef {
 export interface ToolOptions {
   /** Sana API key - when present, registers sana_* tools alongside xpay_* tools. */
   sanaApiKey?: string;
+  /**
+   * Profile directory holding `orders.json`. Enables the xpay_order* tools;
+   * without it they report that orders need a profile.
+   */
+  ordersDir?: string;
+  /** Profile daily cap (USD), enforced across order runs. */
+  maxPerDay?: number;
 }
 
 /** MCP tool annotations (readOnly / openWorld / destructive hints). */
@@ -100,6 +108,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   xpay_rwa_find: READ,
   xpay_stock_find: READ,
   xpay_stock_trade: SPEND,
+  xpay_order_create: LOCAL_CONFIG,
+  xpay_orders_list: READ,
+  xpay_order_cancel: LOCAL_CONFIG,
+  xpay_orders_run: SPEND,
   xpay_mpp_find: READ,
   xpay_mpp_resources: READ,
   xpay_shop_quote: READ,
@@ -551,6 +563,72 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       },
     },
     {
+      name: "xpay_order_create",
+      description:
+        "Create a standing tokenized-stock order on Solana: a recurring buy ('$25 of SPYx every " +
+        "week') or a conditional one-shot ('buy $100 of NVDAx once the premium is under 0.5%'). " +
+        "Nothing trades now. The order is saved in the wallet as PENDING APPROVAL: the user must " +
+        "run `xpay orders approve <id>` in a terminal to activate it (agents cannot approve), and " +
+        "it then fills whenever xpay_orders_run / `xpay orders run` finds it due and its " +
+        "conditions met. Relay the approve command and the order's caps to the user. Recurring " +
+        "orders need a cap (maxTotalUsd and/or maxFills); one-shots expire after 7 days by " +
+        "default. Buy amounts are USDC; sell amounts are stock tokens.",
+      input_schema: {
+        type: "object",
+        properties: {
+          side: { type: "string", enum: ["buy", "sell"] },
+          stock: { type: "string", description: "Ticker (SPY), tokenized symbol (SPYx), or mint. Pinned to one token at creation." },
+          amount: { type: "number", description: "Per fill: USDC to spend (buy) or stock tokens to sell (sell)." },
+          every: { type: "string", description: "Repeat interval: 12h, 1d, 1w, 1m, daily, weekly, monthly. Omit for a one-shot." },
+          startAt: { type: "string", description: "ISO time of the first attempt. Default now." },
+          maxPremiumPct: { type: "number", description: "Only fill when the adverse premium/discount vs the real share price is at most this %. Default 2." },
+          minLiquidityUsd: { type: "number", description: "Only fill with at least this on-chain liquidity. Default 50000." },
+          marketOpenOnly: { type: "boolean", description: "Only fill while the US stock market is open." },
+          maxTotalUsd: { type: "number", description: "Total USD the order may trade across fills." },
+          maxFills: { type: "number", description: "Max number of fills." },
+          expiresAt: { type: "string", description: "ISO time after which the order stops." },
+          slippageBps: { type: "number" },
+        },
+        required: ["side", "stock", "amount"],
+      },
+    },
+    {
+      name: "xpay_orders_list",
+      description:
+        "List the wallet's standing stock orders with status (pending_approval, active, paused, " +
+        "blocked, needs_review, completed, cancelled, expired), caps used, next run time, the " +
+        "latest reason an active order is still waiting, and fill history. Read-only.",
+      input_schema: {
+        type: "object",
+        properties: {
+          all: { type: "boolean", description: "Include completed/cancelled/expired orders. Default false." },
+        },
+      },
+    },
+    {
+      name: "xpay_order_cancel",
+      description: "Cancel a standing stock order by id (e.g. ord_1a2b3c4d). Stops all future fills.",
+      input_schema: {
+        type: "object",
+        properties: { id: { type: "string" } },
+        required: ["id"],
+      },
+    },
+    {
+      name: "xpay_orders_run",
+      description:
+        "Execute every due, active standing order whose conditions hold right now (price " +
+        "premium, liquidity, market hours, caps). Irreversible swaps for the ones that fill; " +
+        "the rest report why they are waiting. Idempotent and safe to call repeatedly - only " +
+        "user-approved orders ever execute. Pass dryRun: true to preview without signing.",
+      input_schema: {
+        type: "object",
+        properties: {
+          dryRun: { type: "boolean", description: "Evaluate and quote only - never sign." },
+        },
+      },
+    },
+    {
       name: "xpay_mpp_find",
       description:
         "Discover MPP (Machine Payments Protocol, the Stripe+Tempo HTTP 402 standard) and x402 " +
@@ -994,6 +1072,47 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       };
     },
 
+    xpay_order_create: async (input) => {
+      const opt = (k: string) => input[k] as number | undefined;
+      const order = await createStockOrder(requireOrdersDir(opts), {
+        side: input.side as "buy" | "sell",
+        stock: input.stock as string,
+        amount: input.amount as number,
+        every: input.every as string | undefined,
+        startAt: input.startAt as string | undefined,
+        conditions: {
+          maxPremiumPct: opt("maxPremiumPct"),
+          minLiquidityUsd: opt("minLiquidityUsd"),
+          marketOpenOnly: input.marketOpenOnly as boolean | undefined,
+          slippageBps: opt("slippageBps"),
+        },
+        limits: {
+          maxTotalUsd: opt("maxTotalUsd"),
+          maxFills: opt("maxFills"),
+          expiresAt: input.expiresAt as string | undefined,
+        },
+        createdBy: "agent",
+        // Never self-approved: a human activates it from the CLI.
+        approved: false,
+      });
+      return { ...order, approveWith: `xpay orders approve ${order.id}` };
+    },
+
+    xpay_orders_list: async (input) => {
+      const orders = loadOrders(requireOrdersDir(opts));
+      return input.all
+        ? orders
+        : orders.filter((o) => !["completed", "cancelled", "expired"].includes(o.status));
+    },
+
+    xpay_order_cancel: async (input) => cancelOrder(requireOrdersDir(opts), input.id as string),
+
+    xpay_orders_run: async (input) =>
+      runDueOrders(requireOrdersDir(opts), xpay, {
+        dryRun: Boolean(input.dryRun),
+        maxPerDay: opts.maxPerDay,
+      }),
+
     xpay_mpp_find: async (input) => {
       if (input.query) {
         return searchMppServices({
@@ -1090,6 +1209,13 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
   }
 
   return { tools, handlers };
+}
+
+function requireOrdersDir(opts: ToolOptions): string {
+  if (!opts.ordersDir) {
+    throw new Error("xpay orders need a wallet profile (run `xpay init`); raw-key mode has nowhere to store them");
+  }
+  return opts.ordersDir;
 }
 
 /** OpenAI function-calling tool definitions (derived from the Claude shape). */

@@ -6,6 +6,26 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.36] – 2026-09-28
+
+### Added
+- **Standing stock orders.** Recurring buys (`$25 of SPYx every week`) and
+  conditional one-shots (`buy NVDAx once the premium is <= 0.5%`, optionally
+  US market hours only) on tokenized stocks, stored in the profile
+  (`orders.json`) so any agent framework creates them and any scheduler
+  runs them. CLI `xpay orders add|list|approve|cancel|pause|resume|run`,
+  MCP `xpay_order_create`, `xpay_orders_list`, `xpay_order_cancel`,
+  `xpay_orders_run`, SDK `createStockOrder` / `runDueOrders`. Runs are
+  idempotent and re-check the stock-trade risk gates live. Safety: every
+  order is capped (budget/fills, one-shots expire in 7 days); agent-created
+  orders need `xpay orders approve` from the CLI; `maxPerDay` is enforced
+  across runs from the persisted fill log; an unconfirmed fill parks the
+  order in `needs_review` instead of retrying; one run at a time
+  (lock file). `--dry-run` / `dryRun` quotes without signing.
+- `SwapSubmitError` from `swap()` marks failures after the signed
+  transaction was submitted (`maybeLanded`), distinct from safe-to-retry
+  pre-submit errors.
+
 ## [0.2.35] – 2026-09-28
 
 ### Added
