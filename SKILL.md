@@ -38,7 +38,8 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 
 | Tool | Use it to |
 |---|---|
-| `xpay_discover` | Find paid services by natural-language query. Returns ranked candidates with price, network, and payee. |
+| `xpay_discover` | Find paid services by natural-language query. Returns ranked candidates with price, network, and payee; Solana payees carry `trust` (ERC-8004 identity + reputation). `minTrust` keeps only registered merchants. |
+| `xpay_trust_check` | ERC-8004 agent identity + reputation of a Solana merchant wallet (e.g. a resource's `payTo`): name, 0-100 feedback score, review count, ATOM tier. Free, read-only. Unregistered is the common case, not a red flag. |
 | `xpay_use` | Pay for and call a specific service. Pass the full `resource` object from `xpay_discover` (preferred), or a `resourceUrl`. Handles the x402 402-challenge → pay → retry flow. |
 | `xpay_do` | One step: discover the best service for an intent **and** call it. Use when you don't need to compare options. |
 | `xpay_transfer` | Send USDC (or any Solana SPL token, or USDT0 on Stable) directly to an address. Executes immediately, gated by the user's guardrail - confirm amount + destination with the user before calling. |

@@ -6,6 +6,21 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.35] – 2026-09-28
+
+### Added
+- **Merchant trust from ERC-8004 agent identities on Solana.** Discovery
+  looks up each Solana merchant wallet (`payTo`) in the 8004-solana
+  registry (as agent wallet or owner) and attaches `resource.trust`: the
+  strongest linked agent identity, its average client feedback (0-100),
+  review count, and ATOM tier/quality/risk when enabled. New
+  `xpay trust <wallet>` CLI command and `xpay_trust_check` MCP tool;
+  `xpay discover --min-trust <n>` / `minTrust` keeps only registered
+  merchants, `--no-trust` / `trust: false` skips lookups. Uses the
+  registry's keyless public indexer, cached 10 minutes per wallet;
+  failures are warnings, never fatal. SDK exports `lookupMerchantTrust`
+  and `enrichWithTrust`.
+
 ## [0.2.31] – 2026-08-20
 
 ### Added

@@ -50,6 +50,7 @@ export { Guardrail } from "./guardrail/index.js";
 export { discover } from "./discover/index.js";
 export { fetchPayAIResources } from "./discover/payai.js";
 export { fetchOrbitX402Resources } from "./discover/orbitx402.js";
+export { lookupMerchantTrust, enrichWithTrust, isSolanaAddress } from "./trust/index.js";
 export {
   fetchAgencResources,
   fetchAgencListing,

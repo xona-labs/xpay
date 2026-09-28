@@ -77,6 +77,11 @@ export const ResourceSchema = z.object({
    * flow so the free tier can be attempted (challenges are per-402).
    */
   extensions: z.record(z.unknown()).optional(),
+  /**
+   * ERC-8004 agent identity + reputation of the merchant wallet (`payTo`),
+   * attached by discovery for Solana recipients. Absent when not looked up.
+   */
+  trust: z.custom<MerchantTrust>((v) => typeof v === "object" && v !== null).optional(),
 });
 export type Resource = z.infer<typeof ResourceSchema>;
 
@@ -148,6 +153,50 @@ export interface UseResult {
   freeRemaining?: number;
 }
 
+/** ATOM trust tiers from the 8004-solana reputation engine. */
+export type TrustTier = "unrated" | "bronze" | "silver" | "gold" | "platinum";
+
+/** One ERC-8004 agent identity registered on Solana (8004-solana registry). */
+export interface TrustAgent {
+  /** Agent asset (Metaplex Core NFT) address - the agent's on-chain id. */
+  asset: string;
+  agentId: number;
+  name?: string;
+  /** Registration metadata URI (ipfs:// or https://). */
+  uri?: string;
+  owner: string;
+  agentWallet?: string;
+  /** Which field matched the merchant wallet. */
+  matchedBy: "agent_wallet" | "owner";
+  feedbackCount: number;
+  /** Average client feedback score, 0-100. Null with no feedback. */
+  avgScore: number | null;
+  /** ATOM reputation engine output, when the agent opted in. */
+  atom?: {
+    tier: TrustTier;
+    /** Confidence-weighted quality, 0-100 (low until feedback accumulates). */
+    quality: number;
+    /** 0-100. */
+    confidence: number;
+    /** 0-100, higher is riskier. */
+    risk: number;
+  };
+}
+
+/** Result of an ERC-8004 identity/reputation lookup for a merchant wallet. */
+export interface MerchantTrust {
+  wallet: string;
+  registry: "8004-solana";
+  /** True when at least one registered agent identity is linked to the wallet. */
+  registered: boolean;
+  /** Strongest linked identity (most feedback, then best score). */
+  agent: TrustAgent | null;
+  /** Number of agent identities linked to this wallet. */
+  agentCount: number;
+  /** One-line human summary, e.g. "8004 agent \"Delx\" · 48/100 from 7 reviews". */
+  summary: string;
+}
+
 /** Options passed to {@link XPay.discover}. */
 export interface DiscoverOptions {
   /** Free-text query - matched against resource URL, metadata, and category. */
@@ -162,6 +211,18 @@ export interface DiscoverOptions {
    * also overridable via the XPAY_DISCOVERY_SOURCES env var (csv).
    */
   sources?: string[];
+  /**
+   * Attach ERC-8004 trust data (`resource.trust`) for Solana merchant
+   * wallets among the returned results. Default true; one indexer call per
+   * unique wallet, cached, failures are non-fatal.
+   */
+  trust?: boolean;
+  /**
+   * Only return services whose merchant wallet has a registered ERC-8004
+   * identity with an average feedback score of at least this (0-100).
+   * `0` keeps any registered merchant. Implies `trust`.
+   */
+  minTrust?: number;
 }
 
 /** A single token balance entry returned by {@link Signer.tokenBalances}. */

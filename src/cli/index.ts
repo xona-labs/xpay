@@ -26,6 +26,7 @@ import { runInit } from "./init.js";
 import { runAccountsList, runAccountsShow, runAccountsUse } from "./accounts.js";
 import { runBalance } from "./balance.js";
 import { runDiscover } from "./discover.js";
+import { runTrust } from "./trust.js";
 import { runPay } from "./pay.js";
 import { runReport } from "./report.js";
 import { runTransfer } from "./transfer.js";
@@ -96,13 +97,24 @@ accounts
 // ---------------------------------------------------------------- discover
 program
   .command("discover [query]")
-  .description("Search the agentic-commerce catalog (PayAI + OrbitX402 + AgenC hireable agents).")
+  .description("Search the agentic-commerce catalog (OrbitX402/PayAI + Agentic Market + AgenC), with ERC-8004 merchant trust.")
   .option("--limit <n>", "Max results (default 10; 50 when a single --sources is given)")
   .option("--network <net>", "Filter by network (solana, base, ...)")
-  .option("--sources <csv>", "Restrict catalogs: orbitx402, agenc (e.g. --sources agenc)")
+  .option("--sources <csv>", "Restrict catalogs: orbitx402, agenticmarket, agenc (e.g. --sources agenc)")
+  .option("--min-trust <score>", "Only Solana merchants with an ERC-8004 identity scoring >= this (0-100; 0 = any registered)")
+  .option("--no-trust", "Skip the ERC-8004 merchant trust lookup")
   .option("--json", "Emit raw JSON instead of the table view")
   .action(async (query: string | undefined, opts) => {
     await runDiscover(query, opts);
+  });
+
+// ---------------------------------------------------------------- trust
+program
+  .command("trust <wallet>")
+  .description("ERC-8004 agent identity + reputation of a Solana merchant wallet (8004-solana registry). Read-only, no wallet.")
+  .option("--json", "Emit raw JSON")
+  .action(async (wallet: string, opts) => {
+    await runTrust(wallet, opts);
   });
 
 // ---------------------------------------------------------------- pay

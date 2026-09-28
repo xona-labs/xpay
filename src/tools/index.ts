@@ -14,6 +14,7 @@
 import type { XPay } from "../index.js";
 import { ResourceSchema } from "../types.js";
 import { fetchAgencTask } from "../agenc/api.js";
+import { lookupMerchantTrust } from "../trust/index.js";
 import { enrichTokenBalances } from "../token/index.js";
 import { robinhoodHoldings } from "../trading/discovery.js";
 import { forSana } from "../sana/tools.js";
@@ -80,6 +81,7 @@ const LOCAL_CONFIG: ToolAnnotations = { readOnlyHint: false, openWorldHint: fals
  */
 export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   xpay_discover: READ,
+  xpay_trust_check: READ,
   xpay_use: SPEND,
   xpay_do: SPEND,
   xpay_transfer: SPEND,
@@ -123,7 +125,11 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         "those are priced in SOL lamports and execute as on-chain escrow hires, not HTTP calls. " +
         "When the user asks specifically about the AgenC marketplace, pass sources: ['agenc'] " +
         "(optionally with no query) to list ALL its listings instead of the few slots it gets " +
-        "in mixed results.",
+        "in mixed results. " +
+        "Solana-paid results carry `trust`: the merchant wallet's ERC-8004 agent identity and " +
+        "reputation (average client feedback 0-100, review count, ATOM tier when enabled). " +
+        "Most merchants have no identity yet, so a missing identity is normal, not a red flag; " +
+        "a registered identity with good reviews is a positive signal worth mentioning.",
       input_schema: {
         type: "object",
         properties: {
@@ -135,7 +141,32 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
             items: { type: "string", enum: ["orbitx402", "agenticmarket", "agenc"] },
             description: "Restrict to specific catalogs, e.g. ['agenc'] for AgenC marketplace only. Default: all.",
           },
+          minTrust: {
+            type: "number",
+            description:
+              "Only return Solana merchants with a registered ERC-8004 identity whose average " +
+              "feedback score is at least this (0-100; 0 = any registered identity). Only set " +
+              "when the user asks for trusted/verified merchants: it drops every unregistered one.",
+          },
         },
+      },
+    },
+    {
+      name: "xpay_trust_check",
+      description:
+        "Check a Solana merchant wallet's ERC-8004 agent identity and reputation (8004-solana " +
+        "registry): FREE, read-only, no wallet. Matches the wallet as the agent's operational " +
+        "wallet or its owner, and returns the strongest linked identity (name, agent id, " +
+        "registration URI), its average client feedback score (0-100) and review count, and " +
+        "ATOM trust tier/quality/risk when the agent opted in. Use before paying an unfamiliar " +
+        "merchant (the `payTo` of a resource) or when the user asks whether a service is " +
+        "trustworthy. 'Not registered' is the common case and is not evidence of fraud.",
+      input_schema: {
+        type: "object",
+        properties: {
+          wallet: { type: "string", description: "Solana merchant wallet address (base58), e.g. a resource's payTo." },
+        },
+        required: ["wallet"],
       },
     },
     {
@@ -742,8 +773,11 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         limit: (input.limit as number) ?? (sources?.length === 1 ? 50 : 5),
         networks: input.network ? [input.network as string] : undefined,
         sources,
+        minTrust: input.minTrust as number | undefined,
       });
     },
+
+    xpay_trust_check: async (input) => lookupMerchantTrust(String(input.wallet ?? "").trim()),
 
     xpay_use: async (input) => {
       // Prefer the full resource object from xpay_discover - it carries

@@ -13,6 +13,9 @@
  *    SOL and executed as escrow hires rather than x402 calls. Its API has no
  *    text search, so queries are matched locally (the catalog is small).
  *
+ * Solana merchant wallets (`payTo`) in the results are annotated with their
+ * ERC-8004 agent identity + reputation (`resource.trust`, see ../trust).
+ *
  * One source failing never kills discovery - its error is stashed in
  * {@link lastDiscoverWarnings} and the other sources' results are returned.
  */
@@ -23,6 +26,7 @@ import { fetchPayAIResources } from "./payai.js";
 import { fetchAgenticMarketResources } from "./agenticmarket.js";
 import { fetchAgencResources } from "../agenc/api.js";
 import { cached, isSourceDown, markSourceDown } from "./cache.js";
+import { enrichWithTrust, meetsMinTrust } from "../trust/index.js";
 
 export { setCacheTtl, invalidate as invalidateCache } from "./cache.js";
 
@@ -82,7 +86,30 @@ export function lastDiscoverWarnings(): string[] {
   return [...warnings];
 }
 
+/**
+ * Over-fetch factor when `minTrust` filters results: most merchant wallets
+ * have no 8004 identity yet, so a plain `limit` would usually come back empty.
+ */
+const TRUST_FILTER_POOL = 50;
+
 export async function discover(opts: InternalDiscoverOptions = {}): Promise<Resource[]> {
+  const filtering = opts.minTrust !== undefined;
+  const wantTrust = filtering || opts.trust !== false;
+  const results = await discoverCatalogs(
+    filtering ? { ...opts, limit: Math.max(opts.limit ?? 0, TRUST_FILTER_POOL) } : opts,
+  );
+  if (!wantTrust) return results;
+
+  const { resources, failed } = await enrichWithTrust(results);
+  if (failed > 0) {
+    warnings.push(`8004 trust lookup failed for ${failed} merchant wallet${failed === 1 ? "" : "s"}`);
+  }
+  if (!filtering) return resources;
+  const kept = resources.filter((r) => meetsMinTrust(r, opts.minTrust!));
+  return opts.limit ? kept.slice(0, opts.limit) : kept;
+}
+
+async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource[]> {
   const query = opts.query?.trim().toLowerCase() || undefined;
   const sources =
     opts.sources ??

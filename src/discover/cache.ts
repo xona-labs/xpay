@@ -16,12 +16,12 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import type { Resource } from "../types.js";
 
-type Loader = () => Promise<Resource[]>;
+type Loader<T> = () => Promise<T>;
 
-interface Entry {
+interface Entry<T = unknown> {
   expiresAt: number;
-  data?: Resource[];
-  inflight?: Promise<Resource[]>;
+  data?: T;
+  inflight?: Promise<T>;
 }
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -37,16 +37,16 @@ function diskCachePath(key: string): string {
   return join(diskCacheDir(), `${safe}.json`);
 }
 
-interface DiskEntry {
+interface DiskEntry<T> {
   expiresAt: number;
-  data: Resource[];
+  data: T;
 }
 
-function readDisk(key: string, allowStale = false): Resource[] | null {
+function readDisk<T>(key: string, allowStale = false): T | null {
   try {
     const file = diskCachePath(key);
     if (!existsSync(file)) return null;
-    const blob = JSON.parse(readFileSync(file, "utf8")) as DiskEntry;
+    const blob = JSON.parse(readFileSync(file, "utf8")) as DiskEntry<T>;
     if (allowStale || blob.expiresAt > Date.now()) return blob.data;
     return null;
   } catch {
@@ -54,11 +54,11 @@ function readDisk(key: string, allowStale = false): Resource[] | null {
   }
 }
 
-function writeDisk(key: string, data: Resource[]): void {
+function writeDisk<T>(key: string, data: T): void {
   try {
     const dir = diskCacheDir();
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
-    const blob: DiskEntry = { expiresAt: Date.now() + ttlMs, data };
+    const blob: DiskEntry<T> = { expiresAt: Date.now() + ttlMs, data };
     writeFileSync(diskCachePath(key), JSON.stringify(blob));
   } catch {
     // Best-effort - cache failures should never break the call.
@@ -72,19 +72,20 @@ export function setCacheTtl(ms: number): void {
 }
 
 /**
- * Get cached resources for `key`, loading via `loader` if missing or expired.
+ * Get cached data for `key`, loading via `loader` if missing or expired.
  * Concurrent calls during a cold load share the same in-flight promise.
+ * Defaults to catalog resources; other callers (e.g. trust lookups) pass `T`.
  */
-export async function cached(key: string, loader: Loader): Promise<Resource[]> {
+export async function cached<T = Resource[]>(key: string, loader: Loader<T>): Promise<T> {
   const now = Date.now();
-  const entry = store.get(key);
+  const entry = store.get(key) as Entry<T> | undefined;
 
   if (entry?.data && entry.expiresAt > now) return entry.data;
   if (entry?.inflight) return entry.inflight;
 
   // Try disk before paying the network cost. CLI invocations hit this path
   // every time (each invocation is a fresh process with empty memory).
-  const onDisk = readDisk(key);
+  const onDisk = readDisk<T>(key);
   if (onDisk) {
     store.set(key, { data: onDisk, expiresAt: now + ttlMs });
     return onDisk;
@@ -104,7 +105,7 @@ export async function cached(key: string, loader: Loader): Promise<Resource[]> {
       // retries the loader.
       const staleMem = entry?.data;
       if (staleMem) return staleMem;
-      const staleDisk = readDisk(key, true);
+      const staleDisk = readDisk<T>(key, true);
       if (staleDisk) return staleDisk;
       throw err;
     },

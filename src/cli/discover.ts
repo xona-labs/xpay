@@ -8,6 +8,7 @@ import chalk from "chalk";
 import { discover, lastDiscoverWarnings } from "../discover/index.js";
 import { AGENC_SCHEME } from "../agenc/api.js";
 import { formatUsd, shortAddress } from "./common.js";
+import { scoreColor } from "./trust.js";
 import type { Resource } from "../types.js";
 
 export interface DiscoverCmdOptions {
@@ -15,6 +16,9 @@ export interface DiscoverCmdOptions {
   network?: string;
   sources?: string;
   json?: boolean;
+  /** Commander sets false for --no-trust. */
+  trust?: boolean;
+  minTrust?: string;
 }
 
 export async function runDiscover(query: string | undefined, opts: DiscoverCmdOptions): Promise<void> {
@@ -23,7 +27,8 @@ export async function runDiscover(query: string | undefined, opts: DiscoverCmdOp
   const networks = opts.network ? [opts.network] : undefined;
 
   const t0 = Date.now();
-  const results = await discover({ query, limit, networks, sources });
+  const minTrust = opts.minTrust !== undefined ? Number(opts.minTrust) : undefined;
+  const results = await discover({ query, limit, networks, sources, trust: opts.trust, minTrust });
   const elapsed = Date.now() - t0;
 
   if (opts.json) {
@@ -37,6 +42,10 @@ export async function runDiscover(query: string | undefined, opts: DiscoverCmdOp
 
   if (results.length === 0) {
     console.log(chalk.yellow(`No services found${query ? ` for "${query}"` : ""}.`));
+    if (minTrust !== undefined) {
+      console.log(chalk.dim(`Few merchants have an ERC-8004 identity yet - try without --min-trust.`));
+      return;
+    }
     console.log(chalk.dim(`Tip: try broader terms, or omit --network.`));
     return;
   }
@@ -75,6 +84,7 @@ function printResource(r: Resource, index: number): void {
     console.log(
       `      ${chalk.dim(`↳ hires ${rep?.totalHires ?? "0"}, ratings ${rep?.ratingCount ?? 0} - xpay agenc hire ${r.metadata?.listingPda}`)}`,
     );
+    printTrust(r);
     console.log("");
     return;
   }
@@ -91,7 +101,23 @@ function printResource(r: Resource, index: number): void {
       `      ${chalk.dim("→ pay")} ${chalk.dim(shortAddress(opt.payTo, 6, 6))} ${chalk.dim(`(${opt.asset.slice(0, 12)}…)`)}`,
     );
   }
+  printTrust(r);
   console.log("");
+}
+
+function printTrust(r: Resource): void {
+  const t = r.trust;
+  if (!t) return;
+  // Multi-network listings: the row shows accepts[0]'s recipient, but trust
+  // is for the Solana one - name it when they differ.
+  const who = r.accepts[0]?.payTo === t.wallet ? "" : `solana payTo ${shortAddress(t.wallet, 4, 4)}: `;
+  if (!t.agent) {
+    console.log(`      ${chalk.dim(`✧ ${who}no ERC-8004 identity`)}`);
+    return;
+  }
+  const score = t.agent.avgScore;
+  const label = score !== null ? scoreColor(score)(t.summary) : chalk.white(t.summary);
+  console.log(`      ${chalk.green("✦")} ${chalk.dim(who)}${label}`);
 }
 
 function safeHost(url: string): string {

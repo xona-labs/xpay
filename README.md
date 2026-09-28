@@ -68,7 +68,8 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay init [name]` | Create a profile (Solana + EVM keys from one BIP-39 seed). `--import` to restore from a phrase, `--no-encrypt` for dev wallets, `--workspace` to store locally. |
 | `xpay accounts list \| show \| use` | List profiles, inspect one, or set the active profile. |
 | `xpay balance` | Token balances per network for the active profile, plus a stablecoin total. Covers Solana, Base and other EVM chains, Robinhood Chain, and [Stable](#stable-chain). `--network`. |
-| `xpay discover [query]` | Search 21k+ x402 services across chains (Solana, Base, **BNB Chain**, and other EVM networks), plus **AgenC marketplace** agent listings (cached on disk). `--network`, `--limit`, `--json`. |
+| `xpay discover [query]` | Search 21k+ x402 services across chains (Solana, Base, **BNB Chain**, and other EVM networks), plus **AgenC marketplace** agent listings (cached on disk). Solana merchants show their [ERC-8004 trust](#merchant-trust-erc-8004-on-solana). `--network`, `--limit`, `--min-trust`, `--no-trust`, `--json`. |
+| `xpay trust <wallet>` | [ERC-8004](#merchant-trust-erc-8004-on-solana) agent identity + reputation of a Solana merchant wallet. Read-only, no wallet. `--json`. |
 | `xpay pay <url>` | Pay an x402 endpoint. Works on catalog URLs and any URL that returns 402. `--max-usd`, `--body`, `-y`. |
 | `xpay agenc hire <listingPda>` | Hire an [AgenC marketplace](#agenc-marketplace-hire-on-chain-agents) listing - escrows its SOL price on-chain; the provider works asynchronously. `--max-usd`, `--review-window`, `-y`. |
 | `xpay agenc status <taskPda>` | Check a hire's progress (read-only, no wallet). `--json`. |
@@ -181,7 +182,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** - fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_shop_lens`, `xpay_shop_lens_quote`, `xpay_rwa_find`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_shop_lens`, `xpay_shop_lens_quote`, `xpay_rwa_find`, `xpay_trust_check`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** - the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -389,6 +390,29 @@ Notes:
 - Keyless by default (~20 req/s shared bucket). Set `JUPITER_API_KEY` (or profile `swap.apiKey`) for higher limits; `XPAY_JUPITER_ENDPOINT` overrides the API base.
 - This is the **native** swap in your own xpay wallet. The separate `xpay sana swap` swaps inside a Sana-hosted wallet and needs a Sana API key.
 
+## Merchant trust (ERC-8004 on Solana)
+
+Before paying an unfamiliar service, check who is on the other end. Solana merchant wallets (the x402 `payTo`) are looked up in the [8004-solana](https://github.com/QuantuLabs/8004-solana) registry, the Solana implementation of [ERC-8004 Trustless Agents](https://eips.ethereum.org/EIPS/eip-8004): an agent identity (Metaplex Core asset) plus on-chain client feedback, and optional ATOM scoring (trust tier, quality, confidence, risk). Free, read-only, no wallet:
+
+```bash
+xpay trust 28heAMpFkeUJsL7o7apiK4oJwZWq2fUHinRwbgYYsemG   # identity, 0-100 feedback score, review count
+xpay discover "token price" --network solana               # each Solana result shows a trust line
+xpay discover "data" --min-trust 50                         # only registered merchants scoring >= 50
+```
+
+```ts
+const trust = await lookupMerchantTrust(payTo);   // { registered, agent: { name, avgScore, feedbackCount, atom? }, summary }
+const results = await xpay.discover({ query: "data", minTrust: 0 });  // resource.trust on each result
+```
+
+Notes:
+- The wallet matches either the agent's operational `agent_wallet` or its `owner`. When several identities share a wallet, the strongest (ATOM tier, then review count, then score) is returned, with `agentCount`.
+- `avgScore` is the average client feedback (0-100). ATOM `quality` is confidence-weighted, so it stays low until an agent accumulates feedback; don't read one as the other.
+- **Most merchants are not registered yet**, so "no identity" is the normal case, not a warning. `--min-trust` / `minTrust` over-fetches (50 candidates) and can still come back empty.
+- Lookups go through the registry's public indexer (`8004-indexer-main.qnt.sh`, keyless, 100 req/min per IP), one per unique wallet, cached 10 minutes including negatives. `XPAY_8004_INDEXER` overrides it; `--no-trust` / `trust: false` skips it. A failed lookup never fails discovery.
+- Solana only for now. EVM ERC-8004 registries have no wallet-to-agent reverse lookup on-chain.
+- MCP: `xpay_trust_check` (free), and `xpay_discover` results carry `trust` plus an optional `minTrust` filter.
+
 ## RWA discovery (Solana)
 
 List tradable real-world-asset tokens: RWA covers any tokenized off-chain asset, and what actually trades on Solana DEXes today is tokenized stocks/ETFs (Backed xStocks like `TSLAx`/`SPYx`, Ondo Global Markets like `TSLAon`/`GLDon`, Remora, Backpack Securities) plus the treasury-backed yieldcoin `USDY`. Free, read-only, no wallet:
@@ -540,6 +564,7 @@ Notes:
 - ✅ Realtime X (Twitter) data at cost via x402 (`xpay x user|posts`)
 - ✅ zauth repo security scans via x402 (`xpay zauth reposcan`)
 - ✅ xona shop product discovery via x402 (`xpay shop search`), free quote preflight
+- ✅ ERC-8004 merchant trust on Solana (`xpay trust`, trust lines in `xpay discover`)
 - ✅ RWA discovery on Solana (`xpay token rwa`): tokenized stocks/ETFs + USDY, swappable via `xpay swap`
 - ✅ Solana + Base mainnet with disk caching
 - ✅ Optional Sana agent card integration (`xpay sana link`) - 8 additional `sana_*` tools
