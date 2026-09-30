@@ -101,7 +101,7 @@ program
   .description("Search the agentic-commerce catalog (OrbitX402/PayAI + Agentic Market + AgenC), with ERC-8004 merchant trust.")
   .option("--limit <n>", "Max results (default 10; 50 when a single --sources is given)")
   .option("--network <net>", "Filter by network (solana, base, ...)")
-  .option("--sources <csv>", "Restrict catalogs: orbitx402, agenticmarket, agenc (e.g. --sources agenc)")
+  .option("--sources <csv>", "Restrict catalogs: xona, orbitx402, agenticmarket, agenc (e.g. --sources agenc)")
   .option("--min-trust <score>", "Only Solana merchants with an ERC-8004 identity scoring >= this (0-100; 0 = any registered)")
   .option("--no-trust", "Skip the ERC-8004 merchant trust lookup")
   .option("--json", "Emit raw JSON instead of the table view")

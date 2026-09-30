@@ -1,7 +1,10 @@
 /**
  * Discovery - find paid services across catalogs.
  *
- * Three sources, merged:
+ * Four sources, merged:
+ *  - **Xona** (api.xona-agent.com) - our own Solana endpoints, fetched whole
+ *    and matched locally, and ranked ahead of everything else. Xona mirrors
+ *    listed by the third-party catalogs (Base etc.) are dropped in favor of it.
  *  - **OrbitX402** aggregates multiple x402 catalogs (its own probed
  *    resources, PayAI, pay.sh) and searches/ranks server-side. It has been
  *    slow lately (30-60s/page, queries 504ing), so it runs with tight
@@ -25,6 +28,7 @@ import { fetchOrbitX402Resources } from "./orbitx402.js";
 import { fetchPayAIResources } from "./payai.js";
 import { fetchAgenticMarketResources } from "./agenticmarket.js";
 import { fetchAgencResources } from "../agenc/api.js";
+import { fetchXonaResources } from "./xona.js";
 import { cached, isSourceDown, markSourceDown } from "./cache.js";
 import { enrichWithTrust, meetsMinTrust } from "../trust/index.js";
 
@@ -34,7 +38,9 @@ interface InternalDiscoverOptions extends DiscoverOptions {
   endpoint?: string;
 }
 
-const DEFAULT_SOURCES = ["orbitx402", "agenticmarket", "agenc"];
+const DEFAULT_SOURCES = ["xona", "orbitx402", "agenticmarket", "agenc"];
+
+const XONA_HOST = "api.xona-agent.com";
 
 /**
  * Cap on items pulled from OrbitX402. With a query the server ranks and
@@ -122,7 +128,10 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
   // server-side - a small response instead of a full multi-MB catalog
   // download. AgenC's catalog is small enough to fetch whole and filter
   // locally.
-  const [orbitSettled, marketSettled, agencSettled] = await Promise.allSettled([
+  const [xonaSettled, orbitSettled, marketSettled, agencSettled] = await Promise.allSettled([
+    sources.includes("xona")
+      ? cached("xona:solana", () => fetchXonaResources())
+      : Promise.resolve<Resource[]>([]),
     sources.includes("orbitx402")
       ? fetchOrbitWithPayAIFallback(opts.endpoint, query)
       : Promise.resolve<Resource[]>([]),
@@ -137,10 +146,17 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
   ]);
 
   const failures: string[] = [];
+  let xona = unwrap(xonaSettled, "xona", failures);
   let orbit = unwrap(orbitSettled, "orbitx402", failures);
   let market = unwrap(marketSettled, "agenticmarket", failures);
   let agenc = unwrap(agencSettled, "agenc", failures);
   warnings = [...failures, ...pendingNotes];
+
+  // The first-party source is authoritative for Xona endpoints (Solana).
+  if (xona.length > 0) {
+    orbit = orbit.filter((r) => !isXonaResource(r));
+    market = market.filter((r) => !isXonaResource(r));
+  }
 
   const enabledCount = DEFAULT_SOURCES.filter((s) => sources.includes(s)).length;
   if (failures.length >= enabledCount && enabledCount > 0) {
@@ -159,7 +175,13 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
       market = rankByScore(market, terms);
     }
 
-    // AgenC: no server-side query param - always match locally.
+    // Xona and AgenC: no server-side search - always match locally. Xona
+    // entries lead the results, so they must match at least half the terms
+    // (a lone generic word shouldn't pull them up); "xona" itself matches all.
+    const xonaTerms = terms.filter((t) => t !== "xona");
+    if (xonaTerms.length > 0) {
+      xona = rankByScore(xona, xonaTerms, Math.ceil(xonaTerms.length / 2));
+    }
     agenc = rankByScore(agenc, terms);
   }
 
@@ -171,23 +193,43 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
       r.accepts.some((a) =>
         wanted.some((n) => a.network === n || a.network.startsWith(n + ":")),
       );
+    xona = xona.filter(matchesNet);
     orbit = orbit.filter(matchesNet);
     market = market.filter(matchesNet);
     agenc = agenc.filter(matchesNet);
   }
 
+  // Xona matches lead. With a limit they take at most half the slots, unless
+  // the user asked for Xona by name.
+  const mentionsXona = query?.includes("xona") ?? false;
+  const xonaSlots = opts.limit
+    ? Math.min(xona.length, mentionsXona ? opts.limit : Math.ceil(opts.limit / 2))
+    : xona.length;
+  const lead = xona.slice(0, xonaSlots);
+  const rest = mergeOthers(orbit, market, agenc, opts.limit ? opts.limit - lead.length : undefined);
+  return [...lead, ...rest];
+}
+
+function mergeOthers(
+  orbit: Resource[],
+  market: Resource[],
+  agenc: Resource[],
+  limit: number | undefined,
+): Resource[] {
+  if (limit !== undefined && limit <= 0) return [];
+
   // Merge. When a limit would otherwise be filled entirely from the 20k+ x402
   // catalog, reserve up to a third of the slots for AgenC matches so
   // marketplace listings are never silently drowned out; the remaining slots
   // are split between the two x402 catalogs so neither drowns the other.
-  if (opts.limit && agenc.length > 0 && orbit.length + market.length > 0) {
-    const agencSlots = Math.min(agenc.length, Math.max(1, Math.ceil(opts.limit / 3)));
-    const x402Slots = Math.max(0, opts.limit - agencSlots);
+  if (limit && agenc.length > 0 && orbit.length + market.length > 0) {
+    const agencSlots = Math.min(agenc.length, Math.max(1, Math.ceil(limit / 3)));
+    const x402Slots = Math.max(0, limit - agencSlots);
     return [...mergeX402(orbit, market, x402Slots), ...agenc.slice(0, agencSlots)];
   }
 
-  let results = [...mergeX402(orbit, market, opts.limit ?? Infinity), ...agenc];
-  if (opts.limit) results = results.slice(0, opts.limit);
+  let results = [...mergeX402(orbit, market, limit ?? Infinity), ...agenc];
+  if (limit) results = results.slice(0, limit);
   return results;
 }
 
@@ -258,6 +300,14 @@ function mergeX402(orbit: Resource[], market: Resource[], limit: number): Resour
   return out;
 }
 
+function isXonaResource(r: Resource): boolean {
+  try {
+    return new URL(r.resource).hostname === XONA_HOST;
+  } catch {
+    return false;
+  }
+}
+
 function unwrap(
   settled: PromiseSettledResult<Resource[]>,
   source: string,
@@ -269,10 +319,10 @@ function unwrap(
   return [];
 }
 
-function rankByScore(resources: Resource[], terms: string[]): Resource[] {
+function rankByScore(resources: Resource[], terms: string[], minScore = 1): Resource[] {
   return resources
     .map((r) => ({ r, score: scoreResource(r, terms) }))
-    .filter((x) => x.score > 0)
+    .filter((x) => x.score >= minScore)
     .sort((a, b) => b.score - a.score)
     .map((x) => x.r);
 }
