@@ -1,5 +1,5 @@
 /**
- * `xpay trust <wallet>` - ERC-8004 identity + reputation of a Solana wallet.
+ * `xpay trust <wallet>` - ERC-8004 and SAID identity + reputation of a Solana wallet.
  *
  * Read-only - does not load a profile or touch keys.
  */
@@ -7,7 +7,7 @@
 import chalk from "chalk";
 import { lookupMerchantTrust } from "../trust/index.js";
 import { shortAddress } from "./common.js";
-import type { MerchantTrust, TrustAgent } from "../types.js";
+import type { MerchantTrust, SaidTrust, TrustAgent } from "../types.js";
 
 export interface TrustCmdOptions {
   json?: boolean;
@@ -29,19 +29,44 @@ export async function runTrust(wallet: string, opts: TrustCmdOptions): Promise<v
 
   console.log("");
   console.log(`  ${chalk.bold("Wallet")}    ${trust.wallet}`);
-  if (!trust.agent) {
+  if (trust.agent) {
+    printAgent(trust.agent);
+    if (trust.agentCount > 1) {
+      console.log(chalk.dim(`  (${trust.agentCount} identities linked to this wallet - showing the strongest)`));
+    }
+  } else {
     console.log(`  ${chalk.bold("Identity")}  ${chalk.yellow("no ERC-8004 identity on Solana")}`);
-    console.log("");
-    console.log(chalk.dim("  Most merchants are not registered yet - this is not a red flag on its own."));
-    console.log("");
-    return;
   }
 
-  printAgent(trust.agent);
-  if (trust.agentCount > 1) {
-    console.log(chalk.dim(`  (${trust.agentCount} identities linked to this wallet - showing the strongest)`));
+  console.log("");
+  if (trust.said) {
+    printSaid(trust.said);
+  } else {
+    console.log(
+      `  ${chalk.bold("SAID")}      ` +
+        (trust.said === null ? chalk.yellow("no SAID identity") : chalk.dim("lookup failed - try again")),
+    );
+  }
+  if (!trust.agent && !trust.said) {
+    console.log("");
+    console.log(chalk.dim("  Most merchants are not registered yet - this is not a red flag on its own."));
   }
   console.log("");
+}
+
+function printSaid(s: SaidTrust): void {
+  console.log(
+    `  ${chalk.bold("SAID")}      ${chalk.green(s.name ?? "identity")}` +
+      (s.verified ? chalk.green(" ✓ verified") : chalk.dim(" unverified")),
+  );
+  console.log(
+    `  ${chalk.bold("Score")}     ` +
+      (s.score !== null ? scoreColor(s.score)(`${s.score}/100`) : chalk.dim("unscored")) +
+      (s.tier ? ` · ${s.tier}` : "") +
+      chalk.dim(` (composite, ${s.feedbackCount} review${s.feedbackCount === 1 ? "" : "s"})`),
+  );
+  if (s.badges.length) console.log(`  ${chalk.bold("Badges")}    ${s.badges.join(", ")}`);
+  console.log(`  ${chalk.bold("Profile")}   ${chalk.dim(s.url)}`);
 }
 
 function printAgent(a: TrustAgent): void {

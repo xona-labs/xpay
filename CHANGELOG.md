@@ -6,6 +6,20 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.38] – 2026-10-05
+
+### Added
+- **SAID Protocol identity in merchant trust.** The Solana `payTo` wallet is
+  now also looked up in SAID Protocol and reported next to ERC-8004 as
+  `trust.said` (verified flag, tier, badges, 0-100 composite score) in
+  `xpay discover`, `xpay trust`, `xpay_discover` and `xpay_trust_check`.
+  The SAID score is a composite, not client feedback, so it is shown on its
+  own line and `--min-trust` keeps filtering on the 8004 score.
+  `XPAY_SAID_API` overrides the API base.
+- Xona first-party listings now carry `metadata.merchantWallet`, so they
+  get the same ERC-8004 and SAID trust lines as other Solana merchants.
+  Settlement still takes the recipient from the live 402.
+
 ## [0.2.36] – 2026-09-28
 
 ### Added

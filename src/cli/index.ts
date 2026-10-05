@@ -98,12 +98,12 @@ accounts
 // ---------------------------------------------------------------- discover
 program
   .command("discover [query]")
-  .description("Search the agentic-commerce catalog (OrbitX402/PayAI + Agentic Market + AgenC), with ERC-8004 merchant trust.")
+  .description("Search the agentic-commerce catalog (OrbitX402/PayAI + Agentic Market + AgenC), with ERC-8004 and SAID merchant trust.")
   .option("--limit <n>", "Max results (default 10; 50 when a single --sources is given)")
   .option("--network <net>", "Filter by network (solana, base, ...)")
   .option("--sources <csv>", "Restrict catalogs: xona, orbitx402, agenticmarket, agenc (e.g. --sources agenc)")
   .option("--min-trust <score>", "Only Solana merchants with an ERC-8004 identity scoring >= this (0-100; 0 = any registered)")
-  .option("--no-trust", "Skip the ERC-8004 merchant trust lookup")
+  .option("--no-trust", "Skip the ERC-8004 and SAID merchant trust lookup")
   .option("--json", "Emit raw JSON instead of the table view")
   .action(async (query: string | undefined, opts) => {
     await runDiscover(query, opts);
@@ -112,7 +112,7 @@ program
 // ---------------------------------------------------------------- trust
 program
   .command("trust <wallet>")
-  .description("ERC-8004 agent identity + reputation of a Solana merchant wallet (8004-solana registry). Read-only, no wallet.")
+  .description("ERC-8004 and SAID agent identity + reputation of a Solana merchant wallet. Read-only, no wallet.")
   .option("--json", "Emit raw JSON")
   .action(async (wallet: string, opts) => {
     await runTrust(wallet, opts);

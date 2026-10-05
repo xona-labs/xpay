@@ -396,13 +396,13 @@ Notes:
 Before paying an unfamiliar service, check who is on the other end. Solana merchant wallets (the x402 `payTo`) are looked up in the [8004-solana](https://github.com/QuantuLabs/8004-solana) registry, the Solana implementation of [ERC-8004 Trustless Agents](https://eips.ethereum.org/EIPS/eip-8004): an agent identity (Metaplex Core asset) plus on-chain client feedback, and optional ATOM scoring (trust tier, quality, confidence, risk). Free, read-only, no wallet:
 
 ```bash
-xpay trust 28heAMpFkeUJsL7o7apiK4oJwZWq2fUHinRwbgYYsemG   # identity, 0-100 feedback score, review count
+xpay trust 28heAMpFkeUJsL7o7apiK4oJwZWq2fUHinRwbgYYsemG   # identity, 0-100 feedback score, review count, SAID identity
 xpay discover "token price" --network solana               # each Solana result shows a trust line
 xpay discover "data" --min-trust 50                         # only registered merchants scoring >= 50
 ```
 
 ```ts
-const trust = await lookupMerchantTrust(payTo);   // { registered, agent: { name, avgScore, feedbackCount, atom? }, summary }
+const trust = await lookupMerchantTrust(payTo);   // { registered, agent: { name, avgScore, feedbackCount, atom? }, summary, said? }
 const results = await xpay.discover({ query: "data", minTrust: 0 });  // resource.trust on each result
 ```
 
@@ -412,6 +412,7 @@ Notes:
 - **Most merchants are not registered yet**, so "no identity" is the normal case, not a warning. `--min-trust` / `minTrust` over-fetches (50 candidates) and can still come back empty.
 - Lookups go through the registry's public indexer (`8004-indexer-main.qnt.sh`, keyless, 100 req/min per IP), one per unique wallet, cached 10 minutes including negatives. `XPAY_8004_INDEXER` overrides it; `--no-trust` / `trust: false` skips it. A failed lookup never fails discovery.
 - Solana only for now. EVM ERC-8004 registries have no wallet-to-agent reverse lookup on-chain.
+- **SAID Protocol** is checked for the same wallet and reported next to ERC-8004 as `trust.said` (`null` = no SAID identity): `verified`, `tier`, `badges` and a 0-100 `score`. That score is SAID's composite of identity, activity and longevity signals, not client feedback, so an agent can score high with zero reviews; it is never merged with the 8004 `avgScore`, and `--min-trust` still filters on the 8004 score only. `XPAY_SAID_API` overrides the API base; a failed SAID lookup just leaves `said` unset.
 - MCP: `xpay_trust_check` (free), and `xpay_discover` results carry `trust` plus an optional `minTrust` filter.
 
 ## RWA discovery (Solana)

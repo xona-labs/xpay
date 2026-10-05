@@ -96,9 +96,10 @@ function printResource(r: Resource, index: number): void {
 
   console.log(`  ${chalk.bold(String(index).padStart(2) + ".")} ${price}  ${net} ${method} ${chalk.white(host)}`);
   console.log(`      ${chalk.dim(r.resource)}`);
-  if (opt?.payTo) {
+  const payTo = opt?.payTo || (typeof r.metadata?.merchantWallet === "string" ? r.metadata.merchantWallet : "");
+  if (opt && payTo) {
     console.log(
-      `      ${chalk.dim("→ pay")} ${chalk.dim(shortAddress(opt.payTo, 6, 6))} ${chalk.dim(`(${opt.asset.slice(0, 12)}…)`)}`,
+      `      ${chalk.dim("→ pay")} ${chalk.dim(shortAddress(payTo, 6, 6))} ${chalk.dim(`(${opt.asset.slice(0, 12)}…)`)}`,
     );
   }
   printTrust(r);
@@ -110,14 +111,22 @@ function printTrust(r: Resource): void {
   if (!t) return;
   // Multi-network listings: the row shows accepts[0]'s recipient, but trust
   // is for the Solana one - name it when they differ.
-  const who = r.accepts[0]?.payTo === t.wallet ? "" : `solana payTo ${shortAddress(t.wallet, 4, 4)}: `;
-  if (!t.agent) {
-    console.log(`      ${chalk.dim(`✧ ${who}no ERC-8004 identity`)}`);
+  const shown = r.accepts[0]?.payTo || r.metadata?.merchantWallet;
+  const who = shown === t.wallet ? "" : `solana payTo ${shortAddress(t.wallet, 4, 4)}: `;
+  if (!t.agent && !t.said) {
+    console.log(`      ${chalk.dim(`✧ ${who}no ERC-8004 or SAID identity`)}`);
     return;
   }
-  const score = t.agent.avgScore;
-  const label = score !== null ? scoreColor(score)(t.summary) : chalk.white(t.summary);
-  console.log(`      ${chalk.green("✦")} ${chalk.dim(who)}${label}`);
+  if (t.agent) {
+    const score = t.agent.avgScore;
+    const label = score !== null ? scoreColor(score)(t.summary) : chalk.white(t.summary);
+    console.log(`      ${chalk.green("✦")} ${chalk.dim(who)}${label}`);
+  }
+  if (t.said) {
+    const score = t.said.score;
+    const label = score !== null ? scoreColor(score)(t.said.summary) : chalk.white(t.said.summary);
+    console.log(`      ${chalk.green("✦")} ${chalk.dim(who)}${label}`);
+  }
 }
 
 function safeHost(url: string): string {

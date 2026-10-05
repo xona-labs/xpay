@@ -142,6 +142,9 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         "in mixed results. " +
         "Solana-paid results carry `trust`: the merchant wallet's ERC-8004 agent identity and " +
         "reputation (average client feedback 0-100, review count, ATOM tier when enabled). " +
+        "`trust.said` is the same wallet's SAID Protocol identity when it has one: verified " +
+        "flag, tier and a 0-100 composite score (identity/activity/longevity, not client " +
+        "feedback, so do not present it as a review average). " +
         "Most merchants have no identity yet, so a missing identity is normal, not a red flag; " +
         "a registered identity with good reviews is a positive signal worth mentioning.",
       input_schema: {
@@ -172,7 +175,9 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         "registry): FREE, read-only, no wallet. Matches the wallet as the agent's operational " +
         "wallet or its owner, and returns the strongest linked identity (name, agent id, " +
         "registration URI), its average client feedback score (0-100) and review count, and " +
-        "ATOM trust tier/quality/risk when the agent opted in. Use before paying an unfamiliar " +
+        "ATOM trust tier/quality/risk when the agent opted in. Also returns `said`: the wallet's " +
+        "SAID Protocol identity (verified flag, tier, 0-100 composite score that is not client " +
+        "feedback), null when it has none. Use before paying an unfamiliar " +
         "merchant (the `payTo` of a resource) or when the user asks whether a service is " +
         "trustworthy. 'Not registered' is the common case and is not evidence of fraud.",
       input_schema: {

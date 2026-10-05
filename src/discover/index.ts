@@ -17,7 +17,7 @@
  *    text search, so queries are matched locally (the catalog is small).
  *
  * Solana merchant wallets (`payTo`) in the results are annotated with their
- * ERC-8004 agent identity + reputation (`resource.trust`, see ../trust).
+ * ERC-8004 + SAID agent identity + reputation (`resource.trust`, see ../trust).
  *
  * One source failing never kills discovery - its error is stashed in
  * {@link lastDiscoverWarnings} and the other sources' results are returned.
@@ -106,9 +106,12 @@ export async function discover(opts: InternalDiscoverOptions = {}): Promise<Reso
   );
   if (!wantTrust) return results;
 
-  const { resources, failed } = await enrichWithTrust(results);
+  const { resources, failed, saidFailed } = await enrichWithTrust(results);
   if (failed > 0) {
     warnings.push(`8004 trust lookup failed for ${failed} merchant wallet${failed === 1 ? "" : "s"}`);
+  }
+  if (saidFailed > 0) {
+    warnings.push(`SAID lookup failed for ${saidFailed} merchant wallet${saidFailed === 1 ? "" : "s"}`);
   }
   if (!filtering) return resources;
   const kept = resources.filter((r) => meetsMinTrust(r, opts.minTrust!));

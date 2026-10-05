@@ -8,14 +8,20 @@
  * x402 `payTo` wallet against both fields through the registry's public
  * indexer (keyless PostgREST, 100 req/min per IP).
  *
+ * The same wallet is also looked up in SAID Protocol (saidprotocol.com), a
+ * separate Solana agent identity registry with its own composite trust score.
+ * The two are reported side by side, never merged into one number.
+ *
  * Most merchant wallets have no identity yet, so "not registered" is the
  * common, non-alarming answer - treat trust as a positive signal, not a gate.
  */
 
 import { cached } from "../discover/cache.js";
-import type { MerchantTrust, Resource, TrustAgent, TrustTier } from "../types.js";
+import type { MerchantTrust, Resource, SaidTrust, TrustAgent, TrustTier } from "../types.js";
 
 const DEFAULT_INDEXER = "https://8004-indexer-main.qnt.sh";
+/** The site host proxies the agent API; api.saidprotocol.com is not reliably reachable. */
+const DEFAULT_SAID_API = "https://www.saidprotocol.com";
 const LOOKUP_TIMEOUT_MS = 6_000;
 /** Parallel indexer calls when enriching a result list (rate limit is per IP). */
 const ENRICH_CONCURRENCY = 8;
@@ -48,6 +54,10 @@ interface IndexedAgentRow {
 export interface TrustLookupOptions {
   /** Indexer base URL. Defaults to $XPAY_8004_INDEXER or the mainnet indexer. */
   indexer?: string;
+  /** SAID API base URL. Defaults to $XPAY_SAID_API or the public one. */
+  saidApi?: string;
+  /** Skip the SAID Protocol lookup. */
+  said?: boolean;
 }
 
 /** True when `address` looks like a Solana public key. */
@@ -56,8 +66,10 @@ export function isSolanaAddress(address: string): boolean {
 }
 
 /**
- * Look up the ERC-8004 identity + reputation linked to a Solana wallet.
- * Cached per wallet (10 min, memory + disk), including "not registered".
+ * Look up the ERC-8004 identity + reputation linked to a Solana wallet, plus
+ * its SAID Protocol identity. Cached per wallet and registry (10 min, memory
+ * + disk), including "not registered". A failed SAID lookup leaves `said`
+ * unset instead of failing the call.
  */
 export async function lookupMerchantTrust(
   wallet: string,
@@ -67,7 +79,62 @@ export async function lookupMerchantTrust(
     throw new Error(`xpay trust: "${wallet}" is not a Solana address (8004 lookups are Solana-only)`);
   }
   const indexer = (opts.indexer ?? process.env.XPAY_8004_INDEXER ?? DEFAULT_INDEXER).replace(/\/+$/, "");
-  return cached<MerchantTrust>(`trust8004:${wallet}`, () => fetchTrust(indexer, wallet));
+  const [trust, said] = await Promise.all([
+    cached<MerchantTrust>(`trust8004:${wallet}`, () => fetchTrust(indexer, wallet)),
+    opts.said === false ? undefined : lookupSaid(wallet, opts).catch(() => undefined),
+  ]);
+  return said === undefined ? trust : { ...trust, said };
+}
+
+/** SAID Protocol identity of a Solana wallet, or null when it has none. */
+async function lookupSaid(wallet: string, opts: TrustLookupOptions): Promise<SaidTrust | null> {
+  const api = (opts.saidApi ?? process.env.XPAY_SAID_API ?? DEFAULT_SAID_API).replace(/\/+$/, "");
+  // Wrapped so "not registered" (null) survives the disk cache round-trip.
+  const hit = await cached<{ said: SaidTrust | null }>(`trustSaid:${wallet}`, async () => ({
+    said: await fetchSaid(api, wallet),
+  }));
+  return hit.said;
+}
+
+interface SaidAgentRow {
+  pda: string;
+  name: string | null;
+  isVerified: boolean;
+  reputationScore: number | null;
+  feedbackCount: number | null;
+  trustScore?: { score?: number | null; tier?: string | null; badges?: string[] | null } | null;
+}
+
+async function fetchSaid(api: string, wallet: string): Promise<SaidTrust | null> {
+  const res = await fetch(`${api}/api/agents/${wallet}`, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`SAID api ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  }
+  const row = (await res.json()) as SaidAgentRow;
+  const raw = row.trustScore?.score ?? row.reputationScore;
+  const said: Omit<SaidTrust, "summary"> = {
+    name: row.name ?? undefined,
+    pda: row.pda,
+    verified: row.isVerified === true,
+    score: typeof raw === "number" ? Math.round(raw) : null,
+    tier: row.trustScore?.tier ?? undefined,
+    feedbackCount: row.feedbackCount ?? 0,
+    badges: row.trustScore?.badges ?? [],
+    url: `https://www.saidprotocol.com/agents/${wallet}`,
+  };
+  return { ...said, summary: summarizeSaid(said) };
+}
+
+function summarizeSaid(s: Omit<SaidTrust, "summary">): string {
+  const parts = [s.name ? `SAID "${s.name}"` : "SAID identity"];
+  if (s.verified) parts.push("verified");
+  if (s.tier) parts.push(s.tier);
+  parts.push(s.score !== null ? `${s.score}/100` : "unscored");
+  return parts.join(" · ");
 }
 
 async function fetchTrust(indexer: string, wallet: string): Promise<MerchantTrust> {
@@ -145,21 +212,29 @@ function summarize(agent: TrustAgent | null, count: number): string {
   return parts.join(" · ");
 }
 
-/** Solana merchant wallet of a resource, if its first payable option has one. */
+/**
+ * Solana merchant wallet of a resource, if its first payable option has one.
+ * Catalogs that leave `payTo` to the live 402 can name the wallet in
+ * `metadata.merchantWallet` instead.
+ */
 export function solanaPayTo(r: Resource): string | undefined {
   const opt = r.accepts.find((a) => a.network.startsWith("solana") && a.payTo);
-  return opt && isSolanaAddress(opt.payTo) ? opt.payTo : undefined;
+  if (opt) return isSolanaAddress(opt.payTo) ? opt.payTo : undefined;
+  const declared = r.metadata?.merchantWallet;
+  const onSolana = r.accepts.some((a) => a.network.startsWith("solana"));
+  return onSolana && typeof declared === "string" && isSolanaAddress(declared) ? declared : undefined;
 }
 
 /**
  * Attach `trust` to Solana-paid resources (first {@link ENRICH_MAX} only).
  * Lookups run with bounded concurrency; a failed lookup leaves `trust` unset
- * and is reported through the returned `failed` count.
+ * and is reported through the returned `failed` count (`saidFailed` for
+ * wallets whose SAID half alone failed).
  */
 export async function enrichWithTrust(
   resources: Resource[],
   opts: TrustLookupOptions = {},
-): Promise<{ resources: Resource[]; failed: number }> {
+): Promise<{ resources: Resource[]; failed: number; saidFailed: number }> {
   const head = resources.slice(0, ENRICH_MAX);
   const wallets = [...new Set(head.map(solanaPayTo).filter((w): w is string => !!w))];
   const found = new Map<string, MerchantTrust>();
@@ -184,7 +259,9 @@ export async function enrichWithTrust(
     const trust = w ? found.get(w) : undefined;
     return trust ? { ...r, trust } : r;
   });
-  return { resources: out, failed };
+  // `said` is absent only when its lookup failed (null means not registered).
+  const saidFailed = opts.said === false ? 0 : [...found.values()].filter((t) => t.said === undefined).length;
+  return { resources: out, failed, saidFailed };
 }
 
 /** Whether a resource's merchant meets a `minTrust` bar (0-100). */

@@ -29,6 +29,12 @@ const DEMOTED = new Set(["image/creative-director"]);
 
 const SOLANA_MAINNET = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp";
 const SOLANA_USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+/**
+ * Xona's Solana x402 recipient, as carried by its live 402s. Published as
+ * `metadata.merchantWallet` for trust lookups only: `accepts[].payTo` stays
+ * empty so settlement always uses the recipient from the live challenge.
+ */
+const XONA_MERCHANT_WALLET = "9VaDVp1Wb78G4Wm6VuTiMrpESjrUymXefQTHcJGRSTEA";
 
 export interface XonaClientOptions {
   endpoint?: string;
@@ -100,6 +106,7 @@ function toResource(item: XonaListing): Resource | null {
       category,
       provider: "Xona",
       providerUrl: "https://xona-agent.com",
+      merchantWallet: XONA_MERCHANT_WALLET,
     },
     inputSchema: item.input_schema,
     outputSchema: item.output_schema ?? null,

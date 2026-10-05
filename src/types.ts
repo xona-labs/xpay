@@ -183,7 +183,30 @@ export interface TrustAgent {
   };
 }
 
-/** Result of an ERC-8004 identity/reputation lookup for a merchant wallet. */
+/** A SAID Protocol agent identity registered for a Solana wallet. */
+export interface SaidTrust {
+  name?: string;
+  /** SAID identity PDA (the on-chain account). */
+  pda: string;
+  /** SAID verification badge. */
+  verified: boolean;
+  /**
+   * SAID trust score, 0-100. A composite of identity, activity, longevity
+   * and ecosystem signals, NOT client feedback - an agent can score high
+   * with zero reviews. Null when SAID has not scored the agent.
+   */
+  score: number | null;
+  /** SAID tier for that score, e.g. "bronze", "gold", "platinum". */
+  tier?: string;
+  feedbackCount: number;
+  badges: string[];
+  /** Public profile page. */
+  url: string;
+  /** One-line human summary, e.g. "SAID \"Syra\" · verified · platinum · 97/100". */
+  summary: string;
+}
+
+/** Result of an identity/reputation lookup for a merchant wallet. */
 export interface MerchantTrust {
   wallet: string;
   registry: "8004-solana";
@@ -195,6 +218,12 @@ export interface MerchantTrust {
   agentCount: number;
   /** One-line human summary, e.g. "8004 agent \"Delx\" · 48/100 from 7 reviews". */
   summary: string;
+  /**
+   * SAID Protocol identity for the same wallet: `null` when the wallet has
+   * none, absent when the SAID lookup failed. Independent of the ERC-8004
+   * fields above (`registered`, `agent`, `summary`).
+   */
+  said?: SaidTrust | null;
 }
 
 /** Options passed to {@link XPay.discover}. */
