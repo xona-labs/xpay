@@ -152,7 +152,7 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         properties: {
           query: { type: "string", description: "What you want to find, in natural language. Omit to browse a whole source." },
           limit: { type: "number", description: "Max results. Default 5." },
-          network: { type: "string", description: "Restrict to one network (solana, base, ...)." },
+          network: { type: "string", description: "Restrict to one network (solana, base, stable, skale, ...). Xona's SKALE routes only appear with network \"skale\"." },
           sources: {
             type: "array",
             items: { type: "string", enum: ["xona", "orbitx402", "agenticmarket", "agenc"] },
@@ -257,11 +257,11 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       name: "xpay_balance",
       description:
         "Token balances on each configured network, plus a stablecoin total. " +
-        "Covers Solana, Base and the other EVM chains, Robinhood Chain, and Stable (USDT0).",
+        "Covers Solana, Base and the other EVM chains, Robinhood Chain, Stable (USDT0), and SKALE (USDC.e).",
       input_schema: {
         type: "object",
         properties: {
-          network: { type: "string", description: "Restrict to one network (solana, base, stable, robinhood, ...)." },
+          network: { type: "string", description: "Restrict to one network (solana, base, stable, skale, robinhood, ...)." },
         },
       },
     },
@@ -900,7 +900,7 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       const configured = xpay.wallet.networks;
       const networks = input.network
         ? [input.network as string]
-        : [...configured, ...["robinhood", "stable"].filter((n) => !configured.includes(n))];
+        : [...configured, ...["robinhood", "stable", "skale"].filter((n) => !configured.includes(n))];
 
       const perNetwork: Record<string, unknown> = {};
       let stablecoinTotal = 0;
@@ -940,7 +940,7 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
           for (const t of tokens) {
             // USDT0 is Stable's USDT (an ERC-20 OFT); its native gas coin
             // reports as USDT. Both are dollars, so both count.
-            if (t.symbol === "USDC" || t.symbol === "USDT" || t.symbol === "USDT0") {
+            if (["USDC", "USDC.e", "USDT", "USDT0"].includes(t.symbol)) {
               stablecoinTotal += t.balance;
             }
           }

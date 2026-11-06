@@ -16,6 +16,8 @@ const NATIVE_TOKEN: Record<string, { symbol: string; name: string }> = {
   // is a different token with 6 decimals. Distinct symbols keep them apart in
   // the balance view.
   stable: { symbol: "USDT", name: "Tether USD (gas)" },
+  // SKALE gas is free; CREDIT is its (non-monetary) native compute credit.
+  skale: { symbol: "CREDIT", name: "SKALE Credits (gas)" },
   // Tempo (Stripe/Paradigm payments L1, chain 4217) has no native gas token -
   // fees are paid in TIP-20 stablecoins - so no NATIVE_TOKEN entry either.
 };
@@ -55,6 +57,11 @@ const KNOWN_ERC20S: Record<string, Array<{ symbol: string; name: string; contrac
   stable: [
     { symbol: "USDT0", name: "USDT0", contract: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", decimals: 6 },
   ],
+  // SKALE on Base (chain 1187947933). Bridged USDC via SKALE Bridge - name,
+  // version 2 and 6 decimals verified on-chain; x402 settles in it.
+  skale: [
+    { symbol: "USDC.e", name: "Bridged USDC (SKALE Bridge)", contract: "0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20", decimals: 6 },
+  ],
   // Tempo (chain 4217). USDC.e is the bridged Circle USDC as a TIP-20 - it
   // answers the standard ERC-20 read surface (symbol/decimals/balanceOf
   // verified on-chain), so balances work over plain JSON-RPC.
@@ -74,6 +81,7 @@ const SETTLEMENT_STABLECOIN: Record<string, string> = {
   arbitrum: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
   optimism: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
   stable: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736",
+  skale: "0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20",
   tempo: "0x20C000000000000000000000b9537d11c60E8b50",
 };
 
@@ -84,6 +92,7 @@ const DEFAULT_RPCS: Record<string, string> = {
   optimism: "https://opt-mainnet.g.alchemy.com/v2/Ug5mqBVIbSHoa8ZHgTUSJ",
   robinhood: "https://rpc.mainnet.chain.robinhood.com",
   stable: "https://rpc.stable.xyz",
+  skale: "https://skale-base.skalenodes.com/v1/base",
   tempo: "https://rpc.tempo.xyz",
 };
 

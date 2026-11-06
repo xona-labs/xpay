@@ -128,7 +128,7 @@ export function signersFromProfile(profile: LoadedProfile): Partial<Record<strin
         secretKey: keys.solana.keypair.secretKey,
         rpcUrl: profile.config.rpcs?.solana,
       });
-    } else if (["base", "ethereum", "arbitrum", "optimism", "robinhood", "stable", "tempo"].includes(network)) {
+    } else if (["base", "ethereum", "arbitrum", "optimism", "robinhood", "stable", "tempo", "skale"].includes(network)) {
       out[network] = rawEvmSigner({
         privateKey: keys.evm.privateKey,
         network,
@@ -154,6 +154,14 @@ export function signersFromProfile(profile: LoadedProfile): Partial<Record<strin
     privateKey: keys.evm.privateKey,
     network: "stable",
     rpcUrl: profile.config.rpcs?.stable,
+  });
+  // Same for SKALE on Base (chain 1187947933): zero-gas EVM chain that
+  // settles bridged USDC.e, used by Xona's /base/* x402 routes. Routing only
+  // picks it when a 402 actually quotes eip155:1187947933.
+  out.skale ??= rawEvmSigner({
+    privateKey: keys.evm.privateKey,
+    network: "skale",
+    rpcUrl: profile.config.rpcs?.skale,
   });
   // Same for Tempo (chain 4217, Stripe/Paradigm payments L1): registering it
   // unconditionally lets any profile read its USDC.e balance and settle MPP

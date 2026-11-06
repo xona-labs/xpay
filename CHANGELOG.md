@@ -6,6 +6,20 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **SKALE on Base (chain `1187947933`) wallet network.** A `skale` signer is
+  registered on every profile from the same derived EVM key, so any wallet can
+  read its bridged USDC.e balance, discover SKALE resources and pay
+  `eip155:1187947933` x402 challenges with no `xpay init`. Payments are
+  gasless (EIP-3009 via PayAI) and SKALE gas is free anyway.
+  `xpay balance`, `xpay discover --network skale`, `xpay pay` and
+  `xpay transfer --network skale` all work. RPC override: `rpcs.skale`.
+- Xona first-party discovery now parses Xona's SKALE (`base/*`) listings and
+  surfaces them when the caller filters to `skale`. Default results stay
+  Solana-only so they aren't duplicated.
+- Stablecoin totals in `xpay balance` and `xpay_balance` now count USDC.e
+  (SKALE and Tempo).
+
 ## [0.2.38] – 2026-10-05
 
 ### Added

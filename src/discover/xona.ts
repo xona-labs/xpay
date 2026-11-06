@@ -5,8 +5,10 @@
  * none of it (Agentic Market carries a few Base mirrors, OrbitX402/PayAI
  * none), so it's fetched directly and ranked ahead of them in discover().
  *
- * Only the Solana routes are surfaced: the same services are also mirrored on
- * Base, Stable and Arc under path prefixes, but Solana is the primary rail.
+ * Solana routes are the primary rail. The same services are also mirrored on
+ * Base, Stable, Arc and SKALE under path prefixes; of those, only the SKALE
+ * (`base/*`) mirrors are parsed, and discover() surfaces them only when the
+ * caller filters to the skale network, so default results aren't duplicated.
  *
  * The listing carries pricing but not payTo/feePayer. Like Agentic Market, the
  * synthesized `accepts[]` entry is enough for network filtering and balance
@@ -29,6 +31,11 @@ const DEMOTED = new Set(["image/creative-director"]);
 
 const SOLANA_MAINNET = "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp";
 const SOLANA_USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+/** SKALE on Base, chain 1187947933. Settles bridged USDC.e via PayAI. */
+export const SKALE_NETWORK = "eip155:1187947933";
+const SKALE_USDC = "0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20";
+/** Xona's EVM x402 recipient (same on every EVM door). Trust lookups only. */
+const XONA_EVM_MERCHANT_WALLET = "0x515e7Bce44Baa5F6e42D16d4B5f27768E7f2F8cC";
 /**
  * Xona's Solana x402 recipient, as carried by its live 402s. Published as
  * `metadata.merchantWallet` for trust lookups only: `accepts[].payTo` stays
@@ -70,8 +77,9 @@ export async function fetchXonaResources(opts: XonaClientOptions = {}): Promise<
   for (const item of body) {
     const r = toResource(item);
     if (!r) continue;
-    if (PREFERRED.includes(item.slug!)) preferred.push(r);
-    else if (DEMOTED.has(item.slug!)) demoted.push(r);
+    const key = slugOf(r);
+    if (PREFERRED.includes(key)) preferred.push(r);
+    else if (DEMOTED.has(key)) demoted.push(r);
     else out.push(r);
   }
   preferred.sort((a, b) => PREFERRED.indexOf(slugOf(a)) - PREFERRED.indexOf(slugOf(b)));
@@ -79,20 +87,23 @@ export async function fetchXonaResources(opts: XonaClientOptions = {}): Promise<
 }
 
 function toResource(item: XonaListing): Resource | null {
-  if (!item.slug || item.pricing?.network !== "solana-mainnet") return null;
+  const net = item.pricing?.network;
+  if (!item.slug || (net !== "solana-mainnet" && net !== "skale")) return null;
+  const skale = net === "skale";
 
   const accepts: PaymentRequirement[] = [
     {
-      asset: SOLANA_USDC,
+      asset: skale ? SKALE_USDC : SOLANA_USDC,
       // Not published in the listing; the live 402 carries payTo + feePayer.
       payTo: "",
       amount: toAtomicUsdc(item.pricing?.amount ?? item.price),
       scheme: "exact",
-      network: SOLANA_MAINNET,
+      network: skale ? SKALE_NETWORK : SOLANA_MAINNET,
     },
   ];
 
-  const category = item.slug.split("/")[0];
+  // SKALE slugs carry a `base/` prefix; categorize by what follows it.
+  const category = item.slug.split("/")[skale ? 1 : 0];
   return {
     resource: `${RESOURCE_BASE}/${item.slug}`,
     type: "http",
@@ -106,15 +117,16 @@ function toResource(item: XonaListing): Resource | null {
       category,
       provider: "Xona",
       providerUrl: "https://xona-agent.com",
-      merchantWallet: XONA_MERCHANT_WALLET,
+      merchantWallet: skale ? XONA_EVM_MERCHANT_WALLET : XONA_MERCHANT_WALLET,
     },
     inputSchema: item.input_schema,
     outputSchema: item.output_schema ?? null,
   };
 }
 
+/** Route slug without the SKALE `base/` prefix, for ranking. */
 function slugOf(r: Resource): string {
-  return r.resource.slice(RESOURCE_BASE.length + 1);
+  return r.resource.slice(RESOURCE_BASE.length + 1).replace(/^base\//, "");
 }
 
 function toAtomicUsdc(amount: string | number | undefined): string | undefined {

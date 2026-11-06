@@ -38,6 +38,7 @@ const NAMED_CHAIN_IDS: Record<string, number> = {
   optimism: 10,
   robinhood: 4663,
   stable: 988,
+  skale: 1187947933,
   tempo: 4217,
 };
 

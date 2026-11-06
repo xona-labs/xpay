@@ -30,7 +30,7 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
   const configured = profile.config.networks;
   const networks = opts.network
     ? [opts.network]
-    : [...configured, ...["robinhood", "stable", "tempo"].filter((n) => !configured.includes(n))];
+    : [...configured, ...["robinhood", "stable", "tempo", "skale"].filter((n) => !configured.includes(n))];
 
   console.log("");
   console.log(chalk.bold(`Profile "${name}"`));
@@ -74,7 +74,7 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
         console.log(`    ${label.padEnd(18)}  ${chalk.white(val.padEnd(14))} ${usd}${flag}`);
         // USDT0 is Stable's USDT (an ERC-20 OFT), and its native gas coin
         // reports as USDT - both are dollars, so both count.
-        if (t.symbol === "USDC" || t.symbol === "USDT" || t.symbol === "USDT0") usdcTotal += t.balance;
+        if (["USDC", "USDC.e", "USDT", "USDT0"].includes(t.symbol)) usdcTotal += t.balance;
         if (t.usdValue !== undefined) portfolioUsd += t.usdValue;
         else portfolioComplete = false;
       }
@@ -88,7 +88,7 @@ export async function runBalance(opts: BalanceCmdOptions): Promise<void> {
     console.log("");
   }
 
-  console.log(`  ${chalk.bold(`$${usdcTotal.toFixed(4)}`)} ${chalk.dim("stablecoin total (USDC + USDT + USDT0)")}`);
+  console.log(`  ${chalk.bold(`$${usdcTotal.toFixed(4)}`)} ${chalk.dim("stablecoin total (USDC + USDC.e + USDT + USDT0)")}`);
   if (portfolioUsd > 0) {
     console.log(
       `  ${chalk.bold(`$${portfolioUsd.toFixed(2)}`)} ${chalk.dim(`portfolio total${portfolioComplete ? "" : " (some tokens unpriced)"}`)}`,

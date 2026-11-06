@@ -577,6 +577,26 @@ Notes:
 - **Routing is automatic.** A 402 quoting `eip155:988` resolves to the Stable signer, and `use()` compares USDT0 balance against the price when several chains are offered.
 - RPC override: profile `rpcs.stable` (default `https://rpc.stable.xyz`). Explorer: [stablescan.xyz](https://stablescan.xyz).
 
+### SKALE on Base
+
+**SKALE on Base** (chain `1187947933`) is a zero-gas EVM chain. It settles **USDC.e**, the bridged USDC at `0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20` (6 decimals), and Xona's `/base/*` x402 routes run on it through the PayAI facilitator.
+
+Like Stable, a SKALE signer is registered on **every** profile from the same derived EVM key:
+
+```bash
+xpay balance --network skale
+xpay discover "image generation" --network skale
+xpay pay https://api.xona-agent.com/base/image/gpt-image-2 --method POST --body '{"prompt":"..."}'
+xpay transfer 1.5 0xRecipient --network skale          # sends USDC.e
+```
+
+Notes:
+
+- **Payments are gasless** (EIP-3009, broadcast by the facilitator) and SKALE charges no gas for direct transfers either. Its native CREDIT token is a compute credit, not money.
+- **The EIP-712 domain is `Bridged USDC (SKALE Bridge)` / `2`**, read from `extra` on the live 402.
+- **Discovery:** Xona's SKALE listings mirror its Solana ones, so they only appear when you filter with `--network skale` (or `eip155:1187947933`).
+- RPC override: profile `rpcs.skale` (default `https://skale-base.skalenodes.com/v1/base`).
+
 ## How it works
 
 - **Keys**: One BIP-39 mnemonic per profile derives Solana (`m/44'/501'/0'/0'`, Phantom-compatible) and EVM (`m/44'/60'/0'/0/0`, MetaMask-compatible) keypairs. Encrypted at rest with scrypt + AES-256-GCM.

@@ -65,10 +65,11 @@ const EVM_STABLECOIN: Record<string, { symbol: string; contract: string }> = {
   arbitrum:  { symbol: "USDC",  contract: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" },
   optimism:  { symbol: "USDC",  contract: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85" },
   stable:    { symbol: "USDT0", contract: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736" },
+  skale:     { symbol: "USDC.e", contract: "0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20" },
 };
 
 /** EVM network slugs xpay knows how to derive a signer for. */
-const EVM_NETWORKS = ["base", "ethereum", "arbitrum", "optimism", "robinhood", "stable"];
+const EVM_NETWORKS = ["base", "ethereum", "arbitrum", "optimism", "robinhood", "stable", "skale"];
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -124,7 +125,10 @@ export async function transfer(args: TransferArgs): Promise<TransferResult> {
     // Accept the network's own symbol, plus the generic "USDC"/"USDT" the
     // caller may default to - on Stable they all mean USDT0.
     const tokenSymbol = (args.token ?? stablecoin.symbol).toUpperCase();
-    const aliases = network === "stable" ? ["USDT0", "USDT", "USDC"] : ["USDC"];
+    const aliases =
+      network === "stable" ? ["USDT0", "USDT", "USDC"]
+      : network === "skale" ? ["USDC.E", "USDC"]
+      : ["USDC"];
     if (!aliases.includes(tokenSymbol)) {
       throw new Error(
         `transfer: only ${stablecoin.symbol} is supported on "${network}" (got "${args.token}"). ` +
@@ -326,6 +330,7 @@ function networkToScheme(net: Network): string {
     case "optimism":  return "eip155:10";
     case "robinhood": return "eip155:4663";
     case "stable":    return "eip155:988";
+    case "skale":     return "eip155:1187947933";
     default:          return net;
   }
 }

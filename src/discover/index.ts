@@ -28,7 +28,7 @@ import { fetchOrbitX402Resources } from "./orbitx402.js";
 import { fetchPayAIResources } from "./payai.js";
 import { fetchAgenticMarketResources } from "./agenticmarket.js";
 import { fetchAgencResources } from "../agenc/api.js";
-import { fetchXonaResources } from "./xona.js";
+import { SKALE_NETWORK, fetchXonaResources } from "./xona.js";
 import { cached, isSourceDown, markSourceDown } from "./cache.js";
 import { enrichWithTrust, meetsMinTrust } from "../trust/index.js";
 
@@ -80,6 +80,7 @@ const NETWORK_ALIASES: Record<string, string> = {
   optimism: "eip155:10",
   robinhood: "eip155:4663",
   stable: "eip155:988",
+  skale: "eip155:1187947933",
 };
 
 let warnings: string[] = [];
@@ -186,6 +187,13 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
       xona = rankByScore(xona, xonaTerms, Math.ceil(xonaTerms.length / 2));
     }
     agenc = rankByScore(agenc, terms);
+  }
+
+  // Xona's SKALE mirrors duplicate its Solana routes, so they only show up
+  // when the caller asked for SKALE specifically.
+  const wantsSkale = opts.networks?.some((n) => (NETWORK_ALIASES[n] ?? n) === SKALE_NETWORK) ?? false;
+  if (!wantsSkale) {
+    xona = xona.filter((r) => !r.accepts.some((a) => a.network === SKALE_NETWORK));
   }
 
   // Network filter - prefix match so "solana" matches "solana:5eykt4..."

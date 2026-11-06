@@ -585,6 +585,7 @@ function normalizeNetwork(raw: string): string {
   if (raw === "eip155:10") return "optimism";
   if (raw === "eip155:4663") return "robinhood";
   if (raw === "eip155:988") return "stable";
+  if (raw === "eip155:1187947933") return "skale";
   // Tempo mainnet + Moderato testnet share the slug: the MPP tempo builder
   // picks the actual chain from the challenge's chainId, not the signer RPC.
   if (raw === "eip155:4217" || raw === "eip155:42431") return "tempo";

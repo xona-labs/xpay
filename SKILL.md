@@ -76,15 +76,17 @@ one. If no network has the funds, the call fails fast with a clear
 "insufficient balance" message naming each network's balance.
 
 Networks the wallet can pay from: Solana, Base and the other EVM chains,
-Robinhood Chain, and **Stable** (chain 988, Tether's payments L1). Stable
-settles in **USDT0**, not USDC - one derived EVM key covers it, so it is
-always available and needs no setup. Fund it with USDT0; payments there are
-gasless, so no native gas token is needed to pay.
+Robinhood Chain, **Stable** (chain 988, Tether's payments L1) and **SKALE on
+Base** (chain 1187947933, zero gas). Stable settles in **USDT0**, not USDC;
+SKALE settles in bridged **USDC.e**. One derived EVM key covers both, so they
+are always available and need no setup. Payments there are gasless, so no
+native gas token is needed to pay. Pass `network: "skale"` to `xpay_discover`
+to find Xona's SKALE routes.
 
 The agent pays from its own wallet, so **it must be funded first**. If a call
 fails for lack of funds, ask the user to send the right stablecoin to the
 matching address from `xpay_balance` - USDC on Solana mainnet or Base, USDT0
-on Stable.
+on Stable, USDC.e on SKALE.
 
 ## AgenC marketplace listings - a different execution rail
 

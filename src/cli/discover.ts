@@ -145,6 +145,7 @@ function normalizeNetwork(raw: string | undefined): string {
   if (raw === "eip155:10") return "optimism";
   if (raw === "eip155:4663") return "robinhood";
   if (raw === "eip155:988") return "stable";
+  if (raw === "eip155:1187947933") return "skale";
   if (raw.startsWith("solana")) return "solana";
   return raw;
 }
