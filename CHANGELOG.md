@@ -6,6 +6,8 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.39] – 2026-11-06
+
 ### Added
 - **SKALE on Base (chain `1187947933`) wallet network.** A `skale` signer is
   registered on every profile from the same derived EVM key, so any wallet can
