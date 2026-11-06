@@ -21,6 +21,7 @@ import type { Network, PaymentRequirement } from "../types.js";
 import type { Wallet } from "../wallet/index.js";
 import type { Guardrail } from "../guardrail/index.js";
 import { magicBlockPrivateTransfer, type MagicBlockConfig } from "../magicblock/client.js";
+import { relayedTransfer, RelayerUnavailableError, type EvmRelayer } from "./evm-relayer.js";
 
 // ─── Solana token registry ────────────────────────────────────────────────────
 
@@ -95,6 +96,12 @@ export interface TransferArgs {
   private?: boolean;
   /** Platform-level MagicBlock config (sourced from the active xpay profile). */
   magicBlockConfig?: MagicBlockConfig;
+  /**
+   * Gasless EVM path: when set and it serves the network, the wallet signs an
+   * EIP-3009 authorization and the relayer submits it and pays the gas, so
+   * the wallet needs no native ETH.
+   */
+  evmRelayer?: EvmRelayer;
   wallet: Wallet;
   guardrail: Guardrail;
 }
@@ -146,7 +153,20 @@ export async function transfer(args: TransferArgs): Promise<TransferResult> {
       requirement,
     });
     const signer = args.wallet.signer(network);
-    const txSig = await signer.pay(requirement);
+    let txSig: string | undefined;
+    if (args.evmRelayer?.supports(network) && signer.signEvmTypedData) {
+      try {
+        txSig = await relayedTransfer({
+          relayer: args.evmRelayer, signer, network,
+          token: stablecoin.contract, to: args.to, value: atoms,
+        });
+      } catch (e) {
+        // Sponsor is dry and nothing was broadcast: let the wallet pay its
+        // own gas instead (works if it holds a little ETH).
+        if (!(e instanceof RelayerUnavailableError)) throw e;
+      }
+    }
+    txSig ??= await signer.pay(requirement);
     return { network, txSig, amount: args.amount, token: stablecoin.symbol, to: args.to };
   }
 

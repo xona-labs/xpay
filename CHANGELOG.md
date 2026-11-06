@@ -6,6 +6,19 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.40] – 2026-11-06
+
+### Added
+- **Gasless EVM stablecoin transfers.** `createXPay({ evmRelayer })` takes an
+  `EvmRelayer`; with one set, `transfer()` on an EVM network signs an EIP-3009
+  `transferWithAuthorization` and the relayer submits it and pays the gas, so
+  a wallet holding only USDC on Base can send it. `walletEvmRelayer({
+  privateKey, rpcUrls })` is a ready-made relayer backed by a hot wallet with
+  native gas. The relayer simulates before broadcasting, so a short balance
+  fails without spending its gas. If the relayer is out of gas money, the
+  send falls back to the wallet paying its own gas (nothing was broadcast).
+  Without a relayer, behaviour is unchanged.
+
 ## [0.2.39] – 2026-11-06
 
 ### Added

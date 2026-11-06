@@ -23,6 +23,7 @@ import { Guardrail, type GuardrailConfig } from "./guardrail/index.js";
 import { signersFromProfile, deriveKeysFromMnemonic, type LoadedProfile } from "./profile/index.js";
 import { fetchReport, type WalletReport, type ReportOptions } from "./report/index.js";
 import { transfer, type TransferResult } from "./transfer/index.js";
+import type { EvmRelayer } from "./transfer/evm-relayer.js";
 import { findTokens, type TokenInfo } from "./token/index.js";
 import { findRwaTokens, type RwaToken, type RwaFindOptions } from "./token/rwa.js";
 import { swap, swapQuote, type SwapQuote, type SwapResult } from "./swap/index.js";
@@ -42,6 +43,7 @@ export * from "./tools/index.js";
 export * from "./profile/index.js";
 export * from "./report/index.js";
 export * from "./transfer/index.js";
+export * from "./transfer/evm-relayer.js";
 export { Guardrail } from "./guardrail/index.js";
 /**
  * Direct access to the discovery layer for callers (e.g. server routes) that
@@ -140,6 +142,11 @@ export interface XPayOptions {
   guardrail?: GuardrailConfig;
   /** Override the OrbitX402 discovery endpoint (for self-hosted instances / tests). */
   discoveryEndpoint?: string;
+  /**
+   * Pays gas for EVM stablecoin transfers (EIP-3009), so wallets holding only
+   * USDC can send it. See {@link walletEvmRelayer}.
+   */
+  evmRelayer?: EvmRelayer;
 }
 
 /** The xPay client returned by {@link createXPay}. */
@@ -252,6 +259,7 @@ export function createXPay(options: XPayOptions): XPay {
       wallet,
       guardrail,
       magicBlockConfig: options.profile?.config.magicblock,
+      evmRelayer: options.evmRelayer,
     }),
     findTokens: (query, opts) => findTokens(query, {
       endpoint: options.profile?.config.swap?.endpoint,
