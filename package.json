@@ -1,6 +1,6 @@
 {
   "name": "@xona-labs/xpay",
-  "version": "0.2.40",
+  "version": "0.2.41",
   "mcpName": "io.github.xona-labs/xpay",
   "description": "Xona Wallet: agent wallet and payment rail for agentic commerce. Multi-network wallet, x402 payments, AgenC marketplace hires, 20k+ services via PayAI and other catalogs",
   "type": "module",
@@ -76,6 +76,7 @@
     "typescript": "^5.8.3"
   },
   "optionalDependencies": {
-    "@bentoguard/sdk": "^1.2.8"
+    "@bentoguard/sdk": "^1.2.8",
+    "wormhole-x402": "0.11.0"
   }
 }

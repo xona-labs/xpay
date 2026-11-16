@@ -79,6 +79,16 @@ export interface ProfileConfig {
     enabled: boolean;
   };
   /**
+   * Agent Wormhole payment conformance check. ON BY DEFAULT: each signed x402
+   * v2 payment is decoded and compared to the 402 quote before it is sent.
+   * Offline, no account needed. Set `enabled: false` to opt out. See
+   * guardrail/wormhole.ts.
+   */
+  wormhole?: {
+    enabled?: boolean;
+    onAbstain?: "fallback" | "approve" | "block";
+  };
+  /**
    * AgenC marketplace hire settings (optional). AgenC listings surface in
    * discovery by default; these only tune how hires execute.
    */

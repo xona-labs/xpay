@@ -251,13 +251,58 @@ xpay guardrail set \
 
 - **`maxPerTx` / `maxPerDay`**: apply to every paid call *and* direct transfers.
 - **`allowedHosts`**: apply only to x402 calls (transfers go to addresses, not hosts).
-- **`maxPerTx` / `maxPerDay`**: apply to every paid call *and* direct transfers.
-- **`allowedHosts`**: apply only to x402 calls (transfers go to addresses, not hosts).
 - **`requireApprovalAbove`**: calls ≥ threshold need explicit approval. In the CLI this is a
   Touch ID prompt when [biometric unlock](#biometric-unlock-macos) is enabled, otherwise a y/n
   confirm; in the MCP server it is Touch ID only (no terminal), so an agent's large payment
   surfaces as a system dialog you physically approve. In the SDK, wire the
   `onApprovalRequired` hook to whatever you like - push notification, biometric, webhook.
+
+## Security - payment conformance check (Agent Wormhole, on by default)
+
+Caps decide *how much* an agent may spend. This check answers a different question: **is the
+payment we just signed the one the merchant quoted?** After Xona Wallet signs an x402 payment and
+before the `X-Payment` header leaves the process, the signed payload is decoded with
+[Agent Wormhole](https://www.agentwormhole.com/docs) (`wormhole-x402`, offline, no RPC, no
+account) and compared to the 402 quote:
+
+- **Solana**: the signed transaction must be a single transfer of the quoted mint and amount to
+  the quoted payee, from this wallet - no approvals, authority changes, extra SOL movement or
+  oversized priority fees.
+- **EVM**: the EIP-3009 signature is recovered against Wormhole's own trusted EIP-712 domain
+  table (not the merchant-supplied `extra.name`/`version`), then payee, amount, chain, payer,
+  validity window and session nonce replay are checked. Base, Arc and Robinhood USDC are covered.
+
+Verdicts:
+
+- **`allow`**: the header is sent.
+- **`refuse`**: a decoded mismatch. Always blocks; nothing is sent, so nothing settles.
+- **`abstain`**: Wormhole can't decide (e.g. Stable, SKALE and Tempo aren't in its domain table
+  yet, or a Solana lookup-table transaction). By default the payment falls back to the local
+  guardrail above, with a one-time warning per network. If `wormhole-x402` isn't installed (it
+  is an optional dependency), the same fallback applies.
+
+Tune it in the SDK or in the profile's `config.json`:
+
+```ts
+createXPay({
+  guardrail: {
+    maxPerTx: 0.5,
+    wormhole: {
+      onAbstain: "approve",  // "fallback" (default) | "approve" (onApprovalRequired, else block) | "block"
+      // enabled: false,     // opt out entirely
+      // enabled: true,      // strict: block if wormhole-x402 can't load instead of falling back
+    },
+  },
+});
+```
+
+```json
+{ "wormhole": { "enabled": false } }
+```
+
+The check covers x402 v2 payments (Solana and gasless EVM). Legacy v1 sign-and-broadcast payments
+and direct transfers aren't covered, since there is no quote to compare against or the
+transaction is already broadcast. Set `XPAY_DEBUG=1` to log each `allow` verdict.
 
 ## Security - Bento intent firewall (optional)
 

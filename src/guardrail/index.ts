@@ -10,6 +10,9 @@
 import type { PaymentRequirement, Resource } from "../types.js";
 import { AGENC_SCHEME } from "../agenc/api.js";
 import { solUsdPrice } from "../agenc/price.js";
+import { describeVerdict, verifyPaymentHeader, type WormholeConfig } from "./wormhole.js";
+
+export type { WormholeConfig } from "./wormhole.js";
 
 export interface GuardrailConfig {
   /** Max USD per single call. */
@@ -41,6 +44,15 @@ export interface GuardrailConfig {
     /** Per-call timeout for the Bento relayer round-trip. Default 8000ms. */
     timeoutMs?: number;
   };
+  /**
+   * Agent Wormhole conformance check. ON BY DEFAULT (set `enabled: false` to
+   * opt out). Every x402 v2 payment header is decoded after signing and
+   * compared to the 402 quote before it is sent; a mismatch (wrong payee/mint/
+   * amount, extra instructions, Permit-style standing approvals, foreign
+   * payer) throws. When Wormhole can't decide, or isn't installed, the call
+   * falls back to the local guardrail above. See ./wormhole.ts.
+   */
+  wormhole?: WormholeConfig;
 }
 
 interface SpendEntry {
@@ -51,6 +63,7 @@ interface SpendEntry {
 export class Guardrail {
   private readonly config: GuardrailConfig;
   private readonly history: SpendEntry[] = [];
+  private readonly seenNonces = new Set<string>();
 
   constructor(config: GuardrailConfig = {}) {
     this.config = config;
@@ -184,6 +197,88 @@ export class Guardrail {
           "onApprovalRequired hook to handle escalations, or run `xpay bento disable`.",
       );
     }
+  }
+
+  /**
+   * Post-sign, pre-send conformance check via Agent Wormhole. Called by
+   * `use()` with the X-Payment header it just built. No-op unless
+   * `wormhole.enabled`. Throws {@link GuardrailError} to stop the send.
+   */
+  async verifyPayment(args: {
+    resource: Resource;
+    requirement: PaymentRequirement;
+    header: string;
+    payer: string;
+  }): Promise<void> {
+    // On by default. Only an explicit `enabled: false` turns it off.
+    const cfg = this.config.wormhole ?? {};
+    if (cfg.enabled === false) return;
+    const explicit = cfg.enabled === true;
+
+    let verdict;
+    try {
+      verdict = await verifyPaymentHeader({ ...args, config: cfg, seenNonces: this.seenNonces });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Opted in explicitly: a broken check is a hard stop. On by default:
+      // fall back to the local guardrail (caps already passed in check()).
+      if (explicit) throw new GuardrailError(msg);
+      this.warnOnce(`load:${msg}`, `Wormhole check unavailable (${msg}), relying on local guardrail`);
+      return;
+    }
+    if (!verdict) {
+      verdict = {
+        decision: "abstain" as const,
+        findings: [],
+        reason: `network ${args.requirement.network} is not covered by Wormhole`,
+      };
+    }
+
+    if (verdict.decision === "allow") {
+      if (process.env.XPAY_DEBUG) {
+        console.warn(`xpay guardrail: Wormhole allow (${args.requirement.network}, payTo ${args.requirement.payTo}, amount ${args.requirement.amount})`);
+      }
+      return;
+    }
+    // A refusal is a decoded mismatch (wrong payee/mint/amount/payer, standing
+    // approval, replay). Always blocks, whatever onAbstain says.
+    if (verdict.decision === "refuse") {
+      throw new GuardrailError(`Wormhole refused this payment - ${describeVerdict(verdict)}`);
+    }
+
+    // abstain: Wormhole couldn't decide (e.g. chain not in its domain table).
+    // Default "fallback" proceeds on the local guardrail's checks alone.
+    const mode = cfg.onAbstain ?? "fallback";
+    const detail = describeVerdict(verdict);
+    if (mode === "fallback") {
+      this.warnOnce(
+        `abstain:${args.requirement.network}:${args.requirement.asset}`,
+        `Wormhole can't verify ${args.requirement.network} payments (${detail}), relying on local guardrail`,
+      );
+      return;
+    }
+    if (mode === "approve" && this.config.onApprovalRequired) {
+      const usd = await this.estimateUsd(args.requirement);
+      const ok = await this.config.onApprovalRequired({ resource: args.resource, usd });
+      if (ok) return;
+      throw new GuardrailError(`Wormhole could not verify this payment and it was not approved - ${detail}`);
+    }
+    throw new GuardrailError(
+      `Wormhole could not verify this payment (${detail}). Configure onApprovalRequired, ` +
+        `set guardrail.wormhole.onAbstain to "fallback", or disable the check.`,
+    );
+  }
+
+  private readonly warned = new Set<string>();
+  private warnOnce(key: string, msg: string): void {
+    if (this.warned.has(key)) return;
+    this.warned.add(key);
+    console.warn(`xpay guardrail: ${msg}`);
+  }
+
+  /** Whether the Wormhole conformance check is active on this instance. */
+  wormholeEnabled(): boolean {
+    return this.config.wormhole?.enabled !== false;
   }
 
   /**

@@ -124,6 +124,12 @@ signing), and hires never auto-release funds without the buyer's acceptance.
   `verified` flag from `xpay_token_find` - unverified tokens can be scams
   reusing a real ticker. Never swap into an unverified token unless the user
   explicitly confirms the exact mint address.
+- **Payment conformance check (on by default).** Every signed x402 payment is
+  compared to the merchant's quote before it is sent. An error starting with
+  "Wormhole refused this payment" means the signed payment didn't match the
+  quote (wrong payee, amount or payer): stop and tell the user, do not retry
+  or work around it. A "Wormhole can't verify" warning is informational; the
+  payment proceeded on the spending caps.
 - **Bento intent firewall (optional security layer).** When enabled, every
   payment is screened for malicious intent (prompt-injection, wallet-drain)
   before signing. A `BLOCKED` result means stop. Toggle with

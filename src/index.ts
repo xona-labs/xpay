@@ -226,6 +226,13 @@ export function createXPay(options: XPayOptions): XPay {
         ).solana.secretKeyBase58;
       }
     }
+
+    // Agent Wormhole conformance check (post-sign, pre-send). On by default
+    // inside Guardrail; the profile can only tune or disable it.
+    const wh = options.profile.config.wormhole;
+    if (wh) {
+      guardrailConfig = { ...guardrailConfig, wormhole: { ...guardrailConfig?.wormhole, ...wh } };
+    }
   }
 
   if (!networks?.length) {

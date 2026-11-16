@@ -356,6 +356,7 @@ async function settle(
       requirement: req,
       x402Version,
     });
+    await args.guardrail.verifyPayment({ resource: args.resource, requirement: req, header, payer: signer.address });
     return { header, network };
   }
 
@@ -374,6 +375,7 @@ async function settle(
       requirement: req,
       x402Version,
     });
+    await args.guardrail.verifyPayment({ resource: args.resource, requirement: req, header, payer: signer.address });
     return { header, network };
   }
 

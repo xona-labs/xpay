@@ -6,6 +6,29 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.41] – 2026-11-16
+
+### Added
+- **Payment conformance check, on by default.** After an x402 v2 payment is
+  signed and before the `X-Payment` header is sent, the guardrail decodes the
+  signed payload with [Agent Wormhole](https://www.agentwormhole.com/docs)
+  (`wormhole-x402`, offline) and compares it to the 402 quote. Solana: the
+  transaction must be a single transfer of the quoted mint/amount to the
+  quoted payee from this wallet. EVM: the EIP-3009 signer is recovered against
+  a trusted EIP-712 domain table rather than the merchant's `extra`, and
+  payee, amount, chain, payer, validity window and session nonce replay are
+  checked. A `refuse` verdict throws `GuardrailError` and nothing is sent.
+- `guardrail.wormhole` config (`enabled`, `onAbstain`, `bindPayer`,
+  `maxPriorityFeeLamports`) and a profile `wormhole` key. When Wormhole can't
+  decide (`abstain`, e.g. Stable/SKALE/Tempo) or the optional dependency is
+  missing, the payment falls back to the local guardrail with a one-time
+  warning. `enabled: false` opts out; `enabled: true` makes a missing package
+  a hard stop.
+- `XPAY_DEBUG=1` logs each Wormhole `allow` verdict.
+
+### Changed
+- `wormhole-x402@0.11.0` added as an optional dependency (exact pin).
+
 ## [0.2.40] – 2026-11-06
 
 ### Added
