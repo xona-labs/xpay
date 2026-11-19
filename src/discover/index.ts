@@ -1,10 +1,13 @@
 /**
  * Discovery - find paid services across catalogs.
  *
- * Four sources, merged:
+ * Five sources, merged:
  *  - **Xona** (api.xona-agent.com) - our own Solana endpoints, fetched whole
  *    and matched locally, and ranked ahead of everything else. Xona mirrors
  *    listed by the third-party catalogs (Base etc.) are dropped in favor of it.
+ *  - **Featured** - a hand-picked list of partner doors (see ./featured),
+ *    probed for their live 402 terms and given a reserved slot right after
+ *    Xona's matches. Their copies in the other catalogs are dropped.
  *  - **OrbitX402** aggregates multiple x402 catalogs (its own probed
  *    resources, PayAI, pay.sh) and searches/ranks server-side. It has been
  *    slow lately (30-60s/page, queries 504ing), so it runs with tight
@@ -29,6 +32,7 @@ import { fetchPayAIResources } from "./payai.js";
 import { fetchAgenticMarketResources } from "./agenticmarket.js";
 import { fetchAgencResources } from "../agenc/api.js";
 import { SKALE_NETWORK, fetchXonaResources } from "./xona.js";
+import { FEATURED_NAMES, fetchFeaturedResources } from "./featured.js";
 import { cached, isSourceDown, markSourceDown } from "./cache.js";
 import { enrichWithTrust, meetsMinTrust } from "../trust/index.js";
 
@@ -38,7 +42,7 @@ interface InternalDiscoverOptions extends DiscoverOptions {
   endpoint?: string;
 }
 
-const DEFAULT_SOURCES = ["xona", "orbitx402", "agenticmarket", "agenc"];
+const DEFAULT_SOURCES = ["xona", "featured", "orbitx402", "agenticmarket", "agenc"];
 
 const XONA_HOST = "api.xona-agent.com";
 
@@ -132,9 +136,12 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
   // server-side - a small response instead of a full multi-MB catalog
   // download. AgenC's catalog is small enough to fetch whole and filter
   // locally.
-  const [xonaSettled, orbitSettled, marketSettled, agencSettled] = await Promise.allSettled([
+  const [xonaSettled, featuredSettled, orbitSettled, marketSettled, agencSettled] = await Promise.allSettled([
     sources.includes("xona")
       ? cached("xona:solana", () => fetchXonaResources())
+      : Promise.resolve<Resource[]>([]),
+    sources.includes("featured")
+      ? cached("featured:doors", () => fetchFeaturedResources())
       : Promise.resolve<Resource[]>([]),
     sources.includes("orbitx402")
       ? fetchOrbitWithPayAIFallback(opts.endpoint, query)
@@ -151,6 +158,7 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
 
   const failures: string[] = [];
   let xona = unwrap(xonaSettled, "xona", failures);
+  let featured = unwrap(featuredSettled, "featured", failures);
   let orbit = unwrap(orbitSettled, "orbitx402", failures);
   let market = unwrap(marketSettled, "agenticmarket", failures);
   let agenc = unwrap(agencSettled, "agenc", failures);
@@ -160,6 +168,12 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
   if (xona.length > 0) {
     orbit = orbit.filter((r) => !isXonaResource(r));
     market = market.filter((r) => !isXonaResource(r));
+  }
+  // Featured doors come with live terms; drop the catalogs' copies.
+  if (featured.length > 0) {
+    const featuredUrls = new Set(featured.map((r) => r.resource));
+    orbit = orbit.filter((r) => !featuredUrls.has(r.resource));
+    market = market.filter((r) => !featuredUrls.has(r.resource));
   }
 
   const enabledCount = DEFAULT_SOURCES.filter((s) => sources.includes(s)).length;
@@ -187,6 +201,22 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
       xona = rankByScore(xona, xonaTerms, Math.ceil(xonaTerms.length / 2));
     }
     agenc = rankByScore(agenc, terms);
+
+    // Featured doors sit right after Xona, so they get the same bar: half
+    // the terms. Naming a partner or product ("kognai", "voxight") pulls in
+    // all its doors, ranked by whatever else was asked.
+    const namesFeatured = terms.some((t) => FEATURED_NAMES.includes(t));
+    const featuredTerms = terms.filter((t) => t !== "xona" && !FEATURED_NAMES.includes(t));
+    if (namesFeatured) {
+      featured = featured.filter((r) =>
+        terms.some((t) => partnerNames(r).includes(t)),
+      );
+      if (featuredTerms.length > 0) featured = rankByScore(featured, featuredTerms, 0);
+    } else if (featuredTerms.length > 0) {
+      featured = rankByScore(featured, featuredTerms, Math.ceil(featuredTerms.length / 2));
+    } else {
+      featured = [];
+    }
   }
 
   // Xona's SKALE mirrors duplicate its Solana routes, so they only show up
@@ -205,6 +235,7 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
         wanted.some((n) => a.network === n || a.network.startsWith(n + ":")),
       );
     xona = xona.filter(matchesNet);
+    featured = featured.filter(matchesNet);
     orbit = orbit.filter(matchesNet);
     market = market.filter(matchesNet);
     agenc = agenc.filter(matchesNet);
@@ -217,8 +248,26 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
     ? Math.min(xona.length, mentionsXona ? opts.limit : Math.ceil(opts.limit / 2))
     : xona.length;
   const lead = xona.slice(0, xonaSlots);
-  const rest = mergeOthers(orbit, market, agenc, opts.limit ? opts.limit - lead.length : undefined);
-  return [...lead, ...rest];
+
+  // Featured doors follow, with a fifth of the slots (at least one), or all
+  // remaining slots when the query names the partner.
+  const namesFeatured = query?.split(/\s+/).some((t) => FEATURED_NAMES.includes(t)) ?? false;
+  const roomAfterXona = opts.limit ? opts.limit - lead.length : Infinity;
+  const featuredSlots = Math.min(
+    featured.length,
+    roomAfterXona,
+    opts.limit && !namesFeatured ? Math.max(1, Math.ceil(opts.limit / 5)) : Infinity,
+  );
+  const partners = featured.slice(0, featuredSlots);
+
+  const used = lead.length + partners.length;
+  const rest = mergeOthers(orbit, market, agenc, opts.limit ? opts.limit - used : undefined);
+  return [...lead, ...partners, ...rest];
+}
+
+function partnerNames(r: Resource): string[] {
+  const names = r.metadata?.names;
+  return Array.isArray(names) ? names.filter((v): v is string => typeof v === "string") : [];
 }
 
 function mergeOthers(

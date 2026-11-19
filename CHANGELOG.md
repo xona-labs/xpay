@@ -6,6 +6,20 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.42] – 2026-11-19
+
+### Added
+- **Featured partner doors in discovery.** A new `featured` source (on by
+  default) promotes a hand-picked list of partner x402 endpoints, starting
+  with Kognai: Golden Kog token risk analysis and 24h watch, Voxight coin
+  attention, deep reading and top signal, and Kreativ reviewed images and
+  clips. Each door is probed for its live 402, so prices, recipients and
+  input examples come from the partner, not from a hardcoded copy. Matches
+  get up to a fifth of the slots (at least one) right after Xona's own;
+  naming the partner or product (`kognai`, `voxight`, `kreativ`, `kog`)
+  returns all its doors. Their duplicates in OrbitX402/PayAI and Agentic
+  Market are dropped.
+
 ## [0.2.41] – 2026-11-16
 
 ### Added
