@@ -6,6 +6,14 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.43] – 2026-11-24
+
+### Fixed
+- **`useByUrl` / `xpay_use` with only a URL on POST routes.** A bare URL was
+  always probed with GET, which dropped any body and returned 404 on POST-only
+  x402 services. Now a body means POST, a bare URL tries GET and falls back to
+  POST on 404/405, and `xpay_use` accepts an explicit `method`.
+
 ## [0.2.42] – 2026-11-19
 
 ### Added

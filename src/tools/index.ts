@@ -216,6 +216,12 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
             description:
               "URL of the resource to call. Used only when `resource` object is not available.",
           },
+          method: {
+            type: "string",
+            enum: ["GET", "POST"],
+            description:
+              "HTTP method, only with `resourceUrl`. Defaults to POST when a body is given, otherwise GET with a POST fallback.",
+          },
           body: { type: "object", description: "Optional JSON body for POST endpoints." },
         },
       },
@@ -879,7 +885,8 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
       // Fallback: only a URL was provided - probe the resource for a 402 challenge.
       const url = input.resourceUrl as string;
       if (!url) throw new Error("xpay_use: provide either `resource` (full object from xpay_discover) or `resourceUrl`");
-      return xpay.useByUrl(url, { body: input.body as unknown });
+      const method = typeof input.method === "string" ? input.method.toUpperCase() : undefined;
+      return xpay.useByUrl(url, { body: input.body as unknown, method });
     },
 
     xpay_do: async (input) =>

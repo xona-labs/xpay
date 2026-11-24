@@ -108,19 +108,27 @@ export interface UseByUrlArgs {
 }
 
 export async function useByUrl(args: UseByUrlArgs): Promise<UseResult> {
+  // With no explicit method, a body means POST (a GET would silently drop
+  // it). A bare URL probes with GET first and falls back to POST when the
+  // route only answers POST (see useWithLiveChallenge).
+  const guessed = !args.method;
+  const method = args.method ?? (args.body !== undefined ? "POST" : "GET");
   const resource: Resource = {
     resource: args.url,
     type: "http",
-    method: args.method ?? "GET",
+    method,
     accepts: [],
   };
-  return useWithLiveChallenge({
-    resource,
-    wallet: args.wallet,
-    guardrail: args.guardrail,
-    body: args.body,
-    headers: args.headers,
-  });
+  return useWithLiveChallenge(
+    {
+      resource,
+      wallet: args.wallet,
+      guardrail: args.guardrail,
+      body: args.body,
+      headers: args.headers,
+    },
+    { methodGuessed: guessed && method === "GET" },
+  );
 }
 
 async function useWithRequirements(
@@ -137,9 +145,19 @@ async function useWithRequirements(
   return result;
 }
 
-async function useWithLiveChallenge(args: UseArgs): Promise<UseResult> {
+async function useWithLiveChallenge(args: UseArgs, opts: { methodGuessed?: boolean } = {}): Promise<UseResult> {
   // Step 1: probe without payment.
-  const probe = await callResource(args, undefined);
+  let probe = await callResource(args, undefined);
+  if (opts.methodGuessed && (probe.res.status === 404 || probe.res.status === 405)) {
+    // Bare URL guessed as GET, but the route doesn't answer GET: many x402
+    // services are POST-only. Probe again as POST and keep that method.
+    const asPost: UseArgs = { ...args, resource: { ...args.resource, method: "POST" } };
+    const retry = await callResource(asPost, undefined);
+    if (retry.res.status !== 404 && retry.res.status !== 405) {
+      args = asPost;
+      probe = retry;
+    }
+  }
   if (probe.res.status !== 402) {
     // No payment required - return the probe response as-is. (Useful when a
     // resource later becomes free or for sanity checks.)
