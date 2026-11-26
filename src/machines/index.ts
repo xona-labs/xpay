@@ -139,13 +139,16 @@ export class MachineNotFoundError extends Error {
 const ID_RE = /^(did:peaq:)?\d+$/;
 const EVM_RE = /^0x[0-9a-fA-F]{40}$/;
 const TYPE_RE = /^[\w .:/-]+$/;
-const MAX_ID_LEN = 80;
+// peaq machine ids are uint256 token ids: up to 78 decimal digits (real ones
+// are 77-78), so the full DID is up to 87 characters. The limit applies to
+// the digits, not the prefixed string.
+const MAX_ID_DIGITS = 80;
 const MAX_TYPE_LEN = 64;
 const MAX_QUERY_LEN = 200;
 
 /**
  * Validate a machine id or DID and return it trimmed. Accepts a decimal id
- * (`12345`) or `did:peaq:12345`, at most 80 characters.
+ * (`12345`) or `did:peaq:12345`, with at most 80 digits.
  */
 export function normalizeMachineId(input: unknown): string {
   if (typeof input !== "string" && typeof input !== "number") {
@@ -153,11 +156,12 @@ export function normalizeMachineId(input: unknown): string {
   }
   const s = String(input).trim();
   if (!s) throw new Error("xpay.machines: machine id is required");
-  if (s.length > MAX_ID_LEN) {
-    throw new Error(`xpay.machines: machine id is longer than ${MAX_ID_LEN} characters`);
-  }
   // DIDs are case-insensitive in the method prefix only.
   const lowered = s.replace(/^did:peaq:/i, "did:peaq:");
+  const digits = lowered.replace(/^did:peaq:/, "");
+  if (digits.length > MAX_ID_DIGITS) {
+    throw new Error(`xpay.machines: machine id is longer than ${MAX_ID_DIGITS} digits`);
+  }
   if (!ID_RE.test(lowered)) {
     throw new Error(`xpay.machines: "${s}" is not a machine id - expected digits or did:peaq:<digits>`);
   }

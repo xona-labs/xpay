@@ -485,7 +485,7 @@ const services = await xpay.discover({ category: "robotics", query: "detect obst
 Notes:
 - peaq's machine network is early: most real machines are compute nodes, about 20 are robots, and none publish service endpoints yet, so there is nothing to pay a machine for directly. Legacy records are excluded, and test machines too unless `includeTest` / `category: "test"`.
 - Unrated is the normal state today, not a red flag; `negative_flag` is the one to warn about.
-- Inputs are validated before any request: ids are digits or `did:peaq:<digits>` (max 80 chars), `owner` must be an EVM address, `limit` 1-100. Requests time out after 10s. `XPAY_MACHINES_ENDPOINT` overrides the API origin (default `https://api.xona-agent.com`).
+- Inputs are validated before any request: ids are digits or `did:peaq:<digits>` (max 80 digits; real peaq ids are 78), `owner` must be an EVM address, `limit` 1-100. Requests time out after 10s. `XPAY_MACHINES_ENDPOINT` overrides the API origin (default `https://api.xona-agent.com`).
 - MCP: `xpay_machine_find` (filters plus `include_stats` for registry totals; active machines first by default) and `xpay_machine_lookup` (one machine plus a plain-language `summary`), both read-only; `xpay_discover` takes `category: "robotics"`.
 
 ## RWA discovery (Solana)

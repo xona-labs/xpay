@@ -71,7 +71,10 @@ describe("normalizeMachineId", () => {
     for (const bad of ["", "abc", "did:peaq:", "did:other:1", "12a", "../1", "1 2", "did:peaq:1/../2"]) {
       assert.throws(() => normalizeMachineId(bad), /machine id/, bad);
     }
-    assert.throws(() => normalizeMachineId("1".repeat(81)), /longer than 80/);
+    assert.throws(() => normalizeMachineId("1".repeat(81)), /longer than 80 digits/);
+    const real = "60541050579565669267093991629679692175206262554264966232425602864190008193462";
+    assert.equal(normalizeMachineId(`did:peaq:${real}`), `did:peaq:${real}`);
+    assert.equal(normalizeMachineId(real), real);
     assert.throws(() => normalizeMachineId(undefined), /machine id/);
   });
 });
