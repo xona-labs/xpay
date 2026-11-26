@@ -6,13 +6,15 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.44] - 2026-11-26
+
 ### Added
 - **Xona for Machines (peaq), read-only.** `findMachines()`, `getMachine()`
   and `machineStats()` (also on the `xpay` client) query Xona's index of
   machines registered on peaq: type, category, owner/operator, credit rating
   and score, bond status, activity/revenue events, revenue in USD and trend,
   and risk flags. Inputs are validated before any request (id = digits or
-  `did:peaq:<digits>`, max 80 chars; owner = EVM address; limit 1-100), calls
+  `did:peaq:<digits>`, max 80 digits; owner = EVM address; limit 1-100), calls
   time out after 10s, and a 404 throws `MachineNotFoundError`.
   `summarizeMachineTrust()` turns a record into a sentence an agent can
   relay. `XPAY_MACHINES_ENDPOINT` overrides the API origin. Never touches a
