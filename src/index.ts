@@ -29,6 +29,15 @@ import { findRwaTokens, type RwaToken, type RwaFindOptions } from "./token/rwa.j
 import { swap, swapQuote, type SwapQuote, type SwapResult } from "./swap/index.js";
 import { trade, tradeQuote, type TradeQuote, type TradeResult } from "./trading/index.js";
 import { trendingTokens, newTokens, type DiscoveredToken } from "./trading/discovery.js";
+import {
+  findMachines,
+  getMachine,
+  machineStats,
+  type MachineDetail,
+  type MachineFindOptions,
+  type MachineList,
+  type MachineStats,
+} from "./machines/index.js";
 import type {
   DiscoverOptions,
   Resource,
@@ -118,6 +127,28 @@ export {
   type TradeTokenInfo,
 } from "./trading/index.js";
 export {
+  findMachines,
+  getMachine,
+  machineStats,
+  normalizeMachineId,
+  summarizeMachineTrust,
+  compactMachine,
+  MachineNotFoundError,
+  MACHINE_CATEGORIES,
+  MACHINE_SORTS,
+  type Machine,
+  type MachineCredit,
+  type MachineDetail,
+  type MachineFlag,
+  type MachineList,
+  type MachineStats,
+  type MachineCategory,
+  type MachineSort,
+  type MachineFindOptions,
+  type MachineApiOptions,
+} from "./machines/index.js";
+export { ROBOTICS_FACETS, DISCOVER_CATEGORIES, type RoboticsFacet, type DiscoverCategory } from "./discover/index.js";
+export {
   trendingTokens,
   newTokens,
   tokenPriceUsd,
@@ -195,6 +226,12 @@ export interface XPay {
   trendingTokens(opts?: { limit?: number }): Promise<DiscoveredToken[]>;
   /** Tokens from the newest Robinhood Chain pools (fresh, high-risk launches). Read-only. */
   newTokens(opts?: { limit?: number }): Promise<DiscoveredToken[]>;
+  /** Search real machines registered on peaq, with credit profiles. Read-only, no signing. */
+  findMachines(opts?: MachineFindOptions): Promise<MachineList>;
+  /** One peaq machine by decimal id or `did:peaq:<id>`, with risk flags. Read-only, no signing. */
+  getMachine(idOrDid: string): Promise<MachineDetail>;
+  /** peaq machine registry totals (real vs legacy, by category, active, rated). Read-only. */
+  machineStats(): Promise<MachineStats>;
 }
 
 /**
@@ -284,5 +321,8 @@ export function createXPay(options: XPayOptions): XPay {
     trade: (args) => trade({ ...args, wallet, guardrail, config: options.profile?.config.trading }),
     trendingTokens: (opts) => trendingTokens(opts),
     newTokens: (opts) => newTokens(opts),
+    findMachines: (opts) => findMachines(opts),
+    getMachine: (idOrDid) => getMachine(idOrDid),
+    machineStats: () => machineStats(),
   };
 }

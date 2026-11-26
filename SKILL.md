@@ -38,8 +38,10 @@ the MCP `env`. To require an explicit wallet (no auto-generation), set
 
 | Tool | Use it to |
 |---|---|
-| `xpay_discover` | Find paid services by natural-language query. Returns ranked candidates with price, network, and payee; Solana payees carry `trust` (ERC-8004 identity + reputation). `minTrust` keeps only registered merchants. |
+| `xpay_discover` | Find paid services by natural-language query. Returns ranked candidates with price, network, and payee; Solana payees carry `trust` (ERC-8004 identity + reputation). `minTrust` keeps only registered merchants. `category: "robotics"` lists services robots and machine agents can pay for (vision, OCR, maps, weather, compute, sensor data, translation, speech). |
 | `xpay_trust_check` | ERC-8004 agent identity + reputation of a Solana merchant wallet (e.g. a resource's `payTo`): name, 0-100 feedback score, review count, ATOM tier. Free, read-only. Unregistered is the common case, not a red flag. |
+| `xpay_machine_find` | Search real machines on peaq (robots, drones, sensors, compute nodes) with credit rating, bond, revenue and a plain-language trust `summary`. Free, read-only. The network is early: mostly compute nodes, ~20 robots, no service endpoints yet. `include_stats` adds registry totals. |
+| `xpay_machine_lookup` | One peaq machine by id or `did:peaq:<id>`: type, owner/operator, rating, bond, activity, revenue (USD), trend, flags, and a `summary` to relay. Free, read-only. |
 | `xpay_use` | Pay for and call a specific service. Pass the full `resource` object from `xpay_discover` (preferred), or a `resourceUrl`. Handles the x402 402-challenge → pay → retry flow. |
 | `xpay_do` | One step: discover the best service for an intent **and** call it. Use when you don't need to compare options. |
 | `xpay_transfer` | Send USDC (or any Solana SPL token, or USDT0 on Stable) directly to an address. Executes immediately, gated by the user's guardrail - confirm amount + destination with the user before calling. |

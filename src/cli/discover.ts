@@ -15,6 +15,7 @@ export interface DiscoverCmdOptions {
   limit?: string;
   network?: string;
   sources?: string;
+  category?: string;
   json?: boolean;
   /** Commander sets false for --no-trust. */
   trust?: boolean;
@@ -28,7 +29,8 @@ export async function runDiscover(query: string | undefined, opts: DiscoverCmdOp
 
   const t0 = Date.now();
   const minTrust = opts.minTrust !== undefined ? Number(opts.minTrust) : undefined;
-  const results = await discover({ query, limit, networks, sources, trust: opts.trust, minTrust });
+  const category = opts.category as "robotics" | undefined;
+  const results = await discover({ query, limit, networks, sources, trust: opts.trust, minTrust, category });
   const elapsed = Date.now() - t0;
 
   if (opts.json) {

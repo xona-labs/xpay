@@ -24,6 +24,10 @@
  *
  * One source failing never kills discovery - its error is stashed in
  * {@link lastDiscoverWarnings} and the other sources' results are returned.
+ *
+ * `category: "robotics"` runs a curated set of machine-useful searches
+ * (vision, maps, weather, compute, ...) and keeps only results that plainly
+ * describe that capability; see ./robotics.
  */
 
 import type { DiscoverOptions, Resource } from "../types.js";
@@ -35,6 +39,17 @@ import { SKALE_NETWORK, fetchXonaResources } from "./xona.js";
 import { FEATURED_NAMES, fetchFeaturedResources } from "./featured.js";
 import { cached, isSourceDown, markSourceDown } from "./cache.js";
 import { enrichWithTrust, meetsMinTrust } from "../trust/index.js";
+import {
+  DISCOVER_CATEGORIES,
+  ROBOTICS_FACETS,
+  facetsForQuery,
+  interleave,
+  roboticsFacetOf,
+  tagFacet,
+  type RoboticsFacet,
+} from "./robotics.js";
+
+export { ROBOTICS_FACETS, DISCOVER_CATEGORIES, type RoboticsFacet, type DiscoverCategory } from "./robotics.js";
 
 export { setCacheTtl, invalidate as invalidateCache } from "./cache.js";
 
@@ -88,9 +103,6 @@ const NETWORK_ALIASES: Record<string, string> = {
 };
 
 let warnings: string[] = [];
-/** Notes queued by in-flight source fetches (e.g. fallback used), folded into
- *  {@link warnings} once the call settles. */
-let pendingNotes: string[] = [];
 
 /** Non-fatal source failures from the most recent {@link discover} call. */
 export function lastDiscoverWarnings(): string[] {
@@ -103,12 +115,25 @@ export function lastDiscoverWarnings(): string[] {
  */
 const TRUST_FILTER_POOL = 50;
 
+/** Default page size for a category browse (a single facet would be too few). */
+const CATEGORY_DEFAULT_LIMIT = 10;
+
+/** Results kept per robotics facet search before interleaving. */
+const ROBOTICS_FACET_POOL = 12;
+
 export async function discover(opts: InternalDiscoverOptions = {}): Promise<Resource[]> {
+  if (opts.category !== undefined && !(DISCOVER_CATEGORIES as readonly string[]).includes(opts.category)) {
+    throw new Error(
+      `xpay.discover: unknown category "${String(opts.category)}" - one of ${DISCOVER_CATEGORIES.join(", ")}`,
+    );
+  }
+  if (opts.category && opts.limit === undefined) opts = { ...opts, limit: CATEGORY_DEFAULT_LIMIT };
   const filtering = opts.minTrust !== undefined;
   const wantTrust = filtering || opts.trust !== false;
-  const results = await discoverCatalogs(
-    filtering ? { ...opts, limit: Math.max(opts.limit ?? 0, TRUST_FILTER_POOL) } : opts,
-  );
+  const scoped = filtering ? { ...opts, limit: Math.max(opts.limit ?? 0, TRUST_FILTER_POOL) } : opts;
+  const { resources: results, warnings: notes } =
+    opts.category === "robotics" ? await discoverRobotics(scoped) : await discoverCatalogs(scoped);
+  warnings = notes;
   if (!wantTrust) return results;
 
   const { resources, failed, saidFailed } = await enrichWithTrust(results);
@@ -123,14 +148,74 @@ export async function discover(opts: InternalDiscoverOptions = {}): Promise<Reso
   return opts.limit ? kept.slice(0, opts.limit) : kept;
 }
 
-async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource[]> {
+interface CatalogResult {
+  resources: Resource[];
+  warnings: string[];
+}
+
+/**
+ * Robotics category: one catalog search per facet (or the caller's query plus
+ * the facets it names), each filtered to listings that match the facet, then
+ * interleaved so every capability shows up near the top. With a query, its
+ * own matches come first.
+ */
+async function discoverRobotics(opts: InternalDiscoverOptions): Promise<CatalogResult> {
+  const limit = opts.limit ?? CATEGORY_DEFAULT_LIMIT;
+  const query = opts.query?.trim();
+  // A query that names facets ("camera", "route") is held to those facets;
+  // one that names none may match any of them.
+  const named = query ? facetsForQuery(query) : [];
+  const searches: Array<{ query: string; facets: RoboticsFacet[] }> = query
+    ? [
+        { query, facets: named.length > 0 ? named : ROBOTICS_FACETS },
+        ...named
+          .filter((f) => f.query !== query.toLowerCase())
+          .map((f) => ({ query: f.query, facets: [f] })),
+      ]
+    : ROBOTICS_FACETS.map((f) => ({ query: f.query, facets: [f] }));
+
+  // No limit on the inner search: the facet filter drops most of what the
+  // catalogs return, so cap after filtering instead.
+  const settled = await Promise.allSettled(
+    searches.map((s) => discoverCatalogs({ ...opts, category: undefined, query: s.query, limit: undefined })),
+  );
+
+  const notes = new Set<string>();
+  const lists: Resource[][] = [];
+  let firstError: unknown;
+  settled.forEach((res, i) => {
+    if (res.status === "rejected") {
+      firstError ??= res.reason;
+      notes.add(`robotics "${searches[i]!.query}": ${res.reason instanceof Error ? res.reason.message : String(res.reason)}`);
+      lists.push([]);
+      return;
+    }
+    for (const w of res.value.warnings) notes.add(w);
+    const kept: Resource[] = [];
+    for (const r of res.value.resources) {
+      const facet = roboticsFacetOf(r, searches[i]!.facets);
+      if (facet) kept.push(tagFacet(r, facet));
+      if (kept.length >= ROBOTICS_FACET_POOL) break;
+    }
+    lists.push(kept);
+  });
+  if (settled.every((s) => s.status === "rejected")) throw firstError;
+
+  const resources = query
+    ? interleave([lists[0]!, interleave(lists.slice(1), limit)], Infinity).slice(0, limit)
+    : interleave(lists, limit);
+  return { resources, warnings: [...notes] };
+}
+
+async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<CatalogResult> {
   const query = opts.query?.trim().toLowerCase() || undefined;
   const sources =
     opts.sources ??
     process.env.XPAY_DISCOVERY_SOURCES?.split(",").map((s) => s.trim()).filter(Boolean) ??
     DEFAULT_SOURCES;
 
-  pendingNotes = [];
+  /** Notes from source fetches (e.g. fallback used), returned as warnings. */
+  const notes: string[] = [];
 
   // The query is sent to OrbitX402 and Agentic Market, which search and rank
   // server-side - a small response instead of a full multi-MB catalog
@@ -144,7 +229,7 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
       ? cached("featured:doors", () => fetchFeaturedResources())
       : Promise.resolve<Resource[]>([]),
     sources.includes("orbitx402")
-      ? fetchOrbitWithPayAIFallback(opts.endpoint, query)
+      ? fetchOrbitWithPayAIFallback(opts.endpoint, query, notes)
       : Promise.resolve<Resource[]>([]),
     sources.includes("agenticmarket")
       ? cached(`agenticmarket${query ? `:q=${query}` : ""}`, () =>
@@ -162,7 +247,7 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
   let orbit = unwrap(orbitSettled, "orbitx402", failures);
   let market = unwrap(marketSettled, "agenticmarket", failures);
   let agenc = unwrap(agencSettled, "agenc", failures);
-  warnings = [...failures, ...pendingNotes];
+  const callWarnings = [...failures, ...notes];
 
   // The first-party source is authoritative for Xona endpoints (Solana).
   if (xona.length > 0) {
@@ -262,7 +347,7 @@ async function discoverCatalogs(opts: InternalDiscoverOptions): Promise<Resource
 
   const used = lead.length + partners.length;
   const rest = mergeOthers(orbit, market, agenc, opts.limit ? opts.limit - used : undefined);
-  return [...lead, ...partners, ...rest];
+  return { resources: [...lead, ...partners, ...rest], warnings: callWarnings };
 }
 
 function partnerNames(r: Resource): string[] {
@@ -301,6 +386,7 @@ function mergeOthers(
 async function fetchOrbitWithPayAIFallback(
   endpoint: string | undefined,
   query: string | undefined,
+  notes: string[],
 ): Promise<Resource[]> {
   // A recent orbit failure puts it in a cooldown window (persisted to disk, so
   // fresh CLI processes benefit too) - go straight to PayAI instead of
@@ -319,18 +405,18 @@ async function fetchOrbitWithPayAIFallback(
       );
     } catch (orbitErr) {
       markSourceDown("orbitx402", ORBIT_COOLDOWN_MS);
-      return payAIDirect(query, orbitErr);
+      return payAIDirect(query, orbitErr, notes);
     }
   }
-  return payAIDirect(query, new Error("orbitx402 in failure cooldown"));
+  return payAIDirect(query, new Error("orbitx402 in failure cooldown"), notes);
 }
 
-async function payAIDirect(query: string | undefined, orbitErr: unknown): Promise<Resource[]> {
+async function payAIDirect(query: string | undefined, orbitErr: unknown, notes: string[]): Promise<Resource[]> {
   try {
     const catalog = await cached("payai:fallback", () =>
       fetchPayAIResources({ maxItems: PAYAI_FALLBACK_MAX_ITEMS }),
     );
-    pendingNotes.push("orbitx402 unavailable, served from PayAI facilitator directly");
+    notes.push("orbitx402 unavailable, served from PayAI facilitator directly");
     if (!query) return catalog;
     return rankByScore(catalog, query.split(/\s+/).filter(Boolean));
   } catch {

@@ -19,6 +19,8 @@
   ],
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test/tsconfig.json",
+    "test": "tsx --test test/*.test.ts",
     "prepublishOnly": "npm run build",
     "dev": "tsx src/cli/index.ts",
     "demo": "tsx examples/discover-and-pay.ts"

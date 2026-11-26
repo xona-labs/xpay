@@ -243,6 +243,15 @@ export interface DiscoverOptions {
    */
   sources?: string[];
   /**
+   * Curated category. `"robotics"`: services a robot, drone, sensor or
+   * machine agent can pay for today (vision, OCR, maps/geocoding, weather,
+   * compute/inference, sensor/IoT data, translation, speech). Runs one
+   * catalog search per facet and keeps only listings that match it; with a
+   * `query`, its matches come first. Each result carries
+   * `metadata.roboticsFacet`. Default limit 10.
+   */
+  category?: "robotics";
+  /**
    * Attach ERC-8004 trust data (`resource.trust`) for Solana merchant
    * wallets among the returned results. Default true; one indexer call per
    * unique wallet, cached, failures are non-fatal.

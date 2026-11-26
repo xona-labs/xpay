@@ -68,7 +68,7 @@ xpay pay https://orbisapi.com/proxy/image-alt-text-generator-api-1c9472
 | `xpay init [name]` | Create a profile (Solana + EVM keys from one BIP-39 seed). `--import` to restore from a phrase, `--no-encrypt` for dev wallets, `--workspace` to store locally. |
 | `xpay accounts list \| show \| use` | List profiles, inspect one, or set the active profile. |
 | `xpay balance` | Token balances per network for the active profile, plus a stablecoin total. Covers Solana, Base and other EVM chains, Robinhood Chain, and [Stable](#stable-chain). `--network`. |
-| `xpay discover [query]` | Search 21k+ x402 services across chains (Solana, Base, **BNB Chain**, and other EVM networks), plus **AgenC marketplace** agent listings (cached on disk). Solana merchants show their [ERC-8004 trust](#merchant-trust-erc-8004-on-solana). `--network`, `--limit`, `--min-trust`, `--no-trust`, `--json`. |
+| `xpay discover [query]` | Search 21k+ x402 services across chains (Solana, Base, **BNB Chain**, and other EVM networks), plus **AgenC marketplace** agent listings (cached on disk). Solana merchants show their [ERC-8004 trust](#merchant-trust-erc-8004-on-solana). `--category robotics` lists [services machines can pay for](#xona-for-machines-peaq). `--network`, `--limit`, `--min-trust`, `--no-trust`, `--json`. |
 | `xpay trust <wallet>` | [ERC-8004](#merchant-trust-erc-8004-on-solana) agent identity + reputation of a Solana merchant wallet. Read-only, no wallet. `--json`. |
 | `xpay pay <url>` | Pay an x402 endpoint. Works on catalog URLs and any URL that returns 402. `--max-usd`, `--body`, `-y`. |
 | `xpay agenc hire <listingPda>` | Hire an [AgenC marketplace](#agenc-marketplace-hire-on-chain-agents) listing - escrows its SOL price on-chain; the provider works asynchronously. `--max-usd`, `--review-window`, `-y`. |
@@ -183,7 +183,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** - fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_shop_lens`, `xpay_shop_lens_quote`, `xpay_rwa_find`, `xpay_trust_check`, `xpay_order_create`, `xpay_orders_list`, `xpay_order_cancel`, `xpay_orders_run`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_shop_lens`, `xpay_shop_lens_quote`, `xpay_rwa_find`, `xpay_trust_check`, `xpay_machine_find`, `xpay_machine_lookup`, `xpay_order_create`, `xpay_orders_list`, `xpay_order_cancel`, `xpay_orders_run`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** - the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -459,6 +459,34 @@ Notes:
 - Solana only for now. EVM ERC-8004 registries have no wallet-to-agent reverse lookup on-chain.
 - **SAID Protocol** is checked for the same wallet and reported next to ERC-8004 as `trust.said` (`null` = no SAID identity): `verified`, `tier`, `badges` and a 0-100 `score`. That score is SAID's composite of identity, activity and longevity signals, not client feedback, so an agent can score high with zero reviews; it is never merged with the 8004 `avgScore`, and `--min-trust` still filters on the 8004 score only. `XPAY_SAID_API` overrides the API base; a failed SAID lookup just leaves `said` unset.
 - MCP: `xpay_trust_check` (free), and `xpay_discover` results carry `trust` plus an optional `minTrust` filter.
+
+## Xona for Machines (peaq)
+
+Robots, drones, sensors and compute nodes registered on [peaq](https://www.peaq.network) get an on-chain identity (`did:peaq:<id>`). Xona indexes that registry and attaches a machine credit profile: rating (`AAA`..`B`, `NR` = not rated, `Provisioned` = too new), 0-100 score, bond status, activity and revenue events, revenue in USD and its trend, and risk flags. Free, read-only, no wallet:
+
+```ts
+const { total, items } = await xpay.findMachines({ category: "robot", sort: "activity" });
+const m = await xpay.getMachine("did:peaq:12345");   // or "12345"; throws MachineNotFoundError on 404
+summarizeMachineTrust(m);   // "Unrated: registered and bonded but no revenue history yet. ..."
+const stats = await xpay.machineStats();              // real vs legacy, by category, active, rated
+```
+
+The robotics discovery category answers the other half: what a machine can pay for today. It runs one catalog search per facet (vision/object detection, OCR, maps/geocoding, weather, compute/inference, sensor/IoT data, translation, speech) and keeps only listings whose name, description, URL or tags plainly describe that capability, so image generators, flight trackers and token tools that fuzzy search drags in are dropped. Results are real catalog listings interleaved across facets, each tagged `metadata.roboticsFacet`; a `query` narrows to the facets it names ("weather on my route" → weather, maps) and its own matches come first.
+
+```bash
+xpay discover --category robotics
+xpay discover "read a shipping label" --category robotics
+```
+
+```ts
+const services = await xpay.discover({ category: "robotics", query: "detect obstacles in the camera frame" });
+```
+
+Notes:
+- peaq's machine network is early: most real machines are compute nodes, about 20 are robots, and none publish service endpoints yet, so there is nothing to pay a machine for directly. Legacy records are excluded, and test machines too unless `includeTest` / `category: "test"`.
+- Unrated is the normal state today, not a red flag; `negative_flag` is the one to warn about.
+- Inputs are validated before any request: ids are digits or `did:peaq:<digits>` (max 80 chars), `owner` must be an EVM address, `limit` 1-100. Requests time out after 10s. `XPAY_MACHINES_ENDPOINT` overrides the API origin (default `https://api.xona-agent.com`).
+- MCP: `xpay_machine_find` (filters plus `include_stats` for registry totals; active machines first by default) and `xpay_machine_lookup` (one machine plus a plain-language `summary`), both read-only; `xpay_discover` takes `category: "robotics"`.
 
 ## RWA discovery (Solana)
 

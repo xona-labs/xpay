@@ -39,6 +39,15 @@ import {
 import { findRwaTokens, type RwaCategory } from "../token/rwa.js";
 import { findStocks, prepareStockTrade, USDC_MINT } from "../token/stock.js";
 import { findMppServices, searchMppServices, mppServiceResources } from "../discover/mppscan.js";
+import {
+  MACHINE_CATEGORIES,
+  MACHINE_SORTS,
+  MachineNotFoundError,
+  compactMachine,
+  normalizeMachineId,
+  type MachineCategory,
+  type MachineSort,
+} from "../machines/index.js";
 
 /** Base URL for xona's paid X (Twitter) data endpoints (x402-gated). */
 const XDATA_BASE = process.env.XPAY_XDATA_ENDPOINT ?? "https://api.xona-agent.com";
@@ -90,6 +99,8 @@ const LOCAL_CONFIG: ToolAnnotations = { readOnlyHint: false, openWorldHint: fals
 export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   xpay_discover: READ,
   xpay_trust_check: READ,
+  xpay_machine_find: READ,
+  xpay_machine_lookup: READ,
   xpay_use: SPEND,
   xpay_do: SPEND,
   xpay_transfer: SPEND,
@@ -149,11 +160,24 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         "flag, tier and a 0-100 composite score (identity/activity/longevity, not client " +
         "feedback, so do not present it as a review average). " +
         "Most merchants have no identity yet, so a missing identity is normal, not a red flag; " +
-        "a registered identity with good reviews is a positive signal worth mentioning.",
+        "a registered identity with good reviews is a positive signal worth mentioning. " +
+        "For a robot, drone, sensor or other machine agent, pass category: 'robotics' to get the " +
+        "services machines can pay for today (vision/object detection, OCR, maps/geocoding, " +
+        "weather, compute/inference, sensor/IoT data, translation, speech); each result's " +
+        "metadata.roboticsFacet says which. These are ordinary paid APIs from the same catalogs, " +
+        "not peaq machines (use xpay_machine_find for those).",
       input_schema: {
         type: "object",
         properties: {
           query: { type: "string", description: "What you want to find, in natural language. Omit to browse a whole source." },
+          category: {
+            type: "string",
+            enum: ["robotics"],
+            description:
+              "Curated category. 'robotics' = services machines and robot agents can pay for " +
+              "(vision, OCR, maps, weather, compute, sensor data, translation, speech). Combine " +
+              "with query to narrow, e.g. 'weather on my route'. Default limit 10.",
+          },
           limit: { type: "number", description: "Max results. Default 5." },
           network: { type: "string", description: "Restrict to one network (solana, base, stable, skale, ...). Xona's SKALE routes only appear with network \"skale\"." },
           sources: {
@@ -189,6 +213,66 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
           wallet: { type: "string", description: "Solana merchant wallet address (base58), e.g. a resource's payTo." },
         },
         required: ["wallet"],
+      },
+    },
+    {
+      name: "xpay_machine_find",
+      description:
+        "Search real machines registered on peaq (robots, drones, sensors, compute nodes, " +
+        "vending/arcade machines, machine agents) with their Xona machine credit profile: " +
+        "FREE, read-only, no wallet. Each result has type, category, owner/operator, active " +
+        "flag, credit rating (AAA..B, NR = not rated, Provisioned = too new), bond status, " +
+        "revenue (USD) and trend, plus a plain-language trust `summary`. Legacy records are " +
+        "excluded, and so are test machines unless include_test is set. Set the user's " +
+        "expectations: peaq's machine network is early. Most machines are compute nodes, only " +
+        "about 20 are robots, and none publish service endpoints yet, so there is nothing to " +
+        "pay a machine for directly today; for services a robot can pay for, use xpay_discover " +
+        "with category 'robotics'. Pass include_stats for registry totals by category.",
+      input_schema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Free-text search over machine type, manufacturer and metadata." },
+          category: {
+            type: "string",
+            enum: [...MACHINE_CATEGORIES],
+            description: "Machine category. 'test' lists test machines.",
+          },
+          type: { type: "string", description: "Machine type as registered on peaq, e.g. 'robot_arm'." },
+          active: { type: "boolean", description: "Only active (true) or inactive (false) machines. Default: both." },
+          owner: { type: "string", description: "Owner EVM address (0x + 40 hex)." },
+          rated: { type: "boolean", description: "Only machines with a credit rating." },
+          sort: {
+            type: "string",
+            enum: [...MACHINE_SORTS],
+            description: "activity (default, active machines first), revenue, or recent (newest registrations).",
+          },
+          limit: { type: "number", description: "Max results, 1-100. Default 20." },
+          offset: { type: "number", description: "Skip this many results (paging)." },
+          include_test: { type: "boolean", description: "Include test machines. Default false." },
+          include_stats: {
+            type: "boolean",
+            description: "Also return registry totals (real vs legacy, by category, active, rated, with revenue).",
+          },
+        },
+      },
+    },
+    {
+      name: "xpay_machine_lookup",
+      description:
+        "Look up one peaq machine by decimal id or DID (did:peaq:<id>): FREE, read-only, no " +
+        "wallet. Returns type, category, manufacturer, owner and operator (controller) " +
+        "addresses, credit rating and score, bond status, activity and revenue event counts, " +
+        "revenue in USD and its trend, risk flags (unrated, no_activity, negative_flag, " +
+        "unbonded, degraded_data, test_machine), the explorer link, and `summary`: a short " +
+        "plain-language trust verdict to relay to the user (e.g. 'Unrated: registered and " +
+        "bonded but no revenue history yet'). Unrated is the normal state on today's network, " +
+        "not evidence of fraud; negative_flag is the one to warn about.",
+      input_schema: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Machine id (digits) or DID, e.g. '12345' or 'did:peaq:12345'." },
+        },
+        required: ["id"],
       },
     },
     {
@@ -864,14 +948,54 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
         query: input.query as string | undefined,
         // Browsing a single catalog implies "show me what's there" - don't
         // truncate to the mixed-results default.
-        limit: (input.limit as number) ?? (sources?.length === 1 ? 50 : 5),
+        // A category spans several facets; let discover() pick its default (10).
+        limit: (input.limit as number) ?? (input.category ? undefined : sources?.length === 1 ? 50 : 5),
         networks: input.network ? [input.network as string] : undefined,
         sources,
         minTrust: input.minTrust as number | undefined,
+        category: input.category as "robotics" | undefined,
       });
     },
 
     xpay_trust_check: async (input) => lookupMerchantTrust(String(input.wallet ?? "").trim()),
+
+    xpay_machine_find: async (input) => {
+      const [list, stats] = await Promise.all([
+        xpay.findMachines({
+          query: input.query as string | undefined,
+          category: input.category as MachineCategory | undefined,
+          type: input.type as string | undefined,
+          active: input.active as boolean | undefined,
+          owner: input.owner as string | undefined,
+          rated: input.rated as boolean | undefined,
+          sort: (input.sort as MachineSort | undefined) ?? "activity",
+          limit: (input.limit as number | undefined) ?? 20,
+          offset: input.offset as number | undefined,
+          includeTest: input.include_test as boolean | undefined,
+        }),
+        input.include_stats ? xpay.machineStats() : Promise.resolve(undefined),
+      ]);
+      return {
+        total: list.total,
+        returned: list.items.length,
+        indexed_through_block: list.indexed_through_block,
+        items: list.items.map(compactMachine),
+        ...(stats ? { stats } : {}),
+      };
+    },
+
+    xpay_machine_lookup: async (input) => {
+      const id = normalizeMachineId(input.id);
+      try {
+        const machine = compactMachine(await xpay.getMachine(id));
+        return { found: true, summary: machine.summary, machine };
+      } catch (err) {
+        if (err instanceof MachineNotFoundError) {
+          return { found: false, id, note: "peaq has no machine registered under this id or DID." };
+        }
+        throw err;
+      }
+    },
 
     xpay_use: async (input) => {
       // Prefer the full resource object from xpay_discover - it carries

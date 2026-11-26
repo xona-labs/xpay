@@ -6,6 +6,36 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Xona for Machines (peaq), read-only.** `findMachines()`, `getMachine()`
+  and `machineStats()` (also on the `xpay` client) query Xona's index of
+  machines registered on peaq: type, category, owner/operator, credit rating
+  and score, bond status, activity/revenue events, revenue in USD and trend,
+  and risk flags. Inputs are validated before any request (id = digits or
+  `did:peaq:<digits>`, max 80 chars; owner = EVM address; limit 1-100), calls
+  time out after 10s, and a 404 throws `MachineNotFoundError`.
+  `summarizeMachineTrust()` turns a record into a sentence an agent can
+  relay. `XPAY_MACHINES_ENDPOINT` overrides the API origin. Never touches a
+  wallet or signer.
+- MCP tools `xpay_machine_find` (filters, active-first by default,
+  `include_stats` for registry totals) and `xpay_machine_lookup` (one machine
+  plus a plain-language trust `summary`), both annotated read-only.
+- **Robotics discovery category.** `discover({ category: "robotics" })`,
+  `xpay_discover` `category: "robotics"` and `xpay discover --category
+  robotics` list services a robot or machine agent can pay for: vision,
+  OCR, maps/geocoding, weather, compute/inference, sensor/IoT data,
+  translation and speech. One catalog search per facet, filtered to listings
+  that plainly describe the capability, interleaved across facets and tagged
+  `metadata.roboticsFacet`. A query narrows to the facets it names and leads
+  the results. Default limit 10.
+- `npm test` (node:test via tsx, mocked catalogs and machines API) and
+  `npm run typecheck`.
+
+### Changed
+- Discovery source notes (e.g. "served from PayAI") are collected per
+  catalog call instead of in shared module state, so parallel searches (as
+  the robotics category runs) can't drop or mix each other's warnings.
+
 ## [0.2.43] – 2026-11-24
 
 ### Fixed
