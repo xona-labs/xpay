@@ -6,6 +6,23 @@ versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.45] - 2026-11-28
+
+### Added
+- **GuildEra X scraping, free.** MCP tools `guildera_x_scrape` and
+  `guildera_x_scrape_status` (also in `forClaude` / `forOpenAI` /
+  `forGemini`) search X posts by `@user`, `#hashtag`, `$cashtag`, keyword
+  or tweet URL with sort, date and engagement filters, via the GuildEra MCP
+  at mcp.guildera.ai. The scrape tool waits up to `wait_seconds` (default
+  60, max 120) and returns the posts, or a `run_id` when the job is still
+  running. On by default with no key and never touches the wallet; opt out
+  with `forClaude(xpay, { guildera: false })`. `GUILDERA_KEY` /
+  `guilderaKey` is sent as the GUILD KEY once GuildEra starts billing.
+- Results are cleaned before they reach the agent: promoted posts dropped
+  (`ads_removed`), card chrome (name, handle, time, counters, "Show more")
+  stripped, split cashtags/mentions rejoined, ids trimmed and deduped,
+  truncated posts flagged, and an `x.com` url added to each post.
+
 ## [0.2.44] - 2026-11-26
 
 ### Added

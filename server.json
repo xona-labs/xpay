@@ -7,13 +7,13 @@
     "source": "github"
   },
   "websiteUrl": "https://wallet.xona-agent.com",
-  "version": "0.2.44",
+  "version": "0.2.45",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@xona-labs/xpay",
-      "version": "0.2.44",
+      "version": "0.2.45",
       "transport": {
         "type": "stdio"
       },
