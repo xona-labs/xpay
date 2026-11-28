@@ -19,6 +19,7 @@ import { cancelOrder, createStockOrder, loadOrders, runDueOrders } from "../orde
 import { enrichTokenBalances } from "../token/index.js";
 import { robinhoodHoldings } from "../trading/discovery.js";
 import { forSana } from "../sana/tools.js";
+import { forGuildera } from "../guildera/tools.js";
 import {
   ZAUTH_BASE,
   isScanPending,
@@ -66,6 +67,13 @@ export interface ClaudeToolDef {
 export interface ToolOptions {
   /** Sana API key - when present, registers sana_* tools alongside xpay_* tools. */
   sanaApiKey?: string;
+  /**
+   * GuildEra X/Twitter scraping tools (guildera_*). On by default since the
+   * service is free; pass `false` to leave them out. `guilderaKey` (or env
+   * GUILDERA_KEY) is sent as the GUILD KEY once GuildEra starts billing.
+   */
+  guildera?: boolean;
+  guilderaKey?: string;
   /**
    * Profile directory holding `orders.json`. Enables the xpay_order* tools;
    * without it they report that orders need a profile.
@@ -133,6 +141,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   xpay_bento_status: READ,
   xpay_bento_enable: LOCAL_CONFIG,
   xpay_bento_disable: LOCAL_CONFIG,
+  // Free third-party read; reaches out to GuildEra but moves no money.
+  guildera_x_scrape: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
+  guildera_x_scrape_status: { readOnlyHint: true, openWorldHint: true, destructiveHint: false },
 };
 
 /** Anthropic Claude tool definitions. */
@@ -1340,16 +1351,18 @@ export function forClaude(xpay: XPay, opts: ToolOptions = {}): ToolBundle<Claude
     xpay_agenc_status: async (input) => fetchAgencTask(input.taskPda as string),
   };
 
-  // Merge Sana tools if an API key is configured.
-  if (opts.sanaApiKey) {
-    const sana = forSana(opts.sanaApiKey);
-    return {
-      tools: [...tools, ...sana.tools],
-      handlers: { ...handlers, ...sana.handlers },
-    };
+  const extras: ToolBundle<ClaudeToolDef>[] = [];
+  // GuildEra X scraping: free, so on unless explicitly turned off.
+  if (opts.guildera !== false) {
+    extras.push(forGuildera({ key: opts.guilderaKey ?? process.env.GUILDERA_KEY }));
   }
+  // Sana tools only when an API key is configured.
+  if (opts.sanaApiKey) extras.push(forSana(opts.sanaApiKey));
 
-  return { tools, handlers };
+  return {
+    tools: [...tools, ...extras.flatMap((e) => e.tools)],
+    handlers: Object.assign({}, handlers, ...extras.map((e) => e.handlers)),
+  };
 }
 
 function requireOrdersDir(opts: ToolOptions): string {

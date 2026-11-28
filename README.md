@@ -183,7 +183,7 @@ That's the whole setup. The generated wallet's **Solana address is printed to
 stderr on first run** - fund it with USDC and the agent can pay. It persists
 under `~/.xpay` and is reused on every later boot, so the address is stable.
 
-The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_shop_lens`, `xpay_shop_lens_quote`, `xpay_rwa_find`, `xpay_trust_check`, `xpay_machine_find`, `xpay_machine_lookup`, `xpay_order_create`, `xpay_orders_list`, `xpay_order_cancel`, `xpay_orders_run`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
+The host sees the core tools: `xpay_discover`, `xpay_use`, `xpay_do`, `xpay_transfer`, `xpay_balance`, `xpay_report`, `xpay_guardrail`, `xpay_token_find`, `xpay_swap`, `xpay_trending_tokens`, `xpay_trade_quote`, `xpay_trade`, `xpay_x_user`, `xpay_x_posts`, `xpay_zauth_reposcan`, `xpay_zauth_scan_status`, `xpay_shop_search`, `xpay_shop_quote`, `xpay_shop_lens`, `xpay_shop_lens_quote`, `xpay_rwa_find`, `xpay_trust_check`, `xpay_machine_find`, `xpay_machine_lookup`, `xpay_order_create`, `xpay_orders_list`, `xpay_order_cancel`, `xpay_orders_run`, `xpay_agenc_status`, plus `xpay_bento_status` / `xpay_bento_enable` / `xpay_bento_disable` to manage the [intent firewall](#security--bento-intent-firewall-optional). Two free X/Twitter scraping tools from [GuildEra](#guildera-x-scraping-free), `guildera_x_scrape` and `guildera_x_scrape_status`, are on by default. If you've linked a Sana key (see below), eight additional `sana_*` tools are also registered automatically.
 
 **Bring your own wallet instead** - the wallet source order is *existing profile → key env → auto-generate*, so any of these overrides the generated wallet:
 
@@ -331,6 +331,17 @@ Each screened call returns a verdict:
 
 Agents can manage it over MCP too: `xpay_bento_status`, `xpay_bento_enable`, `xpay_bento_disable`
 (disable is the escape hatch when the wallet isn't registered yet).
+
+## GuildEra X scraping (free)
+
+[GuildEra](https://guildera.ai) scrapes X (Twitter) posts with engagement metrics. It is free while GuildEra is in demo, so its tools register by default and never touch the wallet.
+
+| Tool | What it does |
+|---|---|
+| `guildera_x_scrape` | Search posts by `@user`, `#hashtag`, `$cashtag`, keyword or tweet URL, with sort, date and engagement filters. Waits up to `wait_seconds` (default 60) and returns the posts, or a `run_id` if the job is still running |
+| `guildera_x_scrape_status` | Check a scrape by `run_id` |
+
+Turn them off with `forClaude(xpay, { guildera: false })`. When GuildEra starts billing, set `GUILDERA_KEY=gk_live_...` (or pass `guilderaKey`) and it is sent with every call.
 
 ## Sana agent wallet card (optional)
 
