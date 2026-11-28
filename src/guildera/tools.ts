@@ -10,6 +10,7 @@
 
 import type { ClaudeToolDef, ToolBundle } from "../tools/index.js";
 import { GuilderaClient, type GuilderaCaller } from "./client.js";
+import { cleanPosts, type RawPost } from "./clean.js";
 
 /** Upstream runs take ~10-30s; GuildEra asks for 15-20s between polls. */
 const POLL_INTERVAL_MS = 15_000;
@@ -39,20 +40,29 @@ interface RunStatus {
 
 const isDone = (s: RunStatus) => s.status === "completed" || s.status === "failed";
 
+/** Swap raw `results` for cleaned posts (ads dropped, chrome stripped, links added). */
+export function tidyRun(s: RunStatus): RunStatus {
+  if (!s || !Array.isArray(s.results)) return s;
+  const { posts, ads_removed } = cleanPosts(s.results as RawPost[]);
+  const { results: _raw, created_at: _c, updated_at: _u, ...rest } = s;
+  return { ...rest, count: posts.length, ads_removed, results: posts };
+}
+
 export function forGuildera(opts: GuilderaToolOptions = {}): ToolBundle<ClaudeToolDef> {
   const client = opts.client ?? new GuilderaClient(opts.key);
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const interval = opts.pollIntervalMs ?? POLL_INTERVAL_MS;
 
-  const status = (runId: string) =>
-    client.callTool("guildera_scrape_status", { run_id: runId }) as Promise<RunStatus>;
+  const status = async (runId: string) =>
+    tidyRun((await client.callTool("guildera_scrape_status", { run_id: runId })) as RunStatus);
 
   const tools: ClaudeToolDef[] = [
     {
       name: "guildera_x_scrape",
       description:
         "Search and scrape X (Twitter) posts with engagement metrics (likes, retweets, replies, views) via GuildEra. " +
-        "Free, no payment from the wallet. Waits for the job to finish (up to wait_seconds) and returns the posts; " +
+        "Free, no payment from the wallet. Promoted posts are removed (ads_removed says how many); each post has a url. " +
+        "Waits for the job to finish (up to wait_seconds) and returns the posts; " +
         "if it is still running, returns a run_id to check with guildera_x_scrape_status. " +
         "Mapping: '$TICKER' -> source_type cashtag; '#tag' -> hashtag; '@user' -> user; anything else -> keyword. " +
         "'Top N / best posts' -> max_results 100, min_likes 10, sort_by likes, then show the first N. " +
